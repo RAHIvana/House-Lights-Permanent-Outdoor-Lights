@@ -122,25 +122,41 @@ can run it again later from the **Settings** tab (**Change setup**).
    asking for up to half a minute. Govee controllers ignore many requests (often three in
    four), so a quick scan can miss them; asking again finds them.
    A JellyFish controller shows one line per zone; each zone becomes its own run.
-3. **Runs**: name each run of lights. WLED and JellyFish report their light counts. For
-   Govee, use the count from the Govee Home app or count it in the next step.
-4. **Test**: show test patterns on each run to check it:
-   - **Blink**: which run is this?
-   - **Count the lights** (Govee): first every segment's first light lights up red or green,
-     and you type how many of those markers you see. Then the last segment lights up red,
-     and you type how many red lights you see. The wizard works out the count.
-   - **Check the count**: light 1 red, the last light blue. If blue isn't the very last
-     light, the count is wrong.
-   - **Direction**: a dot runs from light 1. Tick **Reverse** if themes should run the other
-     way.
-   - **Colours**, **Segment groups**.
+3. **Name and count**: one card per run. Give it a name and a short name, the number of
+   lights if you know it (WLED and JellyFish report theirs; leave it blank if you don't
+   know: the Test step helps you count), and which end light 1 is at, as you face the
+   lights. Runs can be installed left to right or right to left; "Light 1 is at" lets each
+   one still show the right way round. Put the runs in order along the house, left to
+   right, with ▲ and ▼: themes that play across the whole house use this order.
+4. **Test**: one controller at a time ("Controller 2 of 3: Garage"):
+   - **Find it**: the run blinks. Did the run you expected blink? If another one did, pick
+     it and the names swap. If nothing blinked, the wizard lists what to check.
+   - **Count** (Govee): every segment's first light lights up red or green, and you type how
+     many of those markers you see. Then the last segment lights up red, and you type how
+     many red lights you see. The wizard works out the count, like `5 × 14 + 3 = 73`. You
+     can also type the number from the Govee Home app.
+   - **Check** (Govee and WLED): light 1 red, the last light blue, plus 20 orange lights past
+     the end. Say whether red is on the left or the right (can't tell? a dot runs from light
+     1). Orange after the blue means the count is too low: type how many and it checks
+     again. No blue at all means the count is too high.
+   - **Done**: a summary like "Garage: 50 lights, light 1 at the right end".
 
-   Tests stop by themselves after a minute. Govee and WLED go back to what they showed; Tuya
-   lights are saved before the test and put back afterwards. JellyFish can't report what it
-   showed, so after testing pick a theme or use the JellyFish app.
-5. **Time and place**: your time zone, and your location if you want sunrise/sunset
-   schedules (two decimals is enough).
-6. **Save**: settings go to `data/config.json` and the server restarts with them.
+   JellyFish and Tuya only blink. **More tests** has the extra patterns (colours, segment
+   groups). Tests stop by themselves after a minute. Govee and WLED go back to what they
+   showed; Tuya lights are saved before the test and put back afterwards. JellyFish can't
+   report what it showed, so after testing pick a theme or use the JellyFish app.
+5. **Time and place**: the time zone comes from this device (**Change** to pick another).
+   For sunrise/sunset schedules, type your ZIP code and press **Look up** (it asks
+   zippopotam.us); the wizard shows today's sunrise and sunset, and warns if the time zone
+   doesn't fit the place. You can also use this device's location or type latitude and
+   longitude.
+6. **Save**: a table of the runs, with links to change or count each one. Every run needs
+   its number of lights. Settings go to `data/config.json` and the server restarts with
+   them.
+
+With saved settings, every step at the top of the wizard can be clicked. Links:
+`setup.html?step=4&controller=<controller id>` tests just that controller, and
+`setup.html?step=5` opens Time and place.
 
 ## Getting each kind of controller ready
 
@@ -219,15 +235,57 @@ runs; when it stops, the lights go back to their last static look.
 On Windows, leave the PowerShell window open (minimised is fine). When the wizard saves, the
 server restarts inside that same window, and Ctrl+C still stops it.
 
+## Themes
+
+The **Themes** tab lists your own themes first (**My themes**), then the built-in ones by
+group. Pick any theme to open it in the editor; nothing is sent to the lights until you press
+an amber button.
+
+- **Make one**: press **New theme**, or open a built-in theme and change it. Built-in themes
+  never change: **Save** on one makes a copy in My themes. Your themes appear everywhere a
+  theme is picked: Quick Settings tiles, schedules, the Visualization and the Controllers tab.
+- **Movement**: Bands, Gradient, Solid, Random (still), Chase, Twinkle, Drift, Fireworks,
+  Swirl, Flow, Steps, Beat, Breathe, Heartbeat, Flicker (candle, failing bulb, lightning or
+  fire), Candles and Game day, each with its colors and settings. A built-in theme can be a
+  movement too.
+- **Layers**: up to three, for example a base plus **Sparkle** or an occasional **Comet** on
+  top. A layer adds its light, covers the one below (black is see-through) or keeps the
+  brightest.
+- **Shape**: left to right, right to left, back and forth, or from the middle outward;
+  mirrored around the middle; and **Whole house**, which lays the theme along all the runs
+  as one long strip (in the order of the runs, each run's direction taken into account).
+- **Sequence**: up to eight themes, each for its own time, cross-fading into the next.
+- **Ideas**: **Show me variations** (six small previews with the settings nudged; tap one to
+  use it), **Surprise me** (keep the colors or the movement if you like), about 40 palettes,
+  colors from one color (complementary, triadic and so on) or from a photo (the photo stays
+  in your browser), warm/cool and brightness for the whole palette, **Tap tempo** for the
+  beat, and **Paint by hand**, segment by segment.
+- **Favourites** (★) come first in Quick Settings; built-in groups you don't use can be
+  hidden there. **Export** downloads your themes as a `.json` file; **Import** adds them on
+  another house.
+
+Your themes are kept in `themes.json` in the settings folder. If a schedule uses a theme you
+delete, the schedule reports an error until you pick another theme.
+
 ## Good to know
 
 - **No login.** Anyone who can open the page can control the lights. Keep it on your home
   network and don't forward the port to the internet.
 - Your files in `data/`: `config.json` (settings), `secrets.json` (Tuya keys, if any),
-  `schedules.json`, `state.json` (what was last applied) and `logs/`. Back up this folder to
-  keep your setup.
+  `schedules.json`, `themes.json` (your themes), `state.json` (what was last applied) and
+  `logs/`. Back up this folder to keep your setup.
 - To update: `git pull`, then `venv/bin/pip install -r requirements.txt` (Windows:
   `venv\Scripts\pip install -r requirements.txt`), then restart.
+- **Strips on the page** are drawn the way each run is installed: a run whose light 1 is at
+  its right end is drawn from the right, so an animation moves across the screen the same way
+  it moves on the house. At **Fit**, the longest run fills the width and the others are drawn
+  to scale.
+- **Settings tab**: each run's **Test** button opens the wizard's test step for just that
+  controller, and **Change ZIP / time zone** opens the time-and-place step.
+- **Server clock**: the Schedules panel shows the server's time next to today's sunrise and
+  sunset. Schedules run on the server's clock, so if it is more than two minutes off from
+  the clock of the device you're browsing on, the panel warns you to check the server's date
+  and time settings.
 
 ## Tests
 
@@ -235,7 +293,9 @@ No lights needed:
 
 ```sh
 venv/bin/python tests/test_settings.py
+venv/bin/python tests/test_setup.py         # wizard helpers; the ZIP lookup is faked, no internet
 venv/bin/python tests/test_schedule.py
+venv/bin/python tests/test_themes.py       # theme engine, storage, whole-house span
 venv/bin/python tests/test_drivers.py      # Linux and Windows: uses 127.0.0.x addresses
 ```
 
