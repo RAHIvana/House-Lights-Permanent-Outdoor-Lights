@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>House Lights</title>
 <script>try { const t = localStorage.getItem("hl-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
-<link rel="stylesheet" href="style.css?v=11">
+<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="themes.css?v=13">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -16,7 +17,7 @@
 <header class="topbar">
   <h1>House Lights</h1>
   <nav class="tabs" role="tablist" aria-label="Pages">
-    <button role="tab" data-tab="quick">Quick Settings</button><button role="tab" data-tab="ctrl">Controllers</button><button role="tab" data-tab="scene">Scene editor</button><button role="tab" data-tab="settings">Settings</button>
+    <button role="tab" data-tab="quick">Quick Settings</button><button role="tab" data-tab="ctrl">Controllers</button><button role="tab" data-tab="themes">Themes</button><button role="tab" data-tab="settings">Settings</button>
   </nav>
   <span class="spacer"></span>
   <span id="mode" class="pill">…</span>
@@ -56,6 +57,7 @@
     <button id="sched-pause" class="small">Pause tonight</button>
     <button id="sched-add" class="primary small">Add schedule</button>
   </div>
+  <p id="sched-clock" class="sched-warn" role="status" hidden></p>
   <ul id="sched-list" class="sched-list"></ul>
 </section>
 </div>
@@ -167,38 +169,126 @@
 </section>
 </div>
 
-<!-- tab 3 -->
-<div class="tab" id="tab-scene" hidden>
-<section class="panel" id="scene">
-  <div class="ph"><h2>Scene editor</h2><span class="muted">Change a theme's settings and see the whole effect at once. Nothing is sent until you press an amber button.</span></div>
-  <div class="row">
-    <label class="lbl">Lights <select id="sc-run"></select></label>
-    <label class="lbl">Theme <select id="sc-theme"></select></label>
-    <label class="lbl">Time shown <select id="sc-len">
-      <option value="5">5 s</option><option value="10" selected>10 s</option><option value="20">20 s</option></select></label>
+<!-- tab 3: Themes (themes.js, themes.css) -->
+<div class="tab" id="tab-themes" hidden>
+<section class="panel" id="themes">
+  <div class="ph"><h2>Themes</h2>
+    <span class="muted">Make your own, or start from a copy of a built-in one. Nothing is sent until you press an amber button.</span>
+    <span class="spacer"></span>
+    <button class="small" id="th-new">New theme</button>
+    <button class="small" id="th-export" title="Download your themes as a .json file">Export</button>
+    <label class="button small th-filebtn" title="Add themes from an exported .json file">Import<input type="file" id="th-import" accept=".json,application/json" hidden></label>
   </div>
-  <div class="row params" id="sc-params"></div>
-  <p class="note" id="sc-describe"></p>
-  <div class="scene-views">
-    <div class="scene-view">
-      <div class="sv-head"><span class="lbl">Strip: the lights as they'd look</span><span class="muted" id="sc-clock">0.0 s</span></div>
-      <canvas id="sc-strip" height="56"></canvas>
-    </div>
-    <div class="scene-view">
-      <div class="sv-head"><span class="lbl">Time strip: each row is a moment, top to bottom. Tap to jump there.</span></div>
-      <div class="ts-wrap">
-        <div class="ts-axis"><span id="sc-t0">0 s</span><span id="sc-t1">10 s</span></div>
-        <canvas id="sc-time" height="220"></canvas>
+  <div class="th-layout">
+    <aside class="th-side">
+      <input type="search" id="th-search" placeholder="Search themes" aria-label="Search themes">
+      <div id="th-items" class="th-items" role="listbox" aria-label="Themes"></div>
+      <details class="th-hidebox"><summary>Built-in groups shown in Quick Settings</summary><div id="th-groups"></div></details>
+    </aside>
+
+    <div class="th-edit">
+      <div class="row">
+        <label class="lbl">Name <input id="th-name" maxlength="40" size="22"></label>
+        <label class="lbl">Group <input id="th-group" maxlength="40" size="14" list="th-group-list"></label>
+        <datalist id="th-group-list"></datalist>
+        <span class="th-tag" id="th-kind"></span>
+        <span class="spacer"></span>
+        <div class="seg-toggle" role="group" aria-label="Kind of theme" id="th-mode">
+          <button class="small" data-mode="layers">Layers</button><button class="small" data-mode="sequence">Sequence</button>
+        </div>
       </div>
-      <div class="ts-foot"><span>light 1</span><span id="sc-nlab">light 50</span></div>
+
+      <div id="th-layers"></div>
+      <div class="row" id="th-layer-add-row">
+        <button class="small" id="th-add-layer">+ Add a layer on top (sparkle, comet…)</button>
+        <button class="small" id="th-tap" title="Tap along to the music: sets the beat for Beat, Heartbeat and Steps">Tap tempo</button>
+        <span class="muted" id="th-tap-msg"></span>
+      </div>
+
+      <div id="th-seq" class="th-card" hidden>
+        <div class="th-card-head"><b>Sequence</b><span class="muted">Each theme plays for its time, cross-fades to the next, and it repeats.</span></div>
+        <div id="th-steps"></div>
+        <div class="row"><button class="small" id="th-add-step">+ Add a step</button>
+          <label class="lbl">Cross-fade <input type="number" id="th-fade" min="0" max="30" step="0.5" value="2"> s</label></div>
+      </div>
+
+      <div class="th-card">
+        <div class="th-card-head"><b>Shape</b></div>
+        <div class="row">
+          <label class="lbl">Direction <select id="th-dir"></select></label>
+          <label class="lbl"><input type="checkbox" id="th-mirror"> Mirror around the middle</label>
+          <label class="lbl">Span <select id="th-span"><option value="run">Each run on its own</option>
+            <option value="house">Whole house, one long strip</option></select></label>
+        </div>
+      </div>
+
+      <details class="th-card" id="th-tools" open>
+        <summary><b>Colors</b> <span class="muted">for the first layer's color list</span></summary>
+        <div class="row">
+          <label class="lbl">Palette <select id="th-pal"></select></label>
+          <label class="lbl">From one color <input type="color" id="th-h-col" value="#ff6a00">
+            <select id="th-h-kind"><option value="complementary">Complementary</option><option value="analogous">Analogous</option>
+              <option value="triadic">Triadic</option><option value="split">Split complementary</option><option value="shades">Shades</option></select></label>
+          <button class="small" id="th-h-go">Make</button>
+          <label class="button small th-filebtn" title="The photo stays in this browser">From a photo…<input type="file" id="th-photo" accept="image/*" hidden></label>
+          <select id="th-photo-n" aria-label="How many colors from the photo"><option>3</option><option selected>4</option><option>5</option><option>6</option></select>
+        </div>
+        <div class="row">
+          <label class="lbl">Cool <input type="range" id="th-warm" min="-100" max="100" value="0"> Warm</label>
+          <label class="lbl">Brightness <input type="range" id="th-bright" min="-60" max="60" value="0"></label>
+          <label class="lbl"><input type="checkbox" id="th-lift" checked> Lift very dark colors so they show on LEDs</label>
+        </div>
+      </details>
+
+      <div class="row">
+        <button id="th-vary">Show me variations</button>
+        <button id="th-surprise">Surprise me</button>
+        <label class="lbl"><input type="checkbox" id="th-lock-col"> keep colors</label>
+        <label class="lbl"><input type="checkbox" id="th-lock-mv"> keep movement</label>
+        <button class="small" id="th-paint-btn">Paint by hand</button>
+      </div>
+      <div id="th-vars" class="th-vars" hidden></div>
+      <div id="th-paint" class="th-card" hidden>
+        <div class="th-card-head"><b>Paint</b><span class="muted">Pick a color, then tap or drag along the strip. Each cell is one segment (5 lights).</span></div>
+        <div class="row"><input type="color" id="th-brush" value="#ff8a1c" aria-label="Brush color"><span id="th-brushes" class="th-swatches"></span>
+          <button class="small" id="th-paint-fill">Fill with the palette</button>
+          <button class="small primary" id="th-paint-use">Use as a still theme</button></div>
+        <div id="th-cells" class="th-cells"></div>
+      </div>
+
+      <div class="row">
+        <label class="lbl">Preview on <select id="th-run"></select></label>
+        <label class="lbl">Time shown <select id="th-len">
+          <option value="5">5 s</option><option value="10" selected>10 s</option><option value="20">20 s</option></select></label>
+        <span class="muted" id="th-describe"></span>
+      </div>
+      <div class="scene-views">
+        <div class="scene-view">
+          <div class="sv-head"><span class="lbl">Strip: the lights as they'd look</span><span class="muted" id="th-clock">0.0 s</span></div>
+          <canvas id="th-strip" height="56"></canvas>
+        </div>
+        <div class="scene-view">
+          <div class="sv-head"><span class="lbl">Time strip: each row is a moment, top to bottom. Tap to jump there.</span></div>
+          <div class="ts-wrap">
+            <div class="ts-axis"><span>0 s</span><span id="th-t1">10 s</span></div>
+            <canvas id="th-time" height="200"></canvas>
+          </div>
+          <div class="ts-foot"><span>light 1</span><span id="th-nlab">light 50</span></div>
+        </div>
+      </div>
+      <div class="row th-buttons">
+        <button id="th-save" class="primary">Save</button>
+        <button id="th-saveas">Save as new</button>
+        <button id="th-delete" class="danger">Delete</button>
+        <span class="spacer"></span>
+        <button id="th-pause" class="small">Pause</button>
+        <button id="th-house">Show in Visualization</button>
+        <select id="th-target" aria-label="Lights to play on"></select>
+        <button id="th-play" class="live">Play live</button>
+        <button id="th-stop" class="danger">Stop</button>
+      </div>
+      <p class="note" id="th-msg"></p>
     </div>
-  </div>
-  <div class="row">
-    <button id="sc-pause" class="small">Pause</button>
-    <button id="sc-house">Show in Visualization</button>
-    <button id="sc-play" class="live">Play live</button>
-    <button id="sc-stop" class="danger">Stop</button>
-    <span class="muted" id="sc-msg"></span>
   </div>
 </section>
 </div>
@@ -212,9 +302,11 @@
 <div class="tab" id="tab-settings" hidden>
 <section class="panel" id="settings">
   <div class="ph"><h2>Settings</h2><span class="spacer"></span>
+    <a class="button" href="setup.html?step=5">Change ZIP / time zone</a>
     <a class="button primary" href="setup.html">Change setup</a></div>
   <p class="muted">Controllers, runs of lights, time zone and location are set in the setup wizard.
-    Changing them restarts the server; schedules and themes are kept.</p>
+    You can jump to any step of the wizard by tapping it in the list at its top, and test one run
+    with its <b>Test</b> button below. Changing them restarts the server; schedules and themes are kept.</p>
   <div id="settings-body"></div>
 </section>
 </div>
@@ -226,7 +318,9 @@
   <button id="bar-top">Quick Settings</button>
 </div>
 <footer>
-  Each light run's strip starts at light 1 on the left. One segment = 5 lights.
+  Each light run's strip is drawn the way it's installed: light 1 is at the end you set in the setup
+  wizard (left, or right for a run that starts at its right end), so animations move across the screen
+  the way they move on the house. One segment = 5 lights.
   Apply sends a static theme as segment colors, and they stay on the kit. Play live streams every
   light, which animated themes need. It runs until you press Stop or switch the kit off.
 </footer>
@@ -284,8 +378,8 @@
     </div>
   </section>
 </template>
-<script src="app.js?v=11"></script>
-<script src="scene.js?v=11"></script>
-<script src="schedules.js?v=11"></script>
+<script src="app.js?v=12"></script>
+<script src="themes.js?v=12"></script>
+<script src="schedules.js?v=12"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 "use strict";
 // Schedules panel and its dialog. Uses $, api, toast, CONFIG, fillPatterns, patternById from app.js.
 const Schedules = (() => {
-  let OV = null, EDIT = null, previewTimer = null;
+  let OV = null, EDIT = null, previewTimer = null, SKEW = 0;
   const DAY_ORDER = [6, 0, 1, 2, 3, 4, 5];                 // Sun..Sat shown; Mon=0 like Python
   const DAY_SHORT = {6: "S", 0: "M", 1: "T", 2: "W", 3: "T", 4: "F", 5: "S"};
   const DAY_NAME = {0: "Mon", 1: "Tue", 2: "Wed", 3: "Thu", 4: "Fri", 5: "Sat", 6: "Sun"};
@@ -55,9 +55,15 @@ const Schedules = (() => {
     const paused = OV.paused_until;
     $("#sched-pause").textContent = paused ? "Resume schedules" : "Pause tonight";
     $("#sched-pause").hidden = !OV.schedules.length && !paused;
-    $("#sched-state").textContent = paused ? `Paused until ${dayClock(paused)}`
+    $("#sched-state").textContent = (paused ? `Paused until ${dayClock(paused)}`
       : OV.sun ? `Today: sunrise ${clock(OV.sun.sunrise)}, sunset ${clock(OV.sun.sunset)}`
-      : "Sunrise/sunset schedules need your location: Settings tab, Change setup";
+      : "Sunrise/sunset schedules need your location: Settings tab, Change setup")
+      + (OV.now ? ` · Server time ${clock(new Date(Date.now() + SKEW).toISOString())}` : "");
+    // The schedules run on the server's clock: say so if it and this browser's clock disagree.
+    const off = Math.round(Math.abs(SKEW) / 60000), warn = $("#sched-clock");
+    warn.hidden = !OV.now || off <= 2;
+    warn.textContent = `This computer's clock is off by ${off < 60 ? off + " minutes" : hm(off)}; schedules may run `
+      + "at the wrong time. Check the server's date and time settings.";
     const list = $("#sched-list");
     list.innerHTML = "";
     if (!OV.schedules.length) {
@@ -113,13 +119,20 @@ const Schedules = (() => {
 
   const fmtDate = d => new Date(d + "T12:00").toLocaleDateString([], {month: "short", day: "numeric"});
 
+  // Server clock minus this browser's clock, in ms, from the overview's "now".
+  function got(ov) {
+    OV = ov;
+    if (OV.now) SKEW = new Date(OV.now).getTime() - Date.now();
+    render();
+  }
+
   async function post(path, body) {
-    try { OV = await api(path, body); render(); return true; }
+    try { got(await api(path, body)); return true; }
     catch (e) { toast(e.message, true); load(); return false; }
   }
 
   async function load() {
-    try { OV = await api("/api/schedules"); render(); } catch (e) { toast("Schedules: " + e.message, true); }
+    try { got(await api("/api/schedules")); } catch (e) { toast("Schedules: " + e.message, true); }
   }
 
   // --- dialog ----------------------------------------------------------------------------

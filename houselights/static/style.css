@@ -114,8 +114,15 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .dots, .ticks { display: grid; gap: 2px; }
 .dots i { aspect-ratio: 1; border-radius: 50%; background: var(--dot-off); width: 100%; }
 .strips.fit .dots i { width: min(100%, 10px); justify-self: center; }
-.ticks span { font: 10px/1.2 ui-monospace, Menlo, monospace; color: var(--night-fg); border-left: 1px solid #50555d;
-  padding-left: 2px; overflow: hidden; white-space: nowrap; }
+.strips.fit.few .dots i { width: min(100%, 14px); }
+.ticks span { font: 10px/1.2 ui-monospace, Menlo, monospace; color: var(--night-fg); border-inline-start: 1px solid #50555d;
+  padding-inline-start: 2px; overflow: hidden; white-space: nowrap; }
+/* light 1 at the right end of the run: drawn from the right, light numbers running right to left */
+.vrun.rev .dots, .vrun.rev .ticks { direction: rtl; justify-self: end; }
+.vrun.rev .vl { justify-self: end; justify-content: flex-end; left: auto; right: 0; }
+/* at Fit nothing may push the runs wider than the screen (rows are sized as a share of the width) */
+.strips.fit .vrun { grid-template-columns: minmax(0, 1fr); }
+.strips.fit .vl { max-width: 100%; flex-wrap: wrap; column-gap: 12px; row-gap: 0; }
 .vnote { margin: 0; color: var(--night-fg); font-size: 12px; }
 
 /* scene editor */
@@ -149,6 +156,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .seg.selected { border-color: var(--amber); background: rgba(233, 153, 42, .15); }
 .seg.mixed::after { content: ""; position: absolute; top: -6px; right: 2px; width: 5px; height: 5px; border-radius: 50%; background: var(--dry); }
 .seg.unreach { border: 1px dashed #5a606a; cursor: default; }
+.strip.rev, .strip.rev .seg { flex-direction: row-reverse; }   /* light 1 at the right end */
 .light { width: 7px; height: 7px; border-radius: 50%; background: var(--dot-off); }
 .strip.preview { outline: 1px dashed var(--amber); }
 .strip-meta { display: flex; justify-content: space-between; gap: 8px; margin-top: -6px; }
@@ -175,6 +183,8 @@ footer { padding: 16px 0 28px; max-width: 900px; margin: 0 auto; }
 
 /* schedules */
 .sched-head #sched-state { margin-right: auto; }
+.sched-warn { margin: 0; padding: 8px 10px; border: 1px solid var(--red); border-radius: 8px; background: var(--red-bg);
+  color: var(--red); font-size: 13px; }
 .sched-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .sched, .sched-empty { display: flex; gap: 10px; align-items: center; padding: 8px 10px;
   border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); }
@@ -242,12 +252,20 @@ input:disabled, select:disabled { opacity: .45; }
 a.button { display: inline-block; text-decoration: none; font: inherit; border-radius: 8px; padding: 6px 12px;
   border: 1px solid var(--line); background: var(--panel2); color: var(--fg); }
 a.button.primary { background: var(--fg); color: var(--bg); border-color: var(--fg); font-weight: 600; }
+a.button.small { padding: 4px 9px; font-size: 13px; }
+a.button:hover { border-color: var(--muted); }
+a.button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+#settings p { margin: 0; }
 
 /* Settings tab */
 .settings-table { border-collapse: collapse; width: 100%; font-size: 14px; }
 .settings-table th, .settings-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
 .settings-table th { color: var(--muted); font-weight: 600; font-size: 13px; }
-#settings-body { overflow-x: auto; }
+#settings-body { display: grid; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+#settings-body .tablewrap { overflow-x: auto; }
+.settings-table td, .settings-table th { overflow-wrap: normal; }
+.settings-table th { white-space: nowrap; }
+.settings-table td:last-child { text-align: right; }
 
 /* setup wizard */
 .wiz { max-width: 980px; margin: 0 auto 40px; display: grid; gap: 16px; }

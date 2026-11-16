@@ -60,8 +60,12 @@ function kelvinToHex(k) {                                // rough, for display o
 const lanHex = lan => lan.colorTemInKelvin ? kelvinToHex(lan.colorTemInKelvin)
   : "#" + [lan.color.r, lan.color.g, lan.color.b].map(v => v.toString(16).padStart(2, "0")).join("");
 
-const patternById = id => CONFIG.patterns.find(p => p.id === id);
-const labelOf = id => id === "warm" ? "Warm white" : (patternById(id) || {label: id}).label;
+// A theme that isn't in the list (an unsaved one from the Themes tab, or one deleted since)
+// still gets a usable entry, so nothing breaks on it.
+const patternById = id => CONFIG.patterns.find(p => p.id === id)
+  || {id, label: id === "_draft" ? "Unsaved theme" : `${id} (deleted)`, animated: true, params: {}, categories: [],
+      group: "", face: "", describe: id === "_draft" ? "A theme being edited in the Themes tab." : "This theme no longer exists."};
+const labelOf = id => id === "warm" ? "Warm white" : patternById(id).label;
 const shortName = sid => SEC[sid] ? SEC[sid].short || SEC[sid].name : sid;
 const capsOf = sec => sec.caps || {stream: true, pick: true, status: true};
 // "50 lights / 10 segments × 5", or what the controller does instead
@@ -71,13 +75,21 @@ function runSize(sec) {
   if (sec.lights_per_segment === 1) return `${sec.lights} lights, each its own color` + (c.static === "palette" ? " (up to 30 colors)" : "");
   return `${sec.lights} lights / ${sec.segments} segments × ${sec.lights_per_segment}`;
 }
+// Which end of the run light 1 is at, as installed: "left", "right" or "" (not checked yet).
+// Older settings only have `reverse`. A run whose light 1 is at the right is drawn from the right.
+const light1Of = sec => sec.light1 || (sec.reverse ? "right" : "");
+const fromRight = sec => light1Of(sec) === "right";
 const enabledIds = () => CONFIG.sections.filter(s => s.enabled).map(s => s.id);
 const targetIds = () => enabledIds().filter(id => TARGETS.has(id));
 const names = ids => ids.map(shortName).join(", ");
 
-// Fill a <select> with themes grouped by their main category (Everyday, Diwali, ...).
+// Fill a <select> with themes grouped by their main category ("My themes" first, then
+// Everyday, Diwali, ...). Every filled select is remembered so refillPatterns() can bring it
+// up to date when themes are saved or deleted (its other options are kept).
+const FILLED = new Set();
 function fillPatterns(sel, value) {
   const order = CONFIG.categories || [], groups = {};
+  for (const og of [...sel.querySelectorAll("optgroup")]) og.remove();
   for (const p of CONFIG.patterns) (groups[p.group] = groups[p.group] || []).push(p);
   for (const g of Object.keys(groups).sort((a, b) => order.indexOf(a) - order.indexOf(b))) {
     const og = document.createElement("optgroup");
@@ -86,6 +98,14 @@ function fillPatterns(sel, value) {
     sel.appendChild(og);
   }
   sel.value = value;
+  FILLED.add(sel);
+}
+function refillPatterns() {
+  for (const sel of FILLED) {
+    const v = sel.value;
+    fillPatterns(sel, v);
+    if (sel.value !== v) sel.dispatchEvent(new Event("change"));        // its theme was deleted
+  }
 }
 
 // Inputs for a pattern's parameters; readParams() turns them back into a dict.
@@ -292,6 +312,7 @@ function drawStatus(card) {
 
 function buildStrip(card) {
   const {el, sec} = card, strip = $(".strip", el);
+  strip.classList.toggle("rev", fromRight(sec));        // light 1 at the right end: drawn right to left
   card.lightEls = []; card.segEls = [];
   for (let s = 0; s < sec.segments; s++) {
     const seg = document.createElement("div");
@@ -391,7 +412,8 @@ function buildCard(sec) {
   const card = CARDS[sec.id] = {el, sec, selected: new Set(), picked: {name: "Warm white 2200 K", hex: "#ffa04a", kelvin: 2200}, syncedKey: null};
   $(".name", el).textContent = sec.name;
   $(".sub", el).textContent = [sec.subtitle, sec.ip + (sec.zone ? ` · ${sec.zone}` : ""), runSize(sec)
-      + (sec.reachable < sec.lights ? ` (last ${sec.lights - sec.reachable} not reachable by segment)` : "")
+      + (sec.reachable < sec.lights ? ` (last ${sec.lights - sec.reachable} not reachable by segment)` : ""),
+    fromRight(sec) && "light 1 at the right"
   ].filter(Boolean).join(" · ");
   if (!sec.enabled) el.classList.add("disabled");
   el.classList.add("collapsed");
@@ -482,9 +504,56 @@ function buildCard(sec) {
 const WARM_TILE = {id: "warm", label: "Warm white", animated: false, categories: ["Everyday"],
   face: "#ffd8a8,#ffb36b", describe: "Plain warm white, 2200 K."};
 let CAT = "All";
+// Favourites first (starred in the Themes tab), then your own themes, then the built-ins in
+// category order. Built-in groups hidden in the Themes tab are left out (unless starred).
+const themePrefs = () => CONFIG.theme_prefs || {favourites: [], hidden_groups: []};
 function tileList() {
-  const order = CONFIG.categories || [];
-  return [WARM_TILE, ...CONFIG.patterns.filter(p => p.tile).sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group))];
+  const order = CONFIG.categories || [], {favourites, hidden_groups} = themePrefs();
+  const fav = id => { const k = favourites.indexOf(id); return k < 0 ? 1e6 : k; };
+  const list = CONFIG.patterns.filter(p => p.tile && (favourites.includes(p.id) || p.custom
+    || !p.categories.some(c => hidden_groups.includes(c))));
+  return [WARM_TILE, ...list.map(p => favourites.includes(p.id) ? {...p, categories: ["Favourites", ...p.categories]} : p)
+    .sort((a, b) => fav(a.id) - fav(b.id) || order.indexOf(a.group) - order.indexOf(b.group))];
+}
+// Two stops at least: a one-color face would be an invalid gradient.
+const faceGradient = face => { const c = (face || "#888888").split(","); return `linear-gradient(90deg, ${(c.length > 1 ? c : [c[0], c[0]]).join(",")})`; };
+
+// The Quick Settings tiles and their category pull-down; rebuilt when themes change.
+function buildTiles() {
+  const box = $("#tiles"), tiles = tileList();
+  box.innerHTML = "";
+  for (const pat of tiles) {
+    const b = document.createElement("button");
+    b.className = "tile"; b.dataset.p = pat.id; b.dataset.cats = pat.categories.join("|");
+    b.style.setProperty("--g", faceGradient(pat.face));
+    b.innerHTML = `<span class="tile-face"></span><span class="tile-label"></span><span class="tile-st"></span>`;
+    b.querySelector(".tile-label").textContent = (themePrefs().favourites.includes(pat.id) ? "★ " : "") + pat.label;
+    b.title = pat.describe || pat.label;
+    b.onclick = () => quickTheme(pat.id);
+    box.appendChild(b);
+  }
+  // category pull-down: All, Favourites, then each category that has tiles
+  const cat = $("#cat"), used = new Set(tiles.flatMap(t => t.categories));
+  cat.innerHTML = "";
+  cat.appendChild(new Option(`All (${tiles.length})`, "All"));
+  for (const c of ["Favourites", ...(CONFIG.categories || [])]) if (used.has(c))
+    cat.appendChild(new Option(`${c} (${tiles.filter(t => t.categories.includes(c)).length})`, c));
+  const saved = store.get("hl-cat");
+  CAT = [...cat.options].some(o => o.value === saved) ? saved : "All";
+  cat.value = CAT;
+  cat.onchange = () => { CAT = cat.value; store.set("hl-cat", CAT); applyCat(); };
+  applyCat();
+}
+
+// After themes are saved, deleted, imported or starred (Themes tab): new lists everywhere.
+function themesChanged(d) {
+  CONFIG.patterns = d.patterns;
+  CONFIG.categories = d.categories;
+  CONFIG.theme_prefs = d.prefs;
+  refillPatterns();
+  buildTiles();
+  if (typeof syncVizTheme === "function") syncVizTheme();
+  sync();
 }
 function applyCat() {
   let n = 0;
@@ -532,27 +601,7 @@ function buildQuick() {
     store.set("hl-targets", [...TARGETS].join(","));
     sync();
   };
-  const box = $("#tiles"), tiles = tileList();
-  for (const pat of tiles) {
-    const b = document.createElement("button");
-    b.className = "tile"; b.dataset.p = pat.id; b.dataset.cats = pat.categories.join("|");
-    b.style.setProperty("--g", `linear-gradient(90deg, ${pat.face || "#888,#888"})`);
-    b.innerHTML = `<span class="tile-face"></span><span class="tile-label"></span><span class="tile-st"></span>`;
-    b.querySelector(".tile-label").textContent = pat.label;
-    b.title = pat.describe || pat.label;
-    b.onclick = () => quickTheme(pat.id);
-    box.appendChild(b);
-  }
-  // category pull-down: All, then each category that has tiles
-  const cat = $("#cat"), used = new Set(tiles.flatMap(t => t.categories));
-  cat.appendChild(new Option(`All (${tiles.length})`, "All"));
-  for (const c of CONFIG.categories || []) if (used.has(c))
-    cat.appendChild(new Option(`${c} (${tiles.filter(t => t.categories.includes(c)).length})`, c));
-  const saved = store.get("hl-cat");
-  CAT = [...cat.options].some(o => o.value === saved) ? saved : "All";
-  cat.value = CAT;
-  cat.onchange = () => { CAT = cat.value; store.set("hl-cat", CAT); applyCat(); };
-  applyCat();
+  buildTiles();
   const allPower = on => async () => {
     const ids = targetIds();
     if (!ids.length) return toast("Pick some lights first", true);
@@ -579,23 +628,29 @@ function syncVizTheme() {
 }
 
 function buildViz() {
-  // flat strips, one row per run, with segment numbers underneath
+  // flat strips, one row per run, with segment numbers underneath. Each run is drawn the way it's
+  // installed (light 1 at the right end: right to left) and to scale (the longest run is full width).
+  const longest = Math.max(1, ...CONFIG.sections.map(s => s.lights));
   $("#vruns").innerHTML = CONFIG.sections.map(s => {
     const lps = s.lights_per_segment >= 3 ? s.lights_per_segment : 10, segs = Math.ceil(s.lights / lps);
     const label = k => s.lights_per_segment >= 3 ? k + 1 : k * lps + 1;   // segment numbers, or light numbers
     const ticks = Array.from({length: segs}, (_, k) => `<span style="grid-column:span ${Math.min(lps, s.lights - k * lps)}">${label(k)}</span>`).join("");
-    return `<div class="vrun"><div class="vl"><span>${s.name} · ${s.lights} lights</span><span data-vs="${s.id}"></span></div>
+    const rev = fromRight(s);
+    return `<div class="vrun${rev ? " rev" : ""}"><div class="vl"><span>${esc(s.name)} · ${s.lights} lights${rev ? " · light 1 at the right" : ""}</span><span data-vs="${s.id}"></span></div>
       <div class="dots" data-n="${s.lights}" data-v="${s.id}">${"<i></i>".repeat(s.lights)}</div>
       <div class="ticks" data-n="${s.lights}">${ticks}</div></div>`;
   }).join("");
+  $("#strips").classList.toggle("few", CONFIG.sections.length <= 3);
   for (const s of CONFIG.sections) VDOTS[s.id] = [...document.querySelectorAll(`[data-v="${s.id}"] i`)];
   const setZoom = z => {
     ZOOM = Math.max(0, Math.min(ZOOMS.length - 1, z));
     const px = ZOOMS[ZOOM];
     $("#strips").classList.toggle("fit", !px);
-    for (const el of document.querySelectorAll("#vruns .dots, #vruns .ticks"))
+    for (const el of document.querySelectorAll("#vruns .dots, #vruns .ticks")) {
       el.style.gridTemplateColumns = px ? `repeat(${el.dataset.n}, ${px}px)` : `repeat(${el.dataset.n}, minmax(0, 1fr))`;
-    $("#z-lbl").textContent = px ? `${px} px per light: scroll sideways to see the rest` : "Whole run fits the screen";
+      el.style.width = px ? "" : `${(100 * el.dataset.n / longest).toFixed(3)}%`;    // same spacing on every run
+    }
+    $("#z-lbl").textContent = px ? `${px} px per light: scroll sideways to see the rest` : "Fit: the longest run fills the width, the others to scale";
     $("#z-out").disabled = !ZOOM; $("#z-in").disabled = ZOOM === ZOOMS.length - 1;
     $("#z-fit").classList.toggle("on", !ZOOM);
   };
@@ -646,7 +701,7 @@ async function vizPreview(keep) {
 }
 
 // --- tabs ---------------------------------------------------------------------------------
-const TABS = ["quick", "ctrl", "scene", "settings"];
+const TABS = ["quick", "ctrl", "themes", "settings"];
 function setTab(t) {
   for (const b of document.querySelectorAll("[data-tab]")) b.setAttribute("aria-selected", String(b.dataset.tab === t));
   for (const id of TABS) $("#tab-" + id).hidden = id !== t;
@@ -654,9 +709,12 @@ function setTab(t) {
   repaintAll();
 }
 
-// Called by the Scene editor's "Show in Visualization": back to the first tab, preview there.
-function showInViz(sid, data, pattern) {
-  setPreview({source: "scene", pattern, label: labelOf(pattern) + " (Scene editor)", runs: {[sid]: {...data, t0: performance.now() / 1000}}});
+// Called by the Themes tab's "Show in Visualization": back to the first tab, preview there.
+// runs: {section id: preview data} (several for a whole-house theme); label: the theme's name.
+function showInViz(runs, label) {
+  const t0 = performance.now() / 1000;
+  setPreview({source: "scene", pattern: "", label: label + " (Themes tab)",
+              runs: Object.fromEntries(Object.entries(runs).map(([sid, d]) => [sid, {...d, t0}]))});
   setTab("quick");
   $("#viz").scrollIntoView({behavior: "smooth"});
 }
@@ -720,7 +778,7 @@ function sync() {
     $('[data-act="preview"]', el).classList.toggle("on", !!PREVIEW && PREVIEW.source === "card" && PREVIEW.card === sec.id);
     drawMeta(card);
   }
-  if (typeof Scene !== "undefined") Scene.sync();
+  if (typeof Themes !== "undefined") Themes.sync();
 }
 
 // After a command: a fast read (no LAN round trip) at once, then a full one. A slower read
@@ -751,13 +809,22 @@ async function refresh(fast = false) {
 
 // --- Settings tab --------------------------------------------------------------------------------
 const esc = t => String(t).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
+const LIGHT1_TEXT = {left: "Left end", right: "Right end", "": "Not tested"};
 function buildSettings() {
-  const rows = CONFIG.sections.map(s => `<tr><td>${esc(s.name)}</td><td>${esc(s.short)}</td><td>${s.lights}</td>
-    <td>${esc(s.model)} · ${esc(s.ip)}${s.zone ? " · " + esc(s.zone) : ""}</td><td>${esc(s.start || "")}</td><td>${s.reverse ? "yes" : ""}</td>
-    <td>${s.enabled ? "" : "disabled"}</td></tr>`).join("");
+  // Runs in order along the house, left to right as you face it.
+  const rows = CONFIG.sections.map(s => {
+    const l1 = light1Of(s), size = s.lights;
+    return `<tr${s.enabled ? "" : ' class="off"'}><td>${esc(s.name)}${s.enabled ? "" : ' <span class="muted">(disabled)</span>'}</td>
+    <td>${esc(s.short)}</td><td>${size}</td>
+    <td>${esc(s.model)} · ${esc(s.ip)}${s.zone ? " · " + esc(s.zone) : ""}</td>
+    <td${l1 ? "" : ' class="muted"'}>${LIGHT1_TEXT[l1] || esc(l1)}</td>
+    <td><a class="button small" href="setup.html?step=4&amp;controller=${encodeURIComponent(s.controller)}"
+      title="Test ${esc(s.name)} in the setup wizard: count, direction and colors">Test</a></td></tr>`;
+  }).join("");
   $("#settings-body").innerHTML = `
-    <table class="settings-table"><thead><tr><th>Run</th><th>Short name</th><th>Lights</th><th>Controller</th>
-      <th>Light 1 is at</th><th>Reversed</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="tablewrap"><table class="settings-table"><thead><tr><th>Run</th><th>Short name</th><th># Lights / LEDs</th>
+      <th>Controller</th><th>Light 1 is at</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="muted">Runs are listed in order along the house, left to right as you face it.</p>
     <p>Mode: <b>${CONFIG.mode === "live" ? "Live (sends to the lights)" : "Practice (nothing is sent)"}</b> ·
       Time zone: <b>${esc(CONFIG.timezone)}</b> ·
       Location: <b>${CONFIG.location ? "set (sunrise/sunset schedules work)" : "not set (clock-time schedules only)"}</b></p>
@@ -798,7 +865,7 @@ async function init() {
   const main = $("#sections");
   for (const sec of CONFIG.sections) main.appendChild(buildCard(sec));
   $("#refresh").onclick = () => refresh();
-  if (typeof Scene !== "undefined") Scene.init();
+  if (typeof Themes !== "undefined") Themes.init();
   buildSettings();
   for (const b of document.querySelectorAll("[data-tab]")) b.onclick = () => setTab(b.dataset.tab);
   setTab(TABS.includes(store.get("hl-tab")) ? store.get("hl-tab") : "quick");
