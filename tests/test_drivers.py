@@ -7,10 +7,13 @@ ports; Tuya uses a stand-in for the tinytuya library. Linux and Windows (needs 1
 addresses, so not macOS).
 """
 import importlib.util
+import json
 import os
+import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import types
 
@@ -19,6 +22,7 @@ sys.path.insert(0, ROOT)
 os.environ["HOUSELIGHTS_HOME"] = tempfile.mkdtemp()
 os.environ["HOUSELIGHTS_WLED_PORTS"] = "18181,21326"
 os.environ["HOUSELIGHTS_JELLYFISH_PORT"] = "19101"
+os.environ["HOUSELIGHTS_GOVEE_PORTS"] = "14101,14102,14103"
 
 FAILS = []
 
@@ -70,7 +74,7 @@ sys.modules["tinytuya"] = types.SimpleNamespace(
     deviceScan=lambda verbose, seconds: {"127.0.0.41": {"ip": "127.0.0.41", "gwId": "abcdef0123456789abcd", "version": "3.3"}})
 
 from houselights import drivers, settings, setup  # noqa: E402
-from houselights.drivers import jellyfish, net, tuya, wled  # noqa: E402
+from houselights.drivers import govee, jellyfish, net, tuya, wled  # noqa: E402
 from houselights.settings import Controller  # noqa: E402
 from houselights.stream import Streamer  # noqa: E402
 
@@ -202,6 +206,36 @@ time.sleep(0.3)
 st.stop()
 check("Tuya test shows a colour, then puts the light back",
       CALLS[0] == ("set_colour", (255, 0, 0)) and CALLS[-1][0] == "set_multiple_values" and DPS == before)
+
+# --- Govee scan: retries the addresses that didn't answer ----------------------------------------
+ASKED = {}
+
+
+def lossy_govee(ip, drop_first):
+    """A Govee device that answers "scan", optionally ignoring the first request."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.bind((ip, govee.SCAN_PORT))
+
+    def loop():
+        while True:
+            data, (src, _) = s.recvfrom(4096)
+            ASKED[ip] = ASKED.get(ip, 0) + 1
+            if drop_first and ASKED[ip] == 1:
+                continue
+            reply = {"msg": {"cmd": "scan", "data": {"ip": ip, "device": "FA:KE:00:00:00:00:00:01", "sku": "H806A"}}}
+            s.sendto(json.dumps(reply).encode(), (src, govee.REPLY_PORT))
+    threading.Thread(target=loop, daemon=True).start()
+
+
+lossy_govee("127.0.0.12", drop_first=True)
+lossy_govee("127.0.0.13", drop_first=False)
+t0 = time.time()
+found = govee.LAN.scan(["127.0.0.12", "127.0.0.13", "127.0.0.14"], wait=1.5, multicast=False)
+check("Govee scan: a device that missed the first request is found in a later round",
+      sorted(found) == ["127.0.0.12", "127.0.0.13"] and ASKED == {"127.0.0.12": 2, "127.0.0.13": 1})
+t0 = time.time()
+rows = govee.probe({"ip": "127.0.0.13"})
+check("Govee add by address: stops as soon as it answers", len(rows) == 1 and time.time() - t0 < 0.5)
 
 # --- settings with secrets ------------------------------------------------------------------------
 cfg = {"controllers": [{"id": "t1", "type": "tuya", "model": "Tuya light", "ip": "127.0.0.41",

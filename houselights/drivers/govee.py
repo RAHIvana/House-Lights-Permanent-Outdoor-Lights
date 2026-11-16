@@ -95,37 +95,51 @@ class Lan:
                 rx.close()
         return result
 
-    def scan(self, targets=(), wait=2.5, multicast=True):
+    def scan(self, targets=(), wait=2.5, multicast=True, rounds=3):
         """Ask devices to identify themselves: multicast on this network, plus unicast to each
-        address in `targets` (needed when the lights are on another subnet)."""
-        found = {}
+        address in `targets` (needed when the lights are on another subnet).
+
+        Asks up to `rounds` times within `wait` seconds, each time only the addresses that
+        haven't answered yet: a burst to a whole /24 on another subnet loses packets (the
+        router has to look up every address at once), so one try missed controllers at random.
+        With only unicast targets, it stops as soon as all of them have answered."""
+        found, answered = {}, set()
+        targets = list(targets)
         with self._reply_lock:
             rx = self._listen()
             try:
                 body = {"account_topic": "reserve"}
-                if multicast:
-                    try:
-                        m = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                        m.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
-                        m.sendto(json.dumps({"msg": {"cmd": "scan", "data": body}}).encode(), (MULTICAST, SCAN_PORT))
-                        m.close()
-                    except OSError as e:
-                        log.warning("multicast scan failed: %s", e)
-                for ip in targets:
-                    try:
-                        self.send(ip, "scan", body, port=SCAN_PORT)
-                    except OSError:
-                        pass
-                end = time.time() + wait
-                while time.time() < end:
-                    try:
-                        d, a = rx.recvfrom(4096)
-                    except socket.timeout:
-                        continue
-                    m = self._msg(d)
-                    if m and m.get("cmd") == "scan" and isinstance(m.get("data"), dict):
-                        data = m["data"]
-                        found[data.get("ip") or a[0]] = data
+                start, multicast_ok = time.time(), multicast
+                for r in range(rounds):
+                    if multicast_ok:
+                        try:
+                            m = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                            m.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
+                            m.sendto(json.dumps({"msg": {"cmd": "scan", "data": body}}).encode(), (MULTICAST, SCAN_PORT))
+                            m.close()
+                        except OSError as e:
+                            log.warning("multicast scan failed: %s", e)
+                            multicast_ok = False
+                    for n, ip in enumerate(ip for ip in targets if ip not in answered):
+                        if n and n % 32 == 0:
+                            time.sleep(0.005)              # spread a big burst a little
+                        try:
+                            self.send(ip, "scan", body, port=SCAN_PORT)
+                        except OSError:
+                            pass
+                    end = start + wait * (r + 1) / rounds
+                    while time.time() < end and (multicast or not set(targets) <= answered):
+                        try:
+                            d, a = rx.recvfrom(4096)
+                        except socket.timeout:
+                            continue
+                        m = self._msg(d)
+                        if m and m.get("cmd") == "scan" and isinstance(m.get("data"), dict):
+                            data = m["data"]
+                            found[data.get("ip") or a[0]] = data
+                            answered.update({a[0], str(data.get("ip") or a[0])})
+                    if not multicast and set(targets) <= answered:
+                        break
             finally:
                 rx.close()
         return found
