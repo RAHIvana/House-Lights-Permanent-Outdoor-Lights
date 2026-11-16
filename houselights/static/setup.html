@@ -6,6 +6,7 @@
 <title>House Lights setup</title>
 <script>try { const t = localStorage.getItem("hl-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
 <link rel="stylesheet" href="style.css?v=11">
+<link rel="stylesheet" href="setup.css?v=2">
 <link rel="icon" href="icon-192.png">
 <meta name="theme-color" content="#2b2e33">
 </head>
@@ -24,7 +25,7 @@
 
 <div class="wiz">
   <ol class="steps" id="steps">
-    <li data-step="0">1 Lights</li><li data-step="1">2 Controllers</li><li data-step="2">3 Runs</li>
+    <li data-step="0">1 Lights</li><li data-step="1">2 Controllers</li><li data-step="2">3 Name and count</li>
     <li data-step="3">4 Test</li><li data-step="4">5 Time and place</li><li data-step="5">6 Save</li>
   </ol>
 
@@ -61,39 +62,71 @@
       <button id="add">Add</button>
     </div>
     <h3 class="lbl">Controllers you'll use</h3>
-    <div class="tablewrap"><table id="chosen"><thead><tr><th>Address</th><th>Controller</th><th>Name (optional)</th>
+    <div class="tablewrap"><table id="chosen"><thead><tr><th>Address</th><th>Controller</th>
       <th>Settings</th><th>Enabled</th><th></th></tr></thead><tbody></tbody></table></div>
+    <p class="note">You name each run in the next step.</p>
   </section>
 
   <!-- 3: runs -->
   <section class="panel" data-page="2" hidden>
-    <div class="ph"><h2>Name each run of lights</h2></div>
-    <p class="muted">A run is the string of lights on one controller (or one JellyFish zone). Counts that the
-      controller reported are filled in; for Govee, the Test step helps you count. "Light 1 is at" is a note
-      for you, like "left end, seen from the street".</p>
-    <div class="tablewrap"><table id="runs"><thead><tr><th>Controller</th><th>Name</th><th>Short name</th>
-      <th>Lights</th><th>Light 1 is at</th><th>Reverse</th></tr></thead><tbody></tbody></table></div>
+    <div class="ph"><h2>Name and count each run</h2></div>
+    <div class="intro">
+      <p class="muted">A run is the string of lights on one controller (or one JellyFish zone).</p>
+      <p class="muted">If you don't know how many lights you have, leave it blank: the Test step helps you count them.</p>
+      <p class="muted">Some runs may be installed left to right and others right to left. "Light 1 is at" lets every
+        run still show the right way round on the dashboard.</p>
+      <p class="muted">Put the runs in order along the house, left to right as you face it, with ▲ and ▼.
+        Themes that play across the whole house use this order.</p>
+    </div>
+    <div id="runs" class="runcards"></div>
   </section>
 
   <!-- 4: test -->
   <section class="panel" data-page="3" hidden>
     <div class="ph"><h2>Test each run</h2></div>
     <p class="muted" id="test-intro"></p>
-    <div id="tests" class="wrap"></div>
+    <div class="testrun" id="t-one">
+      <div class="row"><b id="t-title"></b><span class="muted" id="t-sub"></span></div>
+      <ol class="steps tphases" id="t-phases"></ol>
+      <div class="testdots" id="t-dots"></div>
+      <p class="note" id="t-status"></p>
+      <div id="t-body" class="tbody"></div>
+      <div class="row" id="t-nav"></div>
+      <details class="tmore"><summary>More tests</summary>
+        <div class="row" id="t-more-btns"></div>
+        <p class="note" id="t-restore"></p>
+      </details>
+    </div>
   </section>
 
   <!-- 5: time and place -->
   <section class="panel" data-page="4" hidden>
     <div class="ph"><h2>Time and place</h2></div>
-    <p class="muted">Schedules use your time zone. Sunrise and sunset schedules also need your
-      location; two decimals (about 1 km) is plenty. Leave it empty to use clock times only.</p>
-    <div class="kv">
-      <label class="lbl" for="tz">Time zone</label>
-      <div class="row"><input type="text" id="tz" list="tz-list" size="28"><datalist id="tz-list"></datalist>
-        <span class="muted" id="tz-hint"></span></div>
+    <p class="muted">Schedules use your time zone. Sunrise and sunset schedules also need roughly where you
+      are: your ZIP code is enough. Leave it empty to use clock times only.</p>
+    <p>Time zone: <b id="tz-show"></b> <span class="muted" id="tz-src"></span> · <a href="#" id="tz-change">Change</a></p>
+    <div class="row" id="tz-edit" hidden><label class="lbl" for="tz">Time zone</label>
+      <input type="text" id="tz" list="tz-list" size="28" placeholder="like America/Chicago"><datalist id="tz-list"></datalist></div>
+    <div class="row">
+      <label class="lbl" for="zip">ZIP code</label><input type="text" id="zip" size="10" maxlength="10" placeholder="12345" autocomplete="postal-code">
+      <select id="country" aria-label="Country">
+        <option value="us">United States</option><option value="ca">Canada</option><option value="gb">United Kingdom</option>
+        <option value="au">Australia</option><option value="nz">New Zealand</option><option value="ie">Ireland</option>
+        <option value="de">Germany</option><option value="fr">France</option><option value="es">Spain</option>
+        <option value="it">Italy</option><option value="nl">Netherlands</option><option value="in">India</option>
+        <option value="mx">Mexico</option>
+      </select>
+      <button id="zip-go">Look up</button>
+    </div>
+    <p class="note" id="sun-msg"></p>
+    <p class="note"><a href="#" id="geo">Use this device's location</a> · <a href="#" id="ll-show">Enter latitude/longitude instead</a>
+      <span id="geo-msg"></span></p>
+    <div class="kv" id="ll" hidden>
       <label class="lbl" for="lat">Latitude</label><div class="row"><input type="number" id="lat" step="0.01" min="-90" max="90" style="width:8em"></div>
       <label class="lbl" for="lon">Longitude</label><div class="row"><input type="number" id="lon" step="0.01" min="-180" max="180" style="width:8em">
-        <button id="geo" class="small">Use this device's location</button><span class="muted" id="geo-msg"></span></div>
+        <span class="note">two decimals (about 1 km) is plenty</span></div>
+    </div>
+    <div class="kv">
       <span class="lbl">Mode</span>
       <div class="row" id="modes">
         <label><input type="radio" name="mode" value="live"> Live: send to the lights</label>
@@ -116,6 +149,6 @@
     <button id="next" class="primary">Next</button>
   </div>
 </div>
-<script src="setup.js?v=11"></script>
+<script src="setup.js?v=13"></script>
 </body>
 </html>

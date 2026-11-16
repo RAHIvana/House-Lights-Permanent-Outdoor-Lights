@@ -6,8 +6,14 @@ they showed when a test stops; Tuya lights are saved and put back; JellyFish can
 (the wizard says so).
 """
 import datetime as dt
+import json
 import logging
 import math
+import re
+import urllib.error
+import urllib.parse
+import urllib.request
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException
 
@@ -25,6 +31,10 @@ HOOKS = {"before_test": None, "settings": None}     # set by app.py
 
 RED, GREEN, BLUE, WHITE, OFF = (255, 0, 0), (0, 200, 0), (0, 0, 255), (255, 255, 255), (0, 0, 0)
 DIM_WHITE = (120, 120, 120)
+ORANGE = (255, 110, 0)
+EXTRA = 20                         # "check" test: orange lights past the last one, to spot a short count
+ZIP_URL = "https://api.zippopotam.us/{country}/{code}"
+ZIP_TIMEOUT = 5
 
 
 # --- test patterns: fn(n, t) -> [rgb] * n, in the run's own light order ---------------------
@@ -52,6 +62,17 @@ def _ruler(n, t):
             out.append((60, 60, 60))
         else:
             out.append(OFF)
+    return out
+
+
+def _check(n, t, lights=None):
+    """Light 1 red, the lights between dim white, light `lights` blue, and orange after it
+    (the frame is longer than the count): orange lights mean the count is too low, no blue
+    means it's too high. Red shows which end light 1 is at."""
+    lights = n if lights is None else max(1, min(n, lights))
+    out = [DIM_WHITE] * lights + [ORANGE] * (n - lights)
+    out[lights - 1] = BLUE
+    out[0] = RED
     return out
 
 
@@ -99,10 +120,13 @@ def _tail(n, t, lps=5, markers=1):
 
 # Counting tests send a full frame whatever the light count; reverse doesn't apply to them.
 COUNTING = {"markers", "tail"}
+# Tests about where light 1 really is: never reversed.
+PHYSICAL = COUNTING | {"check"}
 
 PATTERNS = {"identify": ("Blink the whole run", _identify, True),
             "markers": ("Count: segment markers", _markers, False),
             "tail": ("Count: last segment", _tail, False),
+            "check": ("Check the count and light 1", _check, False),
             "ruler": ("Check the count", _ruler, False),
             "chase": ("Direction: dot from light 1", _chase, True),
             "rgb": ("Colours: red, green, blue", _rgb, False),
@@ -122,9 +146,21 @@ def allowed_tests(caps):
     return names
 
 
-def _pattern(name, n, t, lps=5, markers=1, slow_fps=None):
+def _frame(name, lights, max_lights):
+    """How many lights a test sends: counting tests the most the model takes, "check" the
+    count plus EXTRA (orange), others the count."""
+    if name in COUNTING:
+        return max_lights
+    if name == "check":
+        return min(lights + EXTRA, max_lights)
+    return lights
+
+
+def _pattern(name, n, t, lps=5, markers=1, slow_fps=None, lights=None):
     if name == "identify" and slow_fps:
         return _identify_slow(n, t, slow_fps)
+    if name == "check":
+        return _check(n, t, lights)
     if name == "segments":
         return _segments(n, t, lps)
     if name == "markers":
@@ -169,6 +205,8 @@ def state():
     cat = drivers.catalog()
     for d in cat:
         d["tests"] = allowed_tests(d["caps"])
+        d["max_lights"] = {m: v.get("max_lights", 3000) for m, v in drivers.get(d["type"]).MODELS.items()}
+        d["lights_per_segment"] = {m: v.get("lights_per_segment", 0) for m, v in drivers.get(d["type"]).MODELS.items()}
     return {"configured": bool(s and s.configured),
             "error": error,
             "config": config,
@@ -259,7 +297,8 @@ def _test_controller(c):
 def test(body: dict):
     """body: {controller: {id?, type, model, ip, zone?, device_id?, version?, local_key?},
     lights, reverse, test, markers?}. Shows a test pattern on that one controller for
-    TEST_SECONDS (or until /test/stop)."""
+    TEST_SECONDS (or until /test/stop). Counting and "check" tests ignore reverse: they show
+    where light 1 really is."""
     drv, ctrl = _test_controller(body.get("controller") or {})
     caps = drv.Kit.CAPS
     name = body.get("test")
@@ -278,12 +317,13 @@ def test(body: dict):
         raise HTTPException(400, f"lights must be between 1 and {model['max_lights']}")
     label, _, animated = PATTERNS[name]
     lps = model.get("lights_per_segment") or 5
-    reverse = bool(body.get("reverse")) and not counting
+    reverse = bool(body.get("reverse")) and name not in PHYSICAL
     kit = drivers.make_kit(ctrl, _live())
     slow = not caps.get("stream")
+    count, lights = lights, _frame(name, lights, model["max_lights"])
 
     def render(t):
-        cols = _pattern(name, lights, t, lps, markers, kit.slow_fps if slow else None)
+        cols = _pattern(name, lights, t, lps, markers, kit.slow_fps if slow else None, count)
         return cols[::-1] if reverse else cols
 
     where = (ctrl.ip, ctrl.options.get("zone", ""))
@@ -328,11 +368,12 @@ def save(body: dict):
     return {"ok": True, "config": settings.public_config(clean), "restarting": restarting}
 
 
-def preview_frames(name, lights, lps=5, seconds=3.0, fps=8, markers=1):
+def preview_frames(name, lights, lps=5, seconds=3.0, fps=8, markers=1, frame=None):
     """Frames of a test pattern for the wizard's on-screen strip."""
     animated = PATTERNS[name][2]
     count = int(seconds * fps) if animated else 1
-    return [[f"#{r:02x}{g:02x}{b:02x}" for r, g, b in _pattern(name, lights, k / fps, lps, markers)]
+    n = frame or lights
+    return [[f"#{r:02x}{g:02x}{b:02x}" for r, g, b in _pattern(name, n, k / fps, lps, markers, lights=lights)]
             for k in range(count)]
 
 
@@ -348,14 +389,93 @@ def preview(body: dict):
         raise HTTPException(400, "lights must be a number")
     c = body.get("controller") or {}
     drv = drivers.get(c.get("type", "govee"))
-    lps = (drv.MODELS.get(c.get("model"), {}).get("lights_per_segment") if drv else None) or 5
+    model = drv.MODELS.get(c.get("model"), {}) if drv else {}
+    lps = model.get("lights_per_segment") or 5
+    frame = _frame(name, lights, model.get("max_lights") or 3000) if name == "check" else None
     slow = drv and not drv.Kit.CAPS.get("stream")
     if slow and name == "identify":
         fps = drv.Kit.slow_fps
         frames = [[f"#{r:02x}{g:02x}{b:02x}" for r, g, b in _identify_slow(lights, k / 2, fps)] for k in range(8)]
         return {"frames": frames, "fps": 2, "animated": True}
     frames = preview_frames(name, lights, lps, seconds=math.ceil((lights + 8) / 8) if name == "chase" else 2.0,
-                            markers=markers)
-    if body.get("reverse") and name not in COUNTING:
+                            markers=markers, frame=frame)
+    if body.get("reverse") and name not in PHYSICAL:
         frames = [f[::-1] for f in frames]
     return {"frames": frames, "fps": 8, "animated": PATTERNS[name][2]}
+
+
+# --- time and place ------------------------------------------------------------------------------
+NO_SERVICE = "couldn't reach the ZIP lookup service; enter latitude and longitude instead"
+
+
+def zip_lookup(code, country="us", fetch=None):
+    """{lat, lon, place, zip} for a postal code, from zippopotam.us. fetch(url) -> bytes
+    (tests pass their own). Raises HTTPException 400 (bad or unknown code) or 502 (no answer)."""
+    code, country = str(code or "").strip(), str(country or "us").strip().lower()
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 -]{0,9}", code):
+        raise HTTPException(400, "type a ZIP code like 12345")
+    if not re.fullmatch(r"[a-z]{2}", country):
+        raise HTTPException(400, "pick a country")
+    url = ZIP_URL.format(country=country, code=urllib.parse.quote(code))
+    try:
+        data = json.loads((fetch or _fetch)(url).decode("utf-8"))
+        p = data["places"][0]
+        lat, lon = round(float(p["latitude"]), 4), round(float(p["longitude"]), 4)
+    except urllib.error.HTTPError as e:
+        raise HTTPException(*((400, "ZIP code not found") if e.code == 404 else (502, NO_SERVICE))) from None
+    except OSError:
+        raise HTTPException(502, NO_SERVICE) from None
+    except (KeyError, IndexError, TypeError, ValueError):     # not JSON, or no place in it
+        raise HTTPException(400, "ZIP code not found") from None
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        raise HTTPException(400, "ZIP code not found")
+    state = str(p.get("state abbreviation") or p.get("state") or "").strip()
+    place = ", ".join(x for x in (str(p.get("place name") or "").strip(), state) if x)[:64]
+    return {"lat": lat, "lon": lon, "place": place, "zip": code.upper()}
+
+
+def _fetch(url):
+    req = urllib.request.Request(url, headers={"User-Agent": "houselights-setup", "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=ZIP_TIMEOUT) as r:
+        return r.read()
+
+
+@router.get("/zip")
+def zip_code(code: str = "", country: str = "us"):
+    """GET /api/setup/zip?code=12345&country=us -> {lat, lon, place, zip}."""
+    return zip_lookup(code, country)
+
+
+def sun_today(lat, lon, tz, day=None):
+    """Sunrise, solar noon and sunset ("HH:MM", None in polar day or night) in time zone tz,
+    and tz_ok: noon between 10:30 and 14:30 (otherwise the time zone is likely wrong)."""
+    from astral import Observer
+    from astral.sun import noon, sunrise, sunset
+    try:
+        zone = ZoneInfo(str(tz))
+    except Exception:
+        raise HTTPException(400, f"unknown time zone {tz!r}") from None
+    try:
+        lat, lon = float(lat), float(lon)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "latitude and longitude must be numbers") from None
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        raise HTTPException(400, "latitude or longitude out of range")
+    day = day or dt.datetime.now(zone).date()
+    obs = Observer(latitude=lat, longitude=lon)
+
+    def at(fn):
+        try:
+            return fn(obs, date=day, tzinfo=zone)
+        except ValueError:                           # the sun doesn't rise or set that day
+            return None
+    n, rise, down = at(noon), at(sunrise), at(sunset)
+    hm = (lambda t: t.strftime("%H:%M") if t else None)
+    return {"sunrise": hm(rise), "sunset": hm(down), "noon": hm(n),
+            "tz_ok": n is not None and dt.time(10, 30) <= n.time() <= dt.time(14, 30)}
+
+
+@router.get("/sun")
+def sun(lat: float, lon: float, tz: str):
+    """GET /api/setup/sun?lat=..&lon=..&tz=America/Chicago -> today's sunrise and sunset there."""
+    return sun_today(lat, lon, tz)

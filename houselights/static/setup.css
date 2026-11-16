@@ -1,0 +1,40 @@
+/* Setup wizard extras (the base look is in style.css). */
+.steps li.jump { cursor: pointer; }
+.steps li.jump:hover:not(.on) { outline: 1px solid var(--line); }
+
+/* step 3: one card per run */
+.runcards { display: grid; gap: 10px; }
+.runcard { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; display: grid; gap: 10px; background: var(--panel2); }
+.rc-head { align-items: center; }
+.rc-grid { display: grid; gap: 10px 14px; grid-template-columns: 2fr 1fr 1fr 1.2fr; align-items: start; }
+.fld { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
+.fld > span { color: var(--muted); font-size: 13px; }
+.fld input, .fld select { width: 100%; box-sizing: border-box; }
+.fld small.note { font-size: 12px; }
+@media (max-width: 700px) { .rc-grid { grid-template-columns: 1fr 1fr; } }
+
+/* step 4: one controller at a time */
+.tphases li { padding: 3px 10px; font-size: 12px; }
+.tbody { display: grid; gap: 8px; }
+.tq { margin: 6px 0 0; font-weight: 600; }
+.answers { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tsum { margin: 4px 0; font-size: 16px; font-weight: 600; }
+.help { padding-left: 20px; }
+.help li { margin: 2px 0; }
+#t-nav { display: flex; gap: 8px; align-items: center; border-top: 1px solid var(--line); padding-top: 8px; }
+.tmore summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+.tmore[open] summary { margin-bottom: 8px; }
+.sweep { display: grid; gap: 4px; }
+.sweep-dots { display: grid; gap: 2px; background: var(--night); padding: 8px; border-radius: 8px; }
+.sweep-dots i { display: block; aspect-ratio: 1; border-radius: 50%; background: var(--dot-off); }
+.sweep-ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+
+/* step 5 */
+.note.warn { color: var(--red); font-weight: 600; }
+.note.ok-line { color: var(--green); }
+
+/* step 6 */
+.wiz td.links { white-space: nowrap; font-size: 13px; }
+.wiz a { color: var(--focus); }
+
+.intro p { margin: 0 0 4px; }
