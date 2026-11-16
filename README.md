@@ -51,18 +51,15 @@ may only work after you add the controller to the Smart Life app itself.
 
 ### Not supported
 
-These use their own app and cloud, with no local control we can use (or none we have
-checked yet):
-
-| Brand | Why not (yet) |
+| Brands | Why not |
 |---|---|
-| **Oelo** | Its controllers are run through Oelo's cloud, behind an Oelo account login; no documented local API |
-| **Eufy** | Its own app (newer S4 models also speak Matter, which this project doesn't use); no local API |
-| **Gemstone**, **Trimlight**, **Enbrighten**, **Lumary**, **Nanoleaf** | Their own apps; not checked yet |
+| **Oelo**, **Trimlight**, **Gemstone**, **EverLights**, **Eufy**, **Lumary**, **Enbrighten VIBE**, **Lepro**, **Linkind** | Their own app and cloud, with no public local API to control them through (newer Eufy S4 models also speak Matter, which House Lights doesn't use) |
+| **Nanoleaf**, **Philips Hue**, **Twinkly** | They do have a documented local API, but House Lights doesn't support them yet |
 
-For some of these, owners replace the brand's controller with a WLED controller and keep the
-lights; then pick WLED. Check that the WLED controller suits your lights (LED type, voltage)
-before you swap.
+For brands in the first row, some owners replace the brand's controller with a WLED
+controller and keep the lights; then pick WLED. Check that the WLED controller suits your
+lights (LED type, voltage) before you swap. Support for a brand can change with new models
+and firmware: if yours has gained a local API, please open an issue.
 
 WLED is the most capable choice: every light can have its own colour, and animated themes
 play smoothly. Tuya / Smart Life lights take one colour at a time.
