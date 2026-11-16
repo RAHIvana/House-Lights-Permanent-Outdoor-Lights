@@ -1,8 +1,8 @@
 # House Lights
 
 A web dashboard for permanent outdoor lights (roofline and eave lights), run on a computer in
-your home. It works with **Govee**, **JellyFish**, **ASAHOM** and other brands that use the
-Smart Life / Tuya app, and open-source **WLED** controllers (see
+your home. It works with **Govee**, **JellyFish**, **ASAHOM**, **TreatLife** and the many
+other brands that use the Smart Life / Tuya app, and open-source **WLED** controllers (see
 [Supported controllers](#supported-controllers)). Play animated themes light by light, apply
 static themes, schedule them by clock time or sunrise/sunset, and make your own themes. No
 cloud account and no app login: it talks to the light controllers directly over your home
@@ -37,10 +37,28 @@ Look at the app your lights use:
 | Your lights use | Brands (examples) | Pick in the wizard |
 |---|---|---|
 | **Govee Home** app | Govee | Govee |
-| **Smart Life** or **Tuya Smart** app | Most **ASAHOM** kits, and many other Amazon permanent-light brands | Tuya / Smart Life |
+| **Smart Life** or **Tuya Smart** app | Most **ASAHOM** kits, **TreatLife**, and many other (often unbranded) Amazon permanent-light kits | Tuya / Smart Life |
 | **WLED** app, or a WLED page when you open the controller's address in a browser | DIY and open-source controllers, controllers sold "with WLED", **ASAHOM Pro** models sold as having WLED. Some owners of other brands swap in a WLED controller | WLED |
 | **JellyFish** app | JellyFish Lighting | JellyFish |
-| Another app (Gemstone, Oelo, Trimlight, Eufy, Nanoleaf, Lumary, ...) | | Not supported yet: no local API we could use, or not checked yet |
+
+The app is the clue, not the brand: many brands rebuild the Smart Life app under their own
+name. If your box or manual says "Smart Life" or "Tuya", pick Tuya / Smart Life.
+
+### Not supported
+
+These use their own app and cloud, with no local control we can use (or none we have
+checked yet):
+
+| Brand | Why not (yet) |
+|---|---|
+| **Oelo** | Its controllers are run through Oelo's cloud, behind an Oelo account login; no documented local API |
+| **Astoria** | Its own Astoria Lighting app; no local API we know of |
+| **Eufy** | Its own app (newer S4 models also speak Matter, which this project doesn't use); no local API |
+| **Gemstone**, **Trimlight**, **Enbrighten**, **Lumary**, **Nanoleaf** | Their own apps; not checked yet |
+
+For some of these, owners replace the brand's controller with a WLED controller and keep the
+lights; then pick WLED. Check that the WLED controller suits your lights (LED type, voltage)
+before you swap.
 
 WLED is the most capable choice: every light can have its own colour, and animated themes
 play smoothly. Tuya / Smart Life lights take one colour at a time.
