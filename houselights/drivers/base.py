@@ -99,6 +99,10 @@ class Kit:
     def stream_frame(self, colors):
         raise NotImplementedError
 
+    def stream_keepalive(self):
+        """Called every few seconds while streaming: repeat whatever stream_begin() sent that a
+        controller might have missed (UDP can be lost). Nothing by default."""
+
     def stream_end(self):
         raise NotImplementedError
 

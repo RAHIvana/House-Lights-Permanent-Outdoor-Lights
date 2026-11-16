@@ -258,5 +258,53 @@ rows, prob = setup.tuya_scan("192.168.5.9", usable=True, same_section=lambda t: 
 check("tuya scan with tinytuya: a typed address is usable once the id and key are typed",
       rows[0]["supported"] and rows[0]["needs_key"] and rows[0]["device_id"] == "")
 
+# --- Blink: 1 s on, 1 s off ---
+check("blink: on in the first second", setup._identify(3, 0.5) == [setup.WHITE] * 3)
+check("blink: off in the second second", setup._identify(3, 1.5) == [setup.OFF] * 3)
+check("blink: on again after 2 s", setup._identify(3, 2.2) == [setup.WHITE] * 3)
+
+# --- streams repeat "start streaming" (lost UDP messages) and a test starts once ---
+import threading as _th  # noqa: E402
+import time as _time  # noqa: E402
+
+from houselights import stream as _stream  # noqa: E402
+
+
+class KeepKit:
+    caps, live, tag, prefix, max_stream_lights = {"stream": True}, True, "keep", "LIVE", 255
+    c = FakeC()
+
+    def __init__(self):
+        self.calls = []
+
+    def guard(self):
+        pass
+
+    def stream_begin(self):
+        self.calls.append("begin")
+
+    def stream_frame(self, colors):
+        self.calls.append("frame")
+
+    def stream_keepalive(self):
+        self.calls.append("keep")
+
+    def stream_end(self):
+        self.calls.append("end")
+
+
+old_keep = _stream.KEEPALIVE_S
+_stream.KEEPALIVE_S = 0.1
+try:
+    kk = KeepKit()
+    s = _stream.Streamer(kk, 5, 20)
+    s.start_fn("t", lambda t: [(1, 1, 1)] * 5, True, 100, seconds=0.8)
+    s._thread.join(3)
+    check(f"stream: keepalive repeated ({kk.calls.count('keep')}x)", kk.calls.count("keep") >= 3
+          and kk.calls[0] == "begin" and kk.calls[-1] == "end")
+finally:
+    _stream.KEEPALIVE_S = old_keep
+check("test start is guarded by a lock", isinstance(setup.TEST_LOCK, type(_th.Lock())))
+
 print(f"\n{'ALL OK' if not FAILS else f'{len(FAILS)} FAILED'}")
 sys.exit(1 if FAILS else 0)

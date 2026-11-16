@@ -364,6 +364,7 @@ class Kit(BaseKit):
     def power(self, on):
         with self.lock:
             self._lan("turn", {"value": 1 if on else 0})
+            self._lan("turn", {"value": 1 if on else 0})     # twice: Govee controllers drop many messages
 
     def brightness(self, value):
         with self.lock:
@@ -400,14 +401,22 @@ class Kit(BaseKit):
         self.guard()
         self._need("stream", "play light-by-light themes")
         self._razer(RAZER_ON)
+        self._razer(RAZER_ON)                 # twice: one is often lost (stream_keepalive repeats it)
 
     def stream_frame(self, colors):
         self._need("stream", "play light-by-light themes")
         self._razer(razer_frame(colors))
 
+    def stream_keepalive(self):
+        """Govee controllers ignore many UDP messages: if the one "start streaming" was lost,
+        every frame is ignored and the lights stay as they were. So repeat it."""
+        self._razer(RAZER_ON)
+
     def stream_end(self):
         self._need("stream", "play light-by-light themes")
-        self._razer(RAZER_OFF)
+        for _ in range(3):                    # a lost "stop" would leave the last frame showing
+            self._razer(RAZER_OFF)
+            time.sleep(0.05 if self.live else 0)
 
     # --- tests on models that don't stream: save the state and put it back -----------------
     def snapshot(self):

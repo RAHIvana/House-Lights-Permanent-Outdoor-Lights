@@ -14,6 +14,7 @@ import os
 import re
 import select
 import socket
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -31,9 +32,11 @@ log = logging.getLogger("houselights")
 router = APIRouter(prefix="/api/setup")
 
 TEST_SECONDS = 60
+BLINK_S = 2.0                      # Blink test: one on-off cycle every 2 seconds
 DEEP_SECONDS = 30                  # longest deep scan (Govee: keeps asking silent addresses)
 TESTS = {}                    # (ip, zone) -> Streamer playing a test
-SWITCHED = {}                 # (ip, zone) -> kit switched on for the tests because it was off (else None)
+TEST_LOCK = threading.Lock()  # one test start at a time (the stop of the old one, then the new)
+SWITCHED = {}               # (ip, zone) -> kit switched on for the tests because it was off (else None)
 HOOKS = {"before_test": None, "settings": None}     # set by app.py
 
 RED, GREEN, BLUE, WHITE, OFF = (255, 0, 0), (0, 200, 0), (0, 0, 255), (255, 255, 255), (0, 0, 0)
@@ -46,8 +49,8 @@ ZIP_TIMEOUT = 5
 
 # --- test patterns: fn(n, t) -> [rgb] * n, in the run's own light order ---------------------
 def _identify(n, t):
-    """The whole run blinks white once a second: which run is this?"""
-    return [WHITE if (t % 1.0) < 0.5 else OFF] * n
+    """The whole run blinks white: 1 s on, 1 s off, so it is easy to spot. Which run is this?"""
+    return [WHITE if (t % BLINK_S) < BLINK_S / 2 else OFF] * n
 
 
 def _identify_slow(n, t, fps=1.0):
@@ -543,21 +546,22 @@ def test(body: dict):
         return cols[::-1] if reverse else cols
 
     where = (ctrl.ip, ctrl.options.get("zone", ""))
-    if HOOKS["before_test"]:
-        HOOKS["before_test"](ctrl.ip)             # stop what the dashboard streams there
-    old = TESTS.pop(where, None)
-    if old:
-        old.stop()
-    st = Streamer(kit, lights, 15)
-    try:
-        if not slow:
-            switch_on(drv, kit, where)
-        st.start_fn(f"test:{name}", render, animated, 100, seconds=TEST_SECONDS, slow_ok=True)
-    except (ValueError, drivers.NotAllowed) as e:
-        raise HTTPException(400, str(e))
-    except OSError as e:
-        raise HTTPException(502, f"couldn't reach the controller: {e}")
-    TESTS[where] = st
+    with TEST_LOCK:                               # two quick presses: the second replaces the first
+        if HOOKS["before_test"]:
+            HOOKS["before_test"](ctrl.ip)         # stop what the dashboard streams there
+        old = TESTS.pop(where, None)
+        if old:
+            old.stop()
+        st = Streamer(kit, lights, 15)
+        try:
+            if not slow:
+                switch_on(drv, kit, where)
+            st.start_fn(f"test:{name}", render, animated, 100, seconds=TEST_SECONDS, slow_ok=True)
+        except (ValueError, drivers.NotAllowed) as e:
+            raise HTTPException(400, str(e))
+        except OSError as e:
+            raise HTTPException(502, f"couldn't reach the controller: {e}")
+        TESTS[where] = st
     log.info("setup test %s on %s (%d lights%s)", name, kit.tag, lights, ", reversed" if reverse else "")
     return {"ok": True, "live": kit.live, "label": label, "seconds": TEST_SECONDS, "lights_per_segment": lps,
             "frame_lights": lights, "restore": caps.get("restore"), "slow": slow, "tier": model.get("tier"),
