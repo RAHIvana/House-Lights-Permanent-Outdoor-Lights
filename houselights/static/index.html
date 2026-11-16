@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>House Lights</title>
+<script>try { const t = localStorage.getItem("hl-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<link rel="stylesheet" href="style.css?v=10">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#2b2e33">
+<meta name="mobile-web-app-capable" content="yes">
+</head>
+<body>
+<header class="topbar">
+  <h1>House Lights</h1>
+  <nav class="tabs" role="tablist" aria-label="Pages">
+    <button role="tab" data-tab="quick">Quick Settings</button><button role="tab" data-tab="ctrl">Controllers</button><button role="tab" data-tab="scene">Scene editor</button><button role="tab" data-tab="settings">Settings</button>
+  </nav>
+  <span class="spacer"></span>
+  <span id="mode" class="pill">…</span>
+  <button id="refresh" class="small" title="Re-read the controllers' status">Refresh status</button>
+  <span class="lbl" id="theme-lbl">Theme</span>
+  <div class="seg-toggle" role="group" aria-labelledby="theme-lbl">
+    <button class="small" id="th-light">☀ Light</button><button class="small" id="th-dark">☾ Dark</button>
+  </div>
+</header>
+<p id="banner" class="banner" hidden></p>
+
+<div class="wrap">
+<!-- tab 1: Quick Settings | Schedules side by side, Visualization below -->
+<div class="tab" id="tab-quick">
+<div class="split">
+<section class="panel" id="quick">
+  <div class="ph"><h2>Quick Settings</h2><span class="spacer"></span>
+    <label class="lbl">Themes <select id="cat" aria-label="Theme category"></select></label></div>
+  <div class="row">
+    <span class="lbl" id="lights-lbl">Lights</span>
+    <div class="seg-toggle" role="group" aria-labelledby="lights-lbl" id="targets"></div>
+    <span class="spacer"></span>
+    <button class="live" id="all-on">On</button>
+    <button class="live" id="all-off">Off</button>
+  </div>
+  <div id="tiles" class="tiles" role="group" aria-label="Themes"></div>
+  <p id="tiles-more" class="note"></p>
+  <p id="now-playing" class="note"></p>
+</section>
+
+<!-- 2 -->
+<section class="panel" id="schedules">
+  <div class="ph sched-head">
+    <h2>Schedules</h2>
+    <span id="sched-state" class="muted"></span>
+    <span class="spacer"></span>
+    <button id="sched-pause" class="small">Pause tonight</button>
+    <button id="sched-add" class="primary small">Add schedule</button>
+  </div>
+  <ul id="sched-list" class="sched-list"></ul>
+</section>
+</div>
+
+<dialog id="sched-dialog" class="sched-dialog">
+  <form method="dialog" class="sched-form">
+    <div class="row sched-title">
+      <h2 id="sd-heading">Schedule</h2>
+      <label class="switch">On <input type="checkbox" data-k="enabled" checked></label>
+    </div>
+    <label class="field">Name <input type="text" data-k="name" maxlength="60" placeholder="e.g. Diwali evenings"></label>
+
+    <fieldset><legend>Lights</legend><div id="sd-sections" class="row"></div></fieldset>
+
+    <fieldset><legend>Days</legend>
+      <div class="row">
+        <div id="sd-days" class="seg-toggle days" role="group" aria-label="Days of the week"></div>
+        <button type="button" class="ghost small" data-days="0,1,2,3,4,5,6">Every day</button>
+        <button type="button" class="ghost small" data-days="0,1,2,3,4">Weekdays</button>
+        <button type="button" class="ghost small" data-days="5,6">Weekends</button>
+      </div>
+      <div class="row">
+        <label><input type="radio" name="sd-range" value="all" checked> All year</label>
+        <label><input type="radio" name="sd-range" value="only"> Only</label>
+        <input type="date" data-k="date_from" aria-label="From"> → <input type="date" data-k="date_to" aria-label="To">
+      </div>
+    </fieldset>
+
+    <fieldset><legend>Turn on</legend>
+      <div class="row">
+        <select data-k="on-type">
+          <option value="time">At a time</option><option value="sunset">At sunset</option><option value="sunrise">At sunrise</option>
+        </select>
+        <input type="time" data-k="on-time" value="20:00">
+        <span class="offset" data-for="on">
+          <input type="number" data-k="on-h" min="0" max="12" value="1"> h
+          <input type="number" data-k="on-m" min="0" max="59" step="5" value="0"> m
+          <select data-k="on-sign"><option value="1">after</option><option value="-1">before</option></select>
+          <span class="evt"></span>
+        </span>
+      </div>
+    </fieldset>
+
+    <fieldset><legend>Turn off</legend>
+      <div class="row">
+        <select data-k="off-type">
+          <option value="time">At a time</option><option value="after">After a while</option>
+          <option value="sunrise">At sunrise</option><option value="sunset">At sunset</option>
+        </select>
+        <input type="time" data-k="off-time" value="22:00">
+        <span class="duration">
+          <input type="number" data-k="off-dh" min="0" max="24" value="3"> h
+          <input type="number" data-k="off-dm" min="0" max="59" step="5" value="0"> m after turning on
+        </span>
+        <span class="offset" data-for="off">
+          <input type="number" data-k="off-h" min="0" max="12" value="0"> h
+          <input type="number" data-k="off-m" min="0" max="59" step="5" value="30"> m
+          <select data-k="off-sign"><option value="-1">before</option><option value="1">after</option></select>
+          <span class="evt"></span>
+        </span>
+      </div>
+    </fieldset>
+
+    <fieldset><legend>Show</legend>
+      <div class="row">
+        <select data-k="pattern" id="sd-pattern"></select>
+        <label class="level">Level <input type="number" data-k="level" min="5" max="100" step="5" value="100">%</label>
+      </div>
+      <p id="sd-describe" class="note"></p>
+    </fieldset>
+
+    <p id="sd-next" class="sched-next"></p>
+    <div class="row sched-buttons">
+      <button type="button" id="sd-delete" class="danger">Delete</button>
+      <button type="button" id="sd-cancel" class="ghost">Cancel</button>
+      <button type="button" id="sd-save" class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- 3 -->
+<section class="panel" id="viz">
+  <div class="ph"><h2>Visualization</h2><span class="spacer"></span>
+  </div>
+  <p class="muted" id="viz-target"></p>
+  <div class="viewer">
+    <span class="vbadge idle" id="vbadge"></span>
+    <div id="strips" class="strips fit">
+      <div class="scroller"><div class="stripsin" id="vruns"></div></div>
+      <p class="vnote">Numbers are segments. Zoom in, then scroll sideways.</p>
+    </div>
+  </div>
+  <p class="note" id="viz-note"></p>
+  <div class="row" id="zoom-row">
+    <span class="lbl" id="zoom-lbl">Zoom</span>
+    <div class="seg-toggle" role="group" aria-labelledby="zoom-lbl">
+      <button class="small" id="z-out" aria-label="Zoom out">−</button><button class="small" id="z-fit">Fit</button><button class="small" id="z-in" aria-label="Zoom in">+</button>
+    </div>
+    <span class="muted" id="z-lbl"></span>
+  </div>
+  <div class="row">
+    <label class="lbl">Theme <select id="viz-theme"></select></label>
+    <label class="lbl">Level <input id="viz-level" type="number" min="5" max="100" value="100" step="5">%</label>
+    <button id="viz-preview">Preview</button>
+    <button id="viz-play" class="live">Play live</button>
+    <button id="viz-stop" class="danger">Stop</button>
+  </div>
+  <p id="viz-describe" class="note"></p>
+</section>
+</div>
+
+<!-- tab 3 -->
+<div class="tab" id="tab-scene" hidden>
+<section class="panel" id="scene">
+  <div class="ph"><h2>Scene editor</h2><span class="muted">Change a theme's settings and see the whole effect at once. Nothing is sent until you press an amber button.</span></div>
+  <div class="row">
+    <label class="lbl">Lights <select id="sc-run"></select></label>
+    <label class="lbl">Theme <select id="sc-theme"></select></label>
+    <label class="lbl">Time shown <select id="sc-len">
+      <option value="5">5 s</option><option value="10" selected>10 s</option><option value="20">20 s</option></select></label>
+  </div>
+  <div class="row params" id="sc-params"></div>
+  <p class="note" id="sc-describe"></p>
+  <div class="scene-views">
+    <div class="scene-view">
+      <div class="sv-head"><span class="lbl">Strip: the lights as they'd look</span><span class="muted" id="sc-clock">0.0 s</span></div>
+      <canvas id="sc-strip" height="56"></canvas>
+    </div>
+    <div class="scene-view">
+      <div class="sv-head"><span class="lbl">Time strip: each row is a moment, top to bottom. Tap to jump there.</span></div>
+      <div class="ts-wrap">
+        <div class="ts-axis"><span id="sc-t0">0 s</span><span id="sc-t1">10 s</span></div>
+        <canvas id="sc-time" height="220"></canvas>
+      </div>
+      <div class="ts-foot"><span>light 1</span><span id="sc-nlab">light 50</span></div>
+    </div>
+  </div>
+  <div class="row">
+    <button id="sc-pause" class="small">Pause</button>
+    <button id="sc-house">Show in Visualization</button>
+    <button id="sc-play" class="live">Play live</button>
+    <button id="sc-stop" class="danger">Stop</button>
+    <span class="muted" id="sc-msg"></span>
+  </div>
+</section>
+</div>
+
+<!-- tab 2 -->
+<div class="tab" id="tab-ctrl" hidden>
+<main id="sections" class="runs"></main>
+</div>
+
+<!-- tab 4: what is set up, and the way back into the setup wizard -->
+<div class="tab" id="tab-settings" hidden>
+<section class="panel" id="settings">
+  <div class="ph"><h2>Settings</h2><span class="spacer"></span>
+    <a class="button primary" href="setup.html">Change setup</a></div>
+  <p class="muted">Controllers, runs of lights, time zone and location are set in the setup wizard.
+    Changing them restarts the server; schedules and themes are kept.</p>
+  <div id="settings-body"></div>
+</section>
+</div>
+</div>
+
+<div class="mobile-bar">
+  <button id="bar-stop" class="danger">Stop</button>
+  <button id="bar-off" class="live">Off</button>
+  <button id="bar-top">Quick Settings</button>
+</div>
+<footer>
+  Each light run's strip starts at light 1 on the left. One segment = 5 lights.
+  Apply sends a static theme as segment colors, and they stay on the kit. Play live streams every
+  light, which animated themes need. It runs until you press Stop or switch the kit off.
+</footer>
+
+<template id="section-tpl">
+  <section class="panel card">
+    <div class="head">
+      <div>
+        <h2 class="name"></h2>
+        <div class="sub"></div>
+      </div>
+      <div class="status"></div>
+      <button data-act="more" class="small more">More</button>
+    </div>
+    <div class="strip" role="group" aria-label="Segments: tap to select"></div>
+    <div class="strip-meta"><span class="what"></span><span class="sel"></span></div>
+
+    <div class="row power-row">
+      <div class="seg-toggle" role="group" aria-label="Power">
+        <button class="live" data-act="on">On</button><button class="live" data-act="off">Off</button>
+      </div>
+      <label class="bright">Brightness
+        <input type="range" min="1" max="100" data-act="brightness"><output></output>
+      </label>
+    </div>
+
+    <div class="row">
+      <label>Color <input type="color" value="#ffa04a" data-act="color-pick"></label>
+      <button data-act="presets">Presets ▾</button>
+      <button class="live" data-act="color">Whole kit</button>
+      <button class="live" data-act="segments" disabled>Selected segments</button>
+    </div>
+    <p class="note picked">Picked: Warm white 2200 K</p>
+    <div class="presets" hidden></div>
+
+    <div class="row pattern">
+      <select data-act="pattern"></select>
+      <span class="params"></span>
+    </div>
+    <p class="describe"></p>
+    <div class="row pattern">
+      <button data-act="preview">Preview</button>
+      <button data-act="ai">Describe as text</button>
+      <button class="live" data-act="play">Play live</button>
+      <button class="danger" data-act="stop">Stop</button>
+    </div>
+    <div class="ai-box" hidden>
+      <pre class="ai"></pre>
+      <button data-act="copy" class="small">Copy</button>
+    </div>
+    <div class="row foot">
+      <span class="job"></span>
+      <button data-act="cancel" class="small" hidden>Cancel</button>
+      <button data-act="restore" class="small live">Restore baseline</button>
+    </div>
+  </section>
+</template>
+<script src="app.js?v=10"></script>
+<script src="scene.js?v=10"></script>
+<script src="schedules.js?v=10"></script>
+</body>
+</html>

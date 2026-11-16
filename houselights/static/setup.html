@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>House Lights setup</title>
+<script>try { const t = localStorage.getItem("hl-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<link rel="stylesheet" href="style.css?v=10">
+<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#2b2e33">
+</head>
+<body>
+<header class="topbar">
+  <h1>House Lights setup</h1>
+  <span class="spacer"></span>
+  <span id="mode" class="pill">…</span>
+  <a class="button" id="back" href="./" hidden>Back to the dashboard</a>
+</header>
+<p id="banner" class="banner" hidden></p>
+
+<div class="wiz">
+  <ol class="steps" id="steps">
+    <li data-step="0">1 Lights</li><li data-step="1">2 Controllers</li><li data-step="2">3 Runs</li>
+    <li data-step="3">4 Test</li><li data-step="4">5 Time and place</li><li data-step="5">6 Save</li>
+  </ol>
+
+  <!-- 1: kind of lights -->
+  <section class="panel" data-page="0">
+    <div class="ph"><h2>What lights do you have?</h2></div>
+    <p class="muted">House Lights talks to the controllers over your home network. Pick the kind you have.</p>
+    <div class="choice" id="drivers"></div>
+    <p class="note" id="driver-note"></p>
+  </section>
+
+  <!-- 2: find controllers -->
+  <section class="panel" data-page="1" hidden>
+    <div class="ph"><h2>Find your controllers</h2></div>
+    <p class="muted">For Govee: switch on <b>LAN Control</b> for each device in the Govee Home app first
+      (device settings). Scanning only asks devices to say who they are; it changes nothing.</p>
+    <div class="row">
+      <button id="scan" class="primary">Scan this network</button>
+      <label class="lbl">and these addresses <input type="text" id="targets" size="28"
+        placeholder="e.g. 192.168.1.0/24 or 10.0.0.7"></label>
+      <span class="muted" id="scan-msg"></span>
+    </div>
+    <p class="note">If your lights are on a different network or subnet than this computer, a scan of
+      "this network" won't reach them: type their network (like 192.168.2.0/24) or their addresses.</p>
+    <div class="tablewrap"><table id="found"><thead><tr><th>Use</th><th>Address</th><th>Model</th><th>Device</th><th></th></tr></thead><tbody></tbody></table></div>
+    <div class="row">
+      <span class="lbl">Or add one by address:</span>
+      <input type="text" id="add-ip" size="16" placeholder="192.168.1.50">
+      <select id="add-model"></select>
+      <button id="add">Add</button>
+    </div>
+    <h3 class="lbl">Controllers you'll use</h3>
+    <div class="tablewrap"><table id="chosen"><thead><tr><th>Address</th><th>Model</th><th>Name (optional)</th><th>Enabled</th><th></th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <!-- 3: runs -->
+  <section class="panel" data-page="2" hidden>
+    <div class="ph"><h2>Name each run of lights</h2></div>
+    <p class="muted">A run is the string of lights on one controller. Use the light count from the
+      maker's app (the Test step lets you check it). "Light 1 is at" is just a note for you, like
+      "left end, seen from the street".</p>
+    <div class="tablewrap"><table id="runs"><thead><tr><th>Controller</th><th>Name</th><th>Short name</th>
+      <th>Lights</th><th>Light 1 is at</th><th>Reverse</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <!-- 4: test -->
+  <section class="panel" data-page="3" hidden>
+    <div class="ph"><h2>Test each run</h2></div>
+    <p class="muted" id="test-intro"></p>
+    <div id="tests" class="wrap"></div>
+  </section>
+
+  <!-- 5: time and place -->
+  <section class="panel" data-page="4" hidden>
+    <div class="ph"><h2>Time and place</h2></div>
+    <p class="muted">Schedules use your time zone. Sunrise and sunset schedules also need your
+      location; two decimals (about 1 km) is plenty. Leave it empty to use clock times only.</p>
+    <div class="kv">
+      <label class="lbl" for="tz">Time zone</label>
+      <div class="row"><input type="text" id="tz" list="tz-list" size="28"><datalist id="tz-list"></datalist>
+        <span class="muted" id="tz-hint"></span></div>
+      <label class="lbl" for="lat">Latitude</label><div class="row"><input type="number" id="lat" step="0.01" min="-90" max="90" style="width:8em"></div>
+      <label class="lbl" for="lon">Longitude</label><div class="row"><input type="number" id="lon" step="0.01" min="-180" max="180" style="width:8em">
+        <button id="geo" class="small">Use this device's location</button><span class="muted" id="geo-msg"></span></div>
+      <span class="lbl">Mode</span>
+      <div class="row" id="modes">
+        <label><input type="radio" name="mode" value="live"> Live: send to the lights</label>
+        <label><input type="radio" name="mode" value="dry"> Practice: log only, send nothing</label>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6: save -->
+  <section class="panel" data-page="5" hidden>
+    <div class="ph"><h2>Check and save</h2></div>
+    <div id="summary"></div>
+    <p class="muted" id="save-where"></p>
+    <p id="save-msg"></p>
+  </section>
+
+  <div class="navrow">
+    <span class="err" id="err"></span><span class="spacer"></span>
+    <button id="prev" class="ghost">Back</button>
+    <button id="next" class="primary">Next</button>
+  </div>
+</div>
+<script src="setup.js?v=10"></script>
+</body>
+</html>

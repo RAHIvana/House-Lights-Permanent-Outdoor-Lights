@@ -1,0 +1,8 @@
+# your settings, schedules and logs (python -m houselights --home elsewhere to keep them out of the folder)
+data/
+venv/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.@__thumb/
