@@ -149,7 +149,7 @@ LAN = Lan()
 
 
 def expand_targets(text, limit=1024):
-    """'192.168.1.0/24, 10.0.0.7' -> list of addresses to scan one by one."""
+    """'192.168.2.0/24, 192.168.2.7' -> list of addresses to scan one by one."""
     out = []
     for part in str(text or "").replace(";", ",").replace(" ", ",").split(","):
         part = part.strip()

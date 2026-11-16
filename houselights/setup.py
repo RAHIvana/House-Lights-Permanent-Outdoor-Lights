@@ -183,7 +183,7 @@ def state():
 
 @router.post("/discover")
 def discover(body: dict):
-    """body: {types: ["govee", "wled", ...], targets: "192.168.1.0/24, 10.0.0.7"}. Read-only:
+    """body: {types: ["govee", "wled", ...], targets: "192.168.2.0/24, 192.168.2.7"}. Read-only:
     controllers are only asked who they are. Each type reports its own problems."""
     types = body.get("types") or [body.get("type", "govee")]
     devices, problems = [], {}
