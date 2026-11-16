@@ -2,7 +2,8 @@
   LABEL, NOTE, TESTED, MODELS          shown in the setup wizard
   available() -> (ok, reason)         e.g. an optional package is missing
   options(c, secret) -> (opts, secret) checks the controller's own settings
-  discover(targets) -> [device rows]   find controllers on the network
+  discover(targets, deep, expect, known) -> [device rows]   find controllers on the network
+                                       (deep: try harder; stop at `expect` with `known` addresses)
   probe(info) -> [device rows]         check one controller added by address
   read_status(kits) -> {id: status}    power, brightness, colour (or None)
   Kit                                  commands; Kit.CAPS says what it can do (see base.py)

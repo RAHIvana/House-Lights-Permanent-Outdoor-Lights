@@ -101,13 +101,14 @@ def parse_dps(dps):
             "color": {"r": rgb[0], "g": rgb[1], "b": rgb[2]}, "colorTemInKelvin": kelvin}
 
 
-def discover(targets=""):
-    """Tuya devices announce themselves by UDP broadcast (ports 6666/6667/7000); listen ~6 s.
-    Only devices on this computer's own network are heard; typed addresses are ignored."""
+def discover(targets="", deep=False, expect=0, known=()):
+    """Tuya devices announce themselves by UDP broadcast (ports 6666/6667/7000); listen ~6 s,
+    20 s for a deep scan. Only devices on this computer's own network are heard; typed
+    addresses are ignored."""
     tt = _lib()
     if not tt:
         raise ValueError(f"tinytuya is not installed ({INSTALL})")
-    found = tt.deviceScan(False, 6) or {}
+    found = tt.deviceScan(False, 20 if deep else 6) or {}
     rows = []
     for ip, d in found.items():
         dev = str(d.get("gwId") or d.get("id") or "")

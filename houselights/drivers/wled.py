@@ -61,11 +61,13 @@ def _row(ip, info):
             "rgbw": bool((leds.get("lc", 1) & 2) if isinstance(leds.get("lc"), int) else leds.get("rgbw"))}
 
 
-def discover(targets=""):
-    """Ask every address (typed, or this computer's /24 network) for /json/info."""
+def discover(targets="", deep=False, expect=0, known=()):
+    """Ask every address (typed, or this computer's /24 network) for /json/info. A deep scan
+    waits longer for slow controllers."""
     from .govee import expand_targets
     ips = expand_targets(targets) if str(targets or "").strip() else expand_targets(",".join(net.local_networks()))
-    found = net.probe_many(lambda ip: _info(ip, timeout=1.0), ips)
+    ips = [ip for ip in ips if ip not in set(known)]
+    found = net.probe_many(lambda ip: _info(ip, timeout=4.0 if deep else 1.0), ips)
     return [_row(ip, info) for ip, info in sorted(found.items(), key=lambda kv: socket.inet_aton(kv[0]))]
 
 

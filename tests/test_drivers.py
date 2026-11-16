@@ -92,6 +92,8 @@ check("WLED per-light calls: 256 + 44 colours", len(calls) == 2 and calls[1]["se
 rows = wled.discover("127.0.0.21, 127.0.0.22, 127.0.0.23")
 check("WLED discover finds 2 with their light counts", [(r["ip"], r["lights"]) for r in rows]
       == [("127.0.0.21", 60), ("127.0.0.22", 600)])
+r = setup.discover({"types": ["wled"], "targets": "127.0.0.21, 127.0.0.22", "deep": True, "known": {"wled": ["127.0.0.21"]}})
+check("wizard deep scan skips controllers it already has", [d["ip"] for d in r["devices"]] == ["127.0.0.22"])
 try:
     wled.probe({"ip": "127.0.0.29"})
     check("WLED probe: nothing there -> error", False)
@@ -211,8 +213,9 @@ check("Tuya test shows a colour, then puts the light back",
 ASKED = {}
 
 
-def lossy_govee(ip, drop_first):
-    """A Govee device that answers "scan", optionally ignoring the first request."""
+def lossy_govee(ip, drop_first, every=1):
+    """A Govee device that answers "scan": optionally not the first request, and then only
+    every `every`th one (real controllers ignore many requests)."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.bind((ip, govee.SCAN_PORT))
 
@@ -220,7 +223,7 @@ def lossy_govee(ip, drop_first):
         while True:
             data, (src, _) = s.recvfrom(4096)
             ASKED[ip] = ASKED.get(ip, 0) + 1
-            if drop_first and ASKED[ip] == 1:
+            if (drop_first and ASKED[ip] == 1) or ASKED[ip] % every:
                 continue
             reply = {"msg": {"cmd": "scan", "data": {"ip": ip, "device": "FA:KE:00:00:00:00:00:01", "sku": "H806A"}}}
             s.sendto(json.dumps(reply).encode(), (src, govee.REPLY_PORT))
@@ -236,6 +239,15 @@ check("Govee scan: a device that missed the first request is found in a later ro
 t0 = time.time()
 rows = govee.probe({"ip": "127.0.0.13"})
 check("Govee add by address: stops as soon as it answers", len(rows) == 1 and time.time() - t0 < 0.5)
+lossy_govee("127.0.0.15", drop_first=False, every=15)     # answers one request in 15
+lossy_govee("127.0.0.16", drop_first=False)
+quick = govee.discover("127.0.0.15, 127.0.0.16")
+check("Govee quick scan: 10 tries miss a controller that answers 1 in 15",
+      [r["ip"] for r in quick] == ["127.0.0.16"] and ASKED["127.0.0.15"] == 10)
+t0, before = time.time(), ASKED["127.0.0.16"]
+deep = govee.discover("127.0.0.15, 127.0.0.16", deep=True, expect=2, known=["127.0.0.16"])
+check("Govee deep scan finds it, skips the known one, stops once all are found",
+      [r["ip"] for r in deep] == ["127.0.0.15"] and ASKED["127.0.0.16"] == before and time.time() - t0 < 10)
 
 # --- settings with secrets ------------------------------------------------------------------------
 cfg = {"controllers": [{"id": "t1", "type": "tuya", "model": "Tuya light", "ip": "127.0.0.41",

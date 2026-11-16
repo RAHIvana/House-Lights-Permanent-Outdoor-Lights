@@ -95,22 +95,45 @@ class Lan:
                 rx.close()
         return result
 
-    def scan(self, targets=(), wait=2.5, multicast=True, rounds=3):
+    def scan(self, targets=(), wait=2.5, multicast=True, rounds=3, expect=0, known=()):
         """Ask devices to identify themselves: multicast on this network, plus unicast to each
         address in `targets` (needed when the lights are on another subnet).
 
-        Asks up to `rounds` times within `wait` seconds, each time only the addresses that
-        haven't answered yet: a burst to a whole /24 on another subnet loses packets (the
-        router has to look up every address at once), so one try missed controllers at random.
-        With only unicast targets, it stops as soon as all of them have answered."""
+        Asks `rounds` times within `wait` seconds, each time only the addresses that haven't
+        answered yet. Controllers answer only some requests (measured on H806A over Wi-Fi: one
+        in 4 to one in 10), so a single try misses them at random; asking again finds them.
+        Stops early when every unicast target has answered (without multicast), or when
+        `expect` devices are known, counting the addresses in `known` found before."""
         found, answered = {}, set()
-        targets = list(targets)
+        targets = [ip for ip in targets if ip not in set(known)]
+        period = wait / max(1, rounds)
+
+        def done():
+            if expect and len(set(found) | set(known)) >= expect:
+                return True
+            return not multicast and all(ip in answered for ip in targets)
+
+        def collect(until):
+            while time.time() < until and not done():
+                try:
+                    d, a = rx.recvfrom(4096)
+                except (socket.timeout, ConnectionResetError):
+                    continue
+                m = self._msg(d)
+                if m and m.get("cmd") == "scan" and isinstance(m.get("data"), dict):
+                    data = m["data"]
+                    found[data.get("ip") or a[0]] = data
+                    answered.update({a[0], str(data.get("ip") or a[0])})
+
         with self._reply_lock:
             rx = self._listen()
+            rx.settimeout(0.02)
             try:
                 body = {"account_topic": "reserve"}
                 start, multicast_ok = time.time(), multicast
                 for r in range(rounds):
+                    if done():
+                        break
                     if multicast_ok:
                         try:
                             m = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -120,26 +143,16 @@ class Lan:
                         except OSError as e:
                             log.warning("multicast scan failed: %s", e)
                             multicast_ok = False
-                    for n, ip in enumerate(ip for ip in targets if ip not in answered):
-                        if n and n % 32 == 0:
-                            time.sleep(0.005)              # spread a big burst a little
-                        try:
-                            self.send(ip, "scan", body, port=SCAN_PORT)
-                        except OSError:
-                            pass
-                    end = start + wait * (r + 1) / rounds
-                    while time.time() < end and (multicast or not set(targets) <= answered):
-                        try:
-                            d, a = rx.recvfrom(4096)
-                        except socket.timeout:
-                            continue
-                        m = self._msg(d)
-                        if m and m.get("cmd") == "scan" and isinstance(m.get("data"), dict):
-                            data = m["data"]
-                            found[data.get("ip") or a[0]] = data
-                            answered.update({a[0], str(data.get("ip") or a[0])})
-                    if not multicast and set(targets) <= answered:
-                        break
+                    todo = [ip for ip in targets if ip not in answered]
+                    for k in range(0, len(todo), 16):      # spread a big burst, reading replies meanwhile
+                        for ip in todo[k:k + 16]:
+                            try:
+                                self.send(ip, "scan", body, port=SCAN_PORT)
+                            except OSError:
+                                pass
+                        if len(todo) > 16:
+                            collect(time.time() + min(0.01, period / 40))
+                    collect(start + period * (r + 1))
             finally:
                 rx.close()
         return found
@@ -191,15 +204,21 @@ def probe(info):
     ip = expand_targets(info.get("ip", ""))
     if len(ip) != 1:
         raise ValueError("type one IP address")
-    found = LAN.scan(ip, wait=2.0, multicast=False)
+    found = LAN.scan(ip, wait=6.0, multicast=False, rounds=40)      # one address: ask often, stop at the answer
     if not found:
         raise ValueError(f"no Govee device answered at {ip[0]}. Is LAN Control on in the Govee Home app?")
     return [_row(a, d) for a, d in found.items()]
 
 
-def discover(targets=""):
-    """Devices that answered a scan: [{ip, model, device_tail, supported, label}]."""
-    found = LAN.scan(expand_targets(targets))
+QUICK_SCAN = (3.0, 10)          # seconds, rounds: one request every 0.3 s to each silent address
+DEEP_SCAN = (30.0, 100)         # the wizard's deep scan, when the quick one didn't find them all
+
+
+def discover(targets="", deep=False, expect=0, known=()):
+    """Devices that answered a scan: [{ip, model, device_tail, supported, label}]. A deep scan
+    keeps asking for longer; it stops once `expect` devices are known (with those in `known`)."""
+    wait, rounds = DEEP_SCAN if deep else QUICK_SCAN
+    found = LAN.scan(expand_targets(targets), wait=wait, rounds=rounds, expect=expect, known=known)
     return [_row(ip, d) for ip, d in sorted(found.items(), key=lambda kv: _ipkey(kv[0]))]
 
 

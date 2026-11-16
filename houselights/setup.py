@@ -19,6 +19,7 @@ log = logging.getLogger("houselights")
 router = APIRouter(prefix="/api/setup")
 
 TEST_SECONDS = 60
+DEEP_SECONDS = 30                  # longest deep scan (Govee: keeps asking silent addresses)
 TESTS = {}                    # (ip, zone) -> Streamer playing a test
 HOOKS = {"before_test": None, "settings": None}     # set by app.py
 
@@ -178,14 +179,19 @@ def state():
             "forced_dry": settings.forced_dry(),
             "home": settings.home(),
             "server_timezone": _server_tz(),
+            "deep_scan_seconds": DEEP_SECONDS,
             "running": bool(s and s.configured)}
 
 
 @router.post("/discover")
 def discover(body: dict):
-    """body: {types: ["govee", "wled", ...], targets: "192.168.2.0/24, 192.168.2.7"}. Read-only:
-    controllers are only asked who they are. Each type reports its own problems."""
+    """body: {types: ["govee", "wled", ...], targets: "192.168.2.0/24, 192.168.2.7", deep: false,
+    expect: {"govee": 3}, known: {"govee": ["192.168.2.20"]}}. Read-only: controllers are only
+    asked who they are. A deep scan keeps asking for up to DEEP_SECONDS and stops once it knows
+    `expect` controllers of a kind (counting the `known` ones). Each type reports its own problems."""
     types = body.get("types") or [body.get("type", "govee")]
+    deep = bool(body.get("deep"))
+    expect, known = body.get("expect") or {}, body.get("known") or {}
     devices, problems = [], {}
     for t in types:
         drv = drivers.get(t)
@@ -197,12 +203,14 @@ def discover(body: dict):
             problems[t] = reason
             continue
         try:
-            devices += drv.discover(body.get("targets", ""))
+            devices += drv.discover(body.get("targets", ""), deep=deep, expect=int(expect.get(t) or 0),
+                                    known=[str(ip) for ip in known.get(t) or []])
         except ValueError as e:
             problems[t] = str(e)
         except OSError as e:
             problems[t] = f"could not scan the network: {e}"
-    log.info("setup scan (%s, %s): %d device(s)%s", ",".join(types), body.get("targets") or "this network",
+    log.info("setup %sscan (%s, %s): %d device(s)%s", "deep " if deep else "", ",".join(types),
+             body.get("targets") or "this network",
              len(devices), f", problems: {problems}" if problems else "")
     if problems and not devices and len(types) == 1:
         raise HTTPException(400, next(iter(problems.values())))

@@ -102,12 +102,13 @@ function foundCounts() {
   return Object.fromEntries(Object.entries(ips).map(([t, s]) => [t, s.size]));
 }
 const missingTypes = () => { const have = foundCounts(); return [...W.types].filter(t => W.counts[t] && (have[t] || 0) < W.counts[t]); };
-function countNote() {
+function countNote(afterDeep = false) {
   const have = foundCounts();
   return [...W.types].filter(t => W.counts[t]).map(t => {
-    const n = have[t] || 0, want = W.counts[t], name = drv(t).label.split(" (")[0];
+    const n = have[t] || 0, want = W.counts[t], name = drv(t).label.split(" (")[0], miss = want - n === 1 ? "one" : "ones";
     return n >= want ? `${name}: found all ${want}.`
-      : `${name}: found ${n} of ${want}. Scan again, or add the missing ${want - n === 1 ? "one" : "ones"} by address below.`;
+      : afterDeep ? `${name}: found ${n} of ${want}, even with a deep scan. Add the missing ${miss} by address below.`
+      : `${name}: found ${n} of ${want}. Run a deep scan, or add the missing ${miss} by address below.`;
   }).join(" ");
 }
 function showCount() { const n = countNote(); if (n) $("#scan-msg").textContent = n; }
@@ -191,30 +192,52 @@ function drawTypeNotes() {
     $("#type-notes").appendChild(li);
   }
 }
-async function scan() {
-  err(""); $("#scan").disabled = true; $("#scan-msg").textContent = "Scanning… (a network scan can take up to 10 seconds)";
-  const autoAdd = !W.cfg.controllers.length, targets = $("#targets").value;
-  const merge = rows => { for (const d of rows) if (!W.found.some(f => f.type === d.type && sameSpot(f, d))) W.found.push(d); };
+// Quick scan first. If the user said how many controllers and some are missing, a deep scan
+// follows by itself; otherwise "Missing lights? Run deep scan" offers one.
+async function discover(types, deep, expect) {
+  const body = {types, targets: $("#targets").value, deep};
+  if (deep) {
+    body.expect = expect ? Object.fromEntries(types.filter(t => W.counts[t]).map(t => [t, W.counts[t]])) : {};
+    body.known = {};
+    for (const x of [...W.found, ...W.cfg.controllers]) if (types.includes(x.type)) (body.known[x.type] ||= []).push(x.ip);
+  }
+  const r = await api("/api/setup/discover", body);
+  for (const d of r.devices) if (!W.found.some(f => f.type === d.type && sameSpot(f, d))) W.found.push(d);
+  return r.problems || {};
+}
+function countdown(text) {
+  let left = W.info.deep_scan_seconds || 30;
+  const show = () => { $("#scan-msg").textContent = `${text} About ${left} s left…`; };
+  show();
+  const t = setInterval(() => { left = Math.max(1, left - 1); show(); }, 1000);
+  return () => clearInterval(t);
+}
+async function scan(forceDeep = false) {
+  err(""); $("#scan").disabled = $("#deep").disabled = true;
+  const autoAdd = !W.cfg.controllers.length;
+  let probs = {}, deepRan = false, stop = () => {};
   try {
-    W.found = [];
-    const r = await api("/api/setup/discover", {types: [...W.types], targets});
-    merge(r.devices);
-    let probs = r.problems || {};
-    const short = missingTypes();            // fewer than the user said: ask those kinds once more
-    if (short.length) {
-      $("#scan-msg").textContent = "Not all of them answered yet; scanning once more…";
-      drawFound();
-      const r2 = await api("/api/setup/discover", {types: short, targets});
-      merge(r2.devices);
-      probs = {...probs, ...(r2.problems || {})};
+    if (!forceDeep) {
+      W.found = [];
+      $("#scan-msg").textContent = "Scanning…";
+      probs = await discover([...W.types], false, true);
     }
+    const short = missingTypes();
+    if (forceDeep || short.length) {
+      drawFound();
+      stop = countdown(forceDeep ? "Deep scan: asking every address again, for longer."
+                                 : "Didn't find all the controllers: running a deep scan.");
+      probs = {...probs, ...(await discover(forceDeep ? [...W.types] : short, true, !forceDeep))};
+      deepRan = true;
+    }
+    stop();
     const p = Object.entries(probs).map(([t, m]) => `${drv(t).label}: ${m}`);
-    const counted = countNote();
-    $("#scan-msg").textContent = (counted || (W.found.length ? `Found ${W.found.length}.` : "Nothing answered."))
-      + (p.length ? " " + p.join(" · ") : "");
+    $("#scan-msg").textContent = (countNote(deepRan) || (W.found.length ? `Found ${W.found.length}${deepRan ? " after a deep scan" : ""}.`
+      : `Nothing answered${deepRan ? ", even in a deep scan" : ""}.`)) + (p.length ? " " + p.join(" · ") : "");
     if (autoAdd) for (const d of W.found) if (d.supported && !d.needs_key) addController(d);
-  } catch (e) { $("#scan-msg").textContent = ""; err(e.message); }
-  $("#scan").disabled = false;
+  } catch (e) { stop(); $("#scan-msg").textContent = ""; err(e.message); }
+  $("#scan").disabled = $("#deep").disabled = false;
+  $("#deep").hidden = false;
   drawFound(); drawChosen();
 }
 async function addByAddress() {
@@ -518,7 +541,8 @@ async function init() {
   else if (W.info.configured) $("#back").hidden = false;
   else { b.hidden = false; b.textContent = "Welcome! No settings yet: this wizard sets up your lights. It takes a few minutes."; }
   drawDrivers();
-  $("#scan").onclick = scan;
+  $("#scan").onclick = () => scan(false);
+  $("#deep").onclick = () => scan(true);
   $("#add").onclick = addByAddress;
   $("#geo").onclick = geolocate;
   $("#prev").onclick = () => go(W.step - 1);

@@ -62,10 +62,13 @@ def _rows(ip, zones):
     return out
 
 
-def discover(targets=""):
+def discover(targets="", deep=False, expect=0, known=()):
+    """Ask every address (typed, or this computer's /24 network) for its zones. A deep scan
+    waits longer for slow controllers."""
     from .govee import expand_targets
     ips = expand_targets(targets) if str(targets or "").strip() else expand_targets(",".join(net.local_networks()))
-    found = net.probe_many(lambda ip: _zones(ip, timeout=1.0), ips)
+    ips = [ip for ip in ips if ip not in set(known)]
+    found = net.probe_many(lambda ip: _zones(ip, timeout=4.0 if deep else 1.0), ips)
     rows = []
     for ip in sorted(found, key=socket.inet_aton):
         rows += _rows(ip, found[ip])

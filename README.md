@@ -113,11 +113,14 @@ can run it again later from the **Settings** tab (**Change setup**).
 
 1. **Lights**: tick every kind of controller you have. You can mix them. If you know how
    many controllers of each kind you have, pick the number: the scan then tells you when
-   it has found them all, and scans once more if some didn't answer.
+   it has found them all, and runs a deep scan by itself if some didn't answer.
 2. **Controllers**: press **Scan**. It asks controllers on your network to identify
    themselves and changes nothing. Tick the ones to use. If your lights are on another
    network or subnet than this computer, type that network (like `192.168.2.0/24`) or the
    controllers' addresses before scanning. You can also add a controller by its address.
+   If some controllers are missing, press **Missing lights? Run deep scan**: it keeps
+   asking for up to half a minute. Govee controllers ignore many requests (often three in
+   four), so a quick scan can miss them; asking again finds them.
    A JellyFish controller shows one line per zone; each zone becomes its own run.
 3. **Runs**: name each run of lights. WLED and JellyFish report their light counts. For
    Govee, use the count from the Govee Home app or count it in the next step.
