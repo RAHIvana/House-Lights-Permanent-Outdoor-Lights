@@ -27,6 +27,7 @@ router = APIRouter(prefix="/api/setup")
 TEST_SECONDS = 60
 DEEP_SECONDS = 30                  # longest deep scan (Govee: keeps asking silent addresses)
 TESTS = {}                    # (ip, zone) -> Streamer playing a test
+SWITCHED = {}                 # (ip, zone) -> kit switched on for the tests because it was off (else None)
 HOOKS = {"before_test": None, "settings": None}     # set by app.py
 
 RED, GREEN, BLUE, WHITE, OFF = (255, 0, 0), (0, 200, 0), (0, 0, 255), (255, 255, 255), (0, 0, 0)
@@ -334,23 +335,54 @@ def test(body: dict):
         old.stop()
     st = Streamer(kit, lights, 15)
     try:
+        if not slow:
+            switch_on(drv, kit, where)
         st.start_fn(f"test:{name}", render, animated, 100, seconds=TEST_SECONDS, slow_ok=True)
     except (ValueError, drivers.NotAllowed) as e:
         raise HTTPException(400, str(e))
+    except OSError as e:
+        raise HTTPException(502, f"couldn't reach the controller: {e}")
     TESTS[where] = st
     log.info("setup test %s on %s (%d lights%s)", name, kit.tag, lights, ", reversed" if reverse else "")
     return {"ok": True, "live": kit.live, "label": label, "seconds": TEST_SECONDS, "lights_per_segment": lps,
             "frame_lights": lights, "restore": caps.get("restore"), "slow": slow}
 
 
+def switch_on(drv, kit, where):
+    """A stream shows nothing on a controller that is switched off, so switch it on first.
+    The first time, ask whether it was off (when the controller can say), so switch_off_tested
+    can put it back off when the tests stop. No answer: it stays on afterwards."""
+    if where not in SWITCHED:
+        st = None
+        if kit.live and kit.caps.get("status"):
+            try:
+                st = drv.read_status([kit]).get(kit.c.id)
+            except Exception:                     # no answer is fine: just switch it on
+                st = None
+        SWITCHED[where] = kit if (st or {}).get("onOff") == 0 else None
+    kit.power(True)
+
+
+def switch_off_tested(keys=None):
+    """Switch off again the controllers that were off before their tests."""
+    for k in [k for k in SWITCHED if keys is None or k in keys]:
+        kit = SWITCHED.pop(k)
+        if kit is not None:
+            try:
+                kit.power(False)
+                log.info("setup tests done on %s: switched it off again", kit.tag)
+            except Exception as e:
+                log.warning("couldn't switch %s off again: %s", kit.tag, e)
+
+
 @router.post("/test/stop")
 def test_stop(body: dict):
-    keys = [k for k in TESTS if not body.get("ip") or (k[0] == body["ip"] and
-                                                       (not body.get("zone") or k[1] == body["zone"]))]
-    for k in keys:
+    match = (lambda k: not body.get("ip") or (k[0] == body["ip"] and (not body.get("zone") or k[1] == body["zone"])))
+    for k in [k for k in TESTS if match(k)]:
         st = TESTS.pop(k, None)
         if st:
             st.stop()
+    switch_off_tested({k for k in SWITCHED if match(k)})
     return {"ok": True}
 
 
@@ -364,6 +396,7 @@ def save(body: dict):
     for st in list(TESTS.values()):
         st.stop()
     TESTS.clear()
+    switch_off_tested()
     restarting = runtime.request_restart()
     return {"ok": True, "config": settings.public_config(clean), "restarting": restarting}
 

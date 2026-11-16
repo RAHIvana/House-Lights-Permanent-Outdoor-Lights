@@ -98,5 +98,53 @@ p = setup.sun_today(78.2, 15.6, "Arctic/Longyearbyen", day)
 check(f"sun: polar night has no sunrise {p}", p["sunrise"] is None and p["sunset"] is None)
 fails("sun: bad time zone", lambda: setup.sun_today(1, 2, "Mars/Olympus"), 400, "time zone")
 
+# --- tests switch a controller on first, and back off afterwards if it was off ---
+class FakeC:
+    id, tag = "c1", "fake"
+
+
+class FakeKit:
+    live, caps, c, tag = True, {"stream": True, "status": True}, FakeC(), "fake"
+
+    def __init__(self):
+        self.calls = []
+
+    def power(self, on):
+        self.calls.append(on)
+
+
+class FakeDrv:
+    def __init__(self, status):
+        self.status, self.asked = status, 0
+
+    def read_status(self, kits):
+        self.asked += 1
+        return {"c1": self.status}
+
+
+setup.SWITCHED.clear()
+kit, drv = FakeKit(), FakeDrv({"onOff": 0})
+setup.switch_on(drv, kit, ("192.168.2.50", ""))
+setup.switch_on(drv, kit, ("192.168.2.50", ""))                # the next test on the same controller
+check("switch on: asked once, switched on each test", drv.asked == 1 and kit.calls == [True, True])
+setup.switch_off_tested({("192.168.2.51", "")})
+check("switch off: other controllers untouched", kit.calls == [True, True])
+setup.switch_off_tested({("192.168.2.50", "")})
+check("switch off: was off, so off again", kit.calls == [True, True, False] and not setup.SWITCHED)
+kit, drv = FakeKit(), FakeDrv({"onOff": 1})
+setup.switch_on(drv, kit, ("192.168.2.50", ""))
+setup.switch_off_tested()
+check("was on: stays on", kit.calls == [True])
+kit, drv = FakeKit(), FakeDrv(None)
+setup.switch_on(drv, kit, ("192.168.2.50", ""))
+setup.switch_off_tested()
+check("no answer: switched on, left on", kit.calls == [True])
+kit = FakeKit()
+kit.live = False
+drv = FakeDrv({"onOff": 0})
+setup.switch_on(drv, kit, ("192.168.2.50", ""))
+setup.switch_off_tested()
+check("practice mode: doesn't ask", drv.asked == 0 and kit.calls == [True])
+
 print(f"\n{'ALL OK' if not FAILS else f'{len(FAILS)} FAILED'}")
 sys.exit(1 if FAILS else 0)
