@@ -24,12 +24,38 @@ schedules to work; any phone or computer on that network can open the dashboard.
 
 | Controller | What works | Tested with real hardware? |
 |---|---|---|
-| **Govee** Permanent Outdoor Lights Pro **H806A** | Everything: animated themes light by light, static themes, colours, schedules | **Yes** |
+| **Govee H806A** | Everything: animated themes light by light, static themes, colours, schedules | **Yes** |
+| **Govee permanent outdoor lights** (other models, see below) | Basic control; animated themes light by light to try | Not yet |
+| **Any other Govee light with LAN Control** | One colour at a time: colours, warm white, on/off, brightness, schedules. Themes show their main colour | Not yet |
 | **WLED**: the open-source controller firmware (ESP8266/ESP32), also on some brand-name kits | Everything: animated themes light by light, static themes, colours, schedules | Not yet: tested against a simulator built from the WLED documentation |
 | **JellyFish Lighting** | Static themes (up to 30 colours per pattern: exact for banded themes, rounded otherwise), colours, on/off, brightness, schedules. Animated themes show as a still picture | Not yet: simulator built from JellyFish's API documentation |
 | **Tuya / Smart Life**: the app platform behind many Amazon brands, e.g. most ASAHOM kits | One colour at a time: colours, warm white, on/off, brightness, schedules. Themes show their main colour | Not yet: tested with a stand-in for the tinytuya library |
 
 If you try one of the untested kinds, please report what works and what doesn't.
+
+### Govee models
+
+House Lights talks to Govee lights over your home network with Govee's LAN API: switch on
+**LAN Control** for each device in the Govee Home app. Govee documents only the basic LAN
+commands (on/off, brightness, colour, status). Colouring segments and streaming every light
+use two further Govee commands that are checked on the H806A only, so other models get them
+step by step:
+
+| Models | Product (as sold) | In House Lights |
+|---|---|---|
+| H806A | Govee permanent outdoor lights (product name to be confirmed) | Everything; tested on real controllers |
+| H705A, H705B, H705C | Permanent Outdoor Lights | Basic control; light-by-light animation to try |
+| H705D, H705E, H705F | Permanent Outdoor Lights 2 | Basic control; light-by-light animation to try |
+| H706A, H706B, H706C | Permanent Outdoor Lights Pro | Basic control; light-by-light animation to try |
+| H805A, H805B, H805C | Permanent Outdoor Lights Elite | Basic control; light-by-light animation to try |
+| H707A, H707B, H707C | Permanent Outdoor Lights Prism | Basic control; light-by-light animation to try |
+| H3A51, H3A52, H3A53 | Permanent Outdoor Lights 2 Pro | Basic control (LAN Control not confirmed); light-by-light animation to try |
+| Any other Govee model with LAN Control (floodlights, spotlights, path, string and wall lights) | | One colour at a time |
+
+"To try": the wizard's **Check** test (red first, blue last) shows at once whether your model
+plays light by light. If it does, please report the model so it can be marked as tested.
+Model numbers and names come from Govee's site and community lists; check your box or the
+Govee Home app for yours.
 
 ### Which one is my brand?
 
@@ -336,6 +362,15 @@ On Windows use `venv\Scripts\python tests\test_settings.py` and so on.
 Each kind is a driver in `houselights/drivers/`. `base.py` describes what a driver provides
 and its capabilities (per-light streaming, static frames or segments, status, how the light
 count is found); the setup wizard and the dashboard adapt to them.
+
+## Coming later
+
+**Phase 2: Govee's cloud REST API.** Govee also offers a REST API over the internet (you ask
+Govee for a free API key in the Govee Home app). It would let House Lights control Govee
+models without LAN Control, and offer Govee's own scenes, on any computer it runs on
+(Windows, Mac, Linux or Raspberry Pi). It needs the internet and a Govee account, and Govee
+limits how many requests a key may send, so it fits schedules and scene changes rather than
+light-by-light animation. Today everything works locally, without a cloud account.
 
 ## License
 
