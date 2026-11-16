@@ -3,6 +3,8 @@
 // time zone and location, then save config.json (the server restarts with it).
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
+// A file in the settings folder, written with the server's separator (backslashes on Windows).
+const inHome = (home, name) => home + (home.includes("\\") ? "\\" : "/") + name;
 
 async function api(path, body) {
   const res = await fetch(path, body === undefined ? {} : {
@@ -369,7 +371,7 @@ function drawSummary() {
   const p = document.createElement("p");
   p.textContent = `Mode: ${W.cfg.mode === "live" ? "Live" : "Practice"} · Time zone: ${W.cfg.timezone} · Location: ${W.cfg.location ? `${W.cfg.location.lat}, ${W.cfg.location.lon}` : "not set"}`;
   $("#summary").replaceChildren(t, p);
-  $("#save-where").textContent = `Saved to ${W.info.home}/config.json (keys such as Tuya's go to secrets.json, readable only by you). The server restarts with it.`;
+  $("#save-where").textContent = `Saved to ${inHome(W.info.home, "config.json")} (keys such as Tuya's go to secrets.json, readable only by you). The server restarts with it.`;
 }
 async function save() {
   err(""); $("#next").disabled = true; $("#prev").disabled = true;

@@ -3,6 +3,8 @@
 // an on-screen preview (PREVIEW) and the frames of what is playing live (LIVEF).
 // A single paint loop draws the Visualization strips and each run's strip from it.
 const $ = (sel, el = document) => el.querySelector(sel);
+// A file in the settings folder, written with the server's separator (backslashes on Windows).
+const inHome = (home, name) => home + (home.includes("\\") ? "\\" : "/") + name;
 let CONFIG = null;
 const CARDS = {};             // section id -> card
 const SEC = {};               // section id -> section config
@@ -759,7 +761,7 @@ function buildSettings() {
     <p>Mode: <b>${CONFIG.mode === "live" ? "Live (sends to the lights)" : "Practice (nothing is sent)"}</b> ·
       Time zone: <b>${esc(CONFIG.timezone)}</b> ·
       Location: <b>${CONFIG.location ? "set (sunrise/sunset schedules work)" : "not set (clock-time schedules only)"}</b></p>
-    <p class="muted">Settings file: ${esc(CONFIG.home)}/config.json</p>`;
+    <p class="muted">Settings file: ${esc(inHome(CONFIG.home, "config.json"))}</p>`;
 }
 
 // --- light / dark ------------------------------------------------------------------------------
