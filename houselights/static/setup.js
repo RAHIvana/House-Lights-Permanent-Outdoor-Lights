@@ -479,7 +479,24 @@ async function go(step) {
   scrollTo(0, 0);
 }
 
+// --- light / dark (the same choice as on the dashboard: saved in this browser) -------------------
+function curTheme() {
+  return document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+}
+function paintTheme() {
+  $("#th-light").classList.toggle("on", curTheme() === "light");
+  $("#th-dark").classList.toggle("on", curTheme() === "dark");
+}
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("hl-theme", t); } catch (e) { /* private window: this page only */ }
+  paintTheme();
+}
+
 async function init() {
+  $("#th-light").onclick = () => setTheme("light");
+  $("#th-dark").onclick = () => setTheme("dark");
+  paintTheme();
   W.info = await api("/api/setup");
   W.cfg = JSON.parse(JSON.stringify(W.info.config));
   W.cfg.controllers = Array.isArray(W.cfg.controllers) ? W.cfg.controllers : [];
