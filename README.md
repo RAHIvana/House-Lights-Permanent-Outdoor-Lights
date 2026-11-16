@@ -61,8 +61,12 @@ controller and keep the lights; then pick WLED. Check that the WLED controller s
 lights (LED type, voltage) before you swap. Support for a brand can change with new models
 and firmware: if yours has gained a local API, please open an issue.
 
-WLED is the most capable choice: every light can have its own colour, and animated themes
-play smoothly. Tuya / Smart Life lights take one colour at a time.
+Govee and WLED both give every light its own colour and smooth animated themes. If you have
+Govee lights, keep the Govee controller and pick Govee: House Lights uses Govee's own LAN API,
+which is tested on real H806A controllers and works better than swapping in a WLED
+controller, and you keep the Govee Home app too. For other brands without a local API, a
+WLED controller is the most capable choice. Tuya / Smart Life lights take one colour at a
+time.
 
 ## Install
 
