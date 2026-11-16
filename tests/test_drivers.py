@@ -7,6 +7,7 @@ ports; Tuya uses a stand-in for the tinytuya library. Linux (needs 127.0.0.2+ ad
 """
 import importlib.util
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -209,10 +210,19 @@ cfg = {"controllers": [{"id": "t1", "type": "tuya", "model": "Tuya light", "ip":
                        {"id": "w1", "type": "wled", "model": "WLED", "ip": "127.0.0.21"}],
        "runs": [{"name": "Porch", "controller": "t1", "lights": 60}, {"name": "Front", "controller": "j1", "lights": 120},
                 {"name": "Back", "controller": "j2", "lights": 45}, {"name": "Garage", "controller": "w1", "lights": 60}]}
+def private(p):
+    """Only this user can open the file: mode 600, or on Windows one access entry (this user's),
+    nothing inherited from the folder."""
+    if os.name != "nt":
+        return os.stat(p).st_mode & 0o777 == 0o600
+    acl = subprocess.run(["icacls", p], capture_output=True, text=True).stdout
+    return acl.count(":(") == 1 and "(I)" not in acl and os.environ.get("USERNAME", "?").lower() in acl.lower()
+
+
 settings.save(cfg)
 raw = open(settings.path("config.json")).read()
-mode = os.stat(settings.path("secrets.json")).st_mode & 0o777
-check("local key kept out of config.json, secrets.json is private", "0123456789abcdef" not in raw and mode == 0o600)
+check("local key kept out of config.json, secrets.json is private",
+      "0123456789abcdef" not in raw and private(settings.path("secrets.json")))
 s = settings.load()
 check("loaded with options and secret", s.controllers["t1"].secret == {"local_key": "0123456789abcdef"}
       and s.controllers["j2"].options == {"zone": "Back"} and s.sections["garage"].lights_per_segment == 1)
@@ -221,7 +231,7 @@ cfg2["controllers"] = [dict(c) for c in cfg["controllers"]]
 cfg2["controllers"][0].pop("local_key")
 settings.save(cfg2)
 check("saving again without retyping the key keeps it", settings.load().controllers["t1"].secret.get("local_key")
-      == "0123456789abcdef")
+      == "0123456789abcdef" and private(settings.path("secrets.json")))
 pub = settings.public_config(settings.validate(settings.read_raw()))
 check("the page never gets the key", "0123456789abcdef" not in str(pub) and pub["controllers"][0]["has_secret"])
 try:

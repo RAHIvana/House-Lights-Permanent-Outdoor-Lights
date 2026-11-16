@@ -258,13 +258,34 @@ def read_secrets():
         return {}
 
 
+def _owner_only(p):
+    """Windows ignores the 0o600 mode, and a folder like C:\\Projects lets every account on the
+    computer read what is in it. Replace the file's permissions with one entry: this user."""
+    import subprocess
+    quiet = {"capture_output": True, "check": True, "creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)}
+    try:
+        out = subprocess.run(["whoami", "/user", "/fo", "csv", "/nh"], **quiet).stdout
+        sid = out.decode("ascii", "replace").strip().split(",")[-1].strip('"')
+        if not sid.startswith("S-1-"):
+            raise OSError("whoami did not give this user's id")
+        subprocess.run(["icacls", p, "/inheritance:r", "/grant:r", f"*{sid}:(F)"], **quiet)
+    except (OSError, subprocess.CalledProcessError) as e:
+        raise ValueError(f"could not make {SECRETS_NAME} readable only by you ({e})") from None
+
+
 def _write_private(name, data):
     os.makedirs(home(), exist_ok=True)
     tmp = path(name + ".tmp")
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as f:
-        json.dump(data, f, indent=2)
-    os.replace(tmp, path(name))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            if os.name == "nt":
+                _owner_only(tmp)              # before anything secret is in it
+            json.dump(data, f, indent=2)
+    except ValueError:
+        os.remove(tmp)
+        raise
+    os.replace(tmp, path(name))               # the file keeps its permissions when moved
 
 
 def read_raw():
@@ -285,14 +306,14 @@ def save(raw):
     """Validate and write the config atomically. Returns the clean config."""
     clean = validate(raw)
     secrets = clean.pop("_secrets")
+    if secrets or os.path.exists(path(SECRETS_NAME)):
+        _write_private(SECRETS_NAME, secrets)       # first: if it fails, config.json is unchanged
     os.makedirs(home(), exist_ok=True)
     tmp = path(CONFIG_NAME + ".tmp")
     with open(tmp, "w") as f:
         json.dump(clean, f, indent=2)
         f.write("\n")
     os.replace(tmp, path(CONFIG_NAME))
-    if secrets or os.path.exists(path(SECRETS_NAME)):
-        _write_private(SECRETS_NAME, secrets)
     clean["_secrets"] = secrets
     log.info("config saved: %d controller(s), %d run(s)", len(clean["controllers"]), len(clean["runs"]))
     return clean
