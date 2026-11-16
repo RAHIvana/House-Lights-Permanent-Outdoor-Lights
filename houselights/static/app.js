@@ -71,6 +71,7 @@ const capsOf = sec => sec.caps || {stream: true, pick: true, status: true};
 // "50 lights / 10 segments × 5", or what the controller does instead
 function runSize(sec) {
   const c = capsOf(sec);
+  if (!c.pick && c.stream && c.stream_untested) return `${sec.lights} lights · still themes in one color · Play live untested on this model`;
   if (!c.pick && c.static === "segments") return `${sec.lights} lights · one color at a time`;
   if (sec.lights_per_segment === 1) return `${sec.lights} lights, each its own color` + (c.static === "palette" ? " (up to 30 colors)" : "");
   return `${sec.lights} lights / ${sec.segments} segments × ${sec.lights_per_segment}`;
@@ -415,6 +416,7 @@ function buildCard(sec) {
       + (sec.reachable < sec.lights ? ` (last ${sec.lights - sec.reachable} not reachable by segment)` : ""),
     fromRight(sec) && "light 1 at the right"
   ].filter(Boolean).join(" · ");
+  if (sec.tier && sec.tier !== "full" && sec.tier_note) $(".sub", el).title = `${sec.model_label || ""}: ${sec.tier_note}`;
   if (!sec.enabled) el.classList.add("disabled");
   el.classList.add("collapsed");
   $('[data-act="more"]', el).onclick = () => {
@@ -772,7 +774,7 @@ function sync() {
     $('[data-act="on"]', el).classList.toggle("on", lanOn === true);
     $('[data-act="off"]', el).classList.toggle("on", lanOn === false);
     const play = $('[data-act="play"]', el);
-    play.textContent = pat.animated ? (capsOf(sec).stream ? "Play live" : "Show still") : "Apply";
+    play.textContent = pat.animated ? (capsOf(sec).stream ? (capsOf(sec).stream_untested ? "Play live (try it)" : "Play live") : "Show still") : "Apply";
     play.classList.toggle("on", !!s && s.pattern === sel.value);
     $('[data-act="stop"]', el).disabled = !(st && st.stream);
     $('[data-act="preview"]', el).classList.toggle("on", !!PREVIEW && PREVIEW.source === "card" && PREVIEW.card === sec.id);
@@ -818,7 +820,7 @@ function buildSettings() {
     <td>${esc(s.short)}</td><td>${size}</td>
     <td>${esc(s.model)} · ${esc(s.ip)}${s.zone ? " · " + esc(s.zone) : ""}</td>
     <td${l1 ? "" : ' class="muted"'}>${LIGHT1_TEXT[l1] || esc(l1)}</td>
-    <td><a class="button small" href="setup.html?step=4&amp;controller=${encodeURIComponent(s.controller)}"
+    <td><a class="button small" href="setup.html?step=test&amp;controller=${encodeURIComponent(s.controller)}"
       title="Test ${esc(s.name)} in the setup wizard: count, direction and colors">Test</a></td></tr>`;
   }).join("");
   $("#settings-body").innerHTML = `

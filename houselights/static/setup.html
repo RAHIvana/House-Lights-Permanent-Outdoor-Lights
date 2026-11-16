@@ -6,7 +6,7 @@
 <title>House Lights setup</title>
 <script>try { const t = localStorage.getItem("hl-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
 <link rel="stylesheet" href="style.css?v=12">
-<link rel="stylesheet" href="setup.css?v=2">
+<link rel="stylesheet" href="setup.css?v=4">
 <link rel="icon" href="icon-192.png">
 <meta name="theme-color" content="#2b2e33">
 </head>
@@ -25,50 +25,38 @@
 
 <div class="wiz">
   <ol class="steps" id="steps">
-    <li data-step="0">1 Lights</li><li data-step="1">2 Controllers</li><li data-step="2">3 Name and count</li>
-    <li data-step="3">4 Test</li><li data-step="4">5 Time and place</li><li data-step="5">6 Save</li>
+    <li data-step="0">1 Find your lights</li><li data-step="1">2 Name and count</li>
+    <li data-step="2">3 Test</li><li data-step="3">4 Time and place</li><li data-step="4">5 Save</li>
   </ol>
 
-  <!-- 1: kinds of lights -->
+  <!-- 1: find your lights (every kind at once) -->
   <section class="panel" data-page="0">
-    <div class="ph"><h2>What lights do you have?</h2></div>
-    <p class="muted">House Lights talks to the controllers over your home network. Tick every kind you have;
-      you can mix them.</p>
-    <div class="choice" id="drivers"></div>
+    <div class="ph"><h2>Find your lights</h2></div>
+    <p class="muted">House Lights asks every controller on your network what it is. Asking changes nothing on the lights.</p>
+    <div class="findrow">
+      <label class="fld where"><span>Where to look</span>
+        <input type="text" id="targets" placeholder="This network" autocomplete="off" spellcheck="false"></label>
+      <button id="scan" class="primary">Find my lights</button>
+    </div>
+    <p class="note">Lights on another network section? Type it, like 192.168.2.0/24, or one address.</p>
+    <div class="tiles" id="tiles"></div>
+    <p class="note" id="scan-msg"></p>
+    <ul class="found" id="found"></ul>
+    <div class="more-row">
+      <span class="lbl">Expecting more?</span>
+      <button id="deep" title="Keeps asking every kind for up to half a minute">Deep scan, 30 s</button>
+      <span class="addr"><input type="text" id="add-ip" placeholder="192.168.2.50" aria-label="Address" autocomplete="off" spellcheck="false"><button id="add">Add by address</button></span>
+    </div>
+    <p class="note" id="add-msg" aria-live="polite"></p>
+    <details class="notfound" id="notfound"><summary>Not finding yours?</summary>
+      <div class="kinds" id="kinds"></div>
+      <p class="note">Other brands (Oelo, Trimlight, Gemstone, Eufy and more) have no local control House Lights can use;
+        see the brand list in the README.</p>
+    </details>
   </section>
 
-  <!-- 2: find controllers -->
+  <!-- 2: runs -->
   <section class="panel" data-page="1" hidden>
-    <div class="ph"><h2>Find your controllers</h2></div>
-    <p class="muted">Scanning only asks controllers who they are; it changes nothing.</p>
-    <ul class="note" id="type-notes"></ul>
-    <div class="row">
-      <button id="scan" class="primary">Scan</button>
-      <label class="lbl">addresses to scan <input type="text" id="targets" size="30"
-        placeholder="empty = this network, or e.g. 192.168.2.0/24"></label>
-      <button id="deep" hidden title="Keeps asking for up to half a minute">Missing lights? Run deep scan</button>
-      <span class="muted" id="scan-msg"></span>
-    </div>
-    <p class="note">If your lights are on a different network or subnet than this computer, type that network
-      (like 192.168.2.0/24) or the controllers' addresses. Tuya devices are only heard on this computer's own network.</p>
-    <div class="tablewrap"><table id="found"><thead><tr><th>Use</th><th>Address</th><th>Controller</th><th>Zone / device</th>
-      <th>Lights</th><th></th></tr></thead><tbody></tbody></table></div>
-    <div class="row" id="add-row">
-      <span class="lbl">Or add one by address:</span>
-      <select id="add-type"></select>
-      <b id="add-kind" hidden></b>
-      <input type="text" id="add-ip" size="16" placeholder="192.168.2.50">
-      <span id="add-extra" class="row"></span>
-      <button id="add">Add</button>
-    </div>
-    <h3 class="lbl">Controllers you'll use</h3>
-    <div class="tablewrap"><table id="chosen"><thead><tr><th>Address</th><th>Controller</th>
-      <th>Settings</th><th>Enabled</th><th></th></tr></thead><tbody></tbody></table></div>
-    <p class="note">You name each run in the next step.</p>
-  </section>
-
-  <!-- 3: runs -->
-  <section class="panel" data-page="2" hidden>
     <div class="ph"><h2>Name and count each run</h2></div>
     <div class="intro">
       <p class="muted">A run is the string of lights on one controller (or one JellyFish zone).</p>
@@ -81,8 +69,8 @@
     <div id="runs" class="runcards"></div>
   </section>
 
-  <!-- 4: test -->
-  <section class="panel" data-page="3" hidden>
+  <!-- 3: test -->
+  <section class="panel" data-page="2" hidden>
     <div class="ph"><h2>Test each run</h2></div>
     <p class="muted" id="test-intro"></p>
     <div class="testrun" id="t-one">
@@ -99,8 +87,8 @@
     </div>
   </section>
 
-  <!-- 5: time and place -->
-  <section class="panel" data-page="4" hidden>
+  <!-- 4: time and place -->
+  <section class="panel" data-page="3" hidden>
     <div class="ph"><h2>Time and place</h2></div>
     <p class="muted">Schedules use your time zone. Sunrise and sunset schedules also need roughly where you
       are: your ZIP code is enough. Leave it empty to use clock times only.</p>
@@ -135,8 +123,8 @@
     </div>
   </section>
 
-  <!-- 6: save -->
-  <section class="panel" data-page="5" hidden>
+  <!-- 5: save -->
+  <section class="panel" data-page="4" hidden>
     <div class="ph"><h2>Check and save</h2></div>
     <div id="summary"></div>
     <p class="muted" id="save-where"></p>
@@ -149,6 +137,6 @@
     <button id="next" class="primary">Next</button>
   </div>
 </div>
-<script src="setup.js?v=13"></script>
+<script src="setup.js?v=15"></script>
 </body>
 </html>

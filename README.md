@@ -167,24 +167,32 @@ python -m houselights [--home DIR] [--host HOST] [--port PORT] [--dry]
 The first time you open the page there are no settings yet, so the setup wizard opens. You
 can run it again later from the **Settings** tab (**Change setup**).
 
-1. **Lights**: tick every kind of controller you have. You can mix them. If you know how
-   many controllers of each kind you have, pick the number: the scan then tells you when
-   it has found them all, and runs a deep scan by itself if some didn't answer.
-2. **Controllers**: press **Scan**. It asks controllers on your network to identify
-   themselves and changes nothing. Tick the ones to use. If your lights are on another
-   network or subnet than this computer, type that network (like `192.168.2.0/24`) or the
-   controllers' addresses before scanning. You can also add a controller by its address.
-   If some controllers are missing, press **Missing lights? Run deep scan**: it keeps
-   asking for up to half a minute. Govee controllers ignore many requests (often three in
-   four), so a quick scan can miss them; asking again finds them.
-   A JellyFish controller shows one line per zone; each zone becomes its own run.
-3. **Name and count**: one card per run. Give it a name and a short name, the number of
+1. **Find your lights**: press **Find my lights**. House Lights asks every controller on
+   your network what it is (Govee, WLED, JellyFish and Tuya / Smart Life at once); asking
+   changes nothing on the lights. If your lights are on another network section than this
+   computer, type it in **Where to look** first (like `192.168.2.0/24`, or one address).
+   Each kind shows how many it found, then one list: tick **Use** for the controllers to
+   use (found ones are ticked). A JellyFish controller shows one line per zone; each zone
+   becomes its own run. Govee models other than the H806A show what they can do ("basic
+   control" or "one colour at a time"). Smart Life lights are found even without tinytuya
+   (they announce themselves on this computer's own network section, and a typed address
+   is tried on Tuya's port 6668), but can be used only once tinytuya is installed.
+   - **Expecting more?** **Deep scan, 30 s** keeps asking for up to half a minute. Govee
+     controllers ignore many requests (often three in four), so a quick scan can miss them;
+     asking again finds them. **Add by address** asks one address as every kind and adds
+     whatever answers ("192.168.2.50 is a WLED controller").
+   - **Not finding yours?** One card per kind: how to recognise it (its app, example
+     brands), how to get it ready, and **How many controllers?** with **Look for … again**:
+     if it finds fewer than the number you picked, it runs a deep scan by itself.
+   Other brands (Oelo, Trimlight, Gemstone, Eufy and more) have no local control House
+   Lights can use; see the brand list above.
+2. **Name and count**: one card per run. Give it a name and a short name, the number of
    lights if you know it (WLED and JellyFish report theirs; leave it blank if you don't
    know: the Test step helps you count), and which end light 1 is at, as you face the
    lights. Runs can be installed left to right or right to left; "Light 1 is at" lets each
    one still show the right way round. Put the runs in order along the house, left to
    right, with ▲ and ▼: themes that play across the whole house use this order.
-4. **Test**: one controller at a time ("Controller 2 of 3: Garage"):
+3. **Test**: one controller at a time ("Controller 2 of 3: Garage"):
    - **Find it**: the run blinks. Did the run you expected blink? If another one did, pick
      it and the names swap. If nothing blinked, the wizard lists what to check.
    - **Count** (Govee): every segment's first light lights up red or green, and you type how
@@ -197,22 +205,23 @@ can run it again later from the **Settings** tab (**Change setup**).
      again. No blue at all means the count is too high.
    - **Done**: a summary like "Garage: 50 lights, light 1 at the right end".
 
-   JellyFish and Tuya only blink. **More tests** has the extra patterns (colours, segment
+   JellyFish, Tuya and basic Govee models only blink. **More tests** has the extra patterns (colours, segment
    groups). Tests stop by themselves after a minute. Govee and WLED go back to what they
    showed; Tuya lights are saved before the test and put back afterwards. JellyFish can't
    report what it showed, so after testing pick a theme or use the JellyFish app.
-5. **Time and place**: the time zone comes from this device (**Change** to pick another).
+4. **Time and place**: the time zone comes from this device (**Change** to pick another).
    For sunrise/sunset schedules, type your ZIP code and press **Look up** (it asks
    zippopotam.us); the wizard shows today's sunrise and sunset, and warns if the time zone
    doesn't fit the place. You can also use this device's location or type latitude and
    longitude.
-6. **Save**: a table of the runs, with links to change or count each one. Every run needs
+5. **Save**: a table of the runs, with links to change or count each one. Every run needs
    its number of lights. Settings go to `data/config.json` and the server restarts with
    them.
 
 With saved settings, every step at the top of the wizard can be clicked. Links:
-`setup.html?step=4&controller=<controller id>` tests just that controller, and
-`setup.html?step=5` opens Time and place.
+`setup.html?step=test&controller=<controller id>` tests just that controller, and
+`setup.html?step=place` opens Time and place (also `find`, `name`, `save`, or the step's
+number, 1 to 5).
 
 ## Getting each kind of controller ready
 
@@ -262,7 +271,7 @@ venv\Scripts\python -m houselights --home $env:TEMP\hl-demo --port 8094
 
 The `$env:` settings last until you close that PowerShell window.
 
-In the wizard, tick Govee, WLED and JellyFish and scan `127.0.0.11, 127.0.0.21, 127.0.0.31`.
+In the wizard, type `127.0.0.11, 127.0.0.21, 127.0.0.31` in **Where to look** and press **Find my lights**.
 The extra ports keep the simulators apart from real controllers.
 
 ## Keep it running

@@ -6,10 +6,15 @@ they showed when a test stops; Tuya lights are saved and put back; JellyFish can
 (the wizard says so).
 """
 import datetime as dt
+import ipaddress
 import json
 import logging
 import math
+import os
 import re
+import select
+import socket
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -18,6 +23,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, HTTPException
 
 from . import drivers, runtime, settings
+from .drivers import net
 from .settings import Controller
 from .stream import Streamer
 
@@ -144,6 +150,8 @@ def allowed_tests(caps):
         names = ["identify"]
     if caps.get("count") != "manual":
         names = [n for n in names if n not in COUNTING]
+    if not caps.get("pick"):                     # no segments to show (e.g. Govee "try" models)
+        names = [n for n in names if n != "segments"]
     return names
 
 
@@ -204,10 +212,18 @@ def state():
             raw = None
         config = {**settings.default_config(), **(raw or {})}
     cat = drivers.catalog()
+    used = {(str(c.get("type") or "govee"), str(c.get("model") or "")) for c in config.get("controllers") or []
+            if isinstance(c, dict)}
     for d in cat:
         d["tests"] = allowed_tests(d["caps"])
-        d["max_lights"] = {m: v.get("max_lights", 3000) for m, v in drivers.get(d["type"]).MODELS.items()}
-        d["lights_per_segment"] = {m: v.get("lights_per_segment", 0) for m, v in drivers.get(d["type"]).MODELS.items()}
+        infos = d["model_info"]                  # per model: label, tier, caps, limits, note, tests
+        for t, m in used:                        # models in the config that aren't known by name
+            if t == d["type"] and m not in infos and drivers.model_info(t, m):
+                infos[m] = drivers.model_info(t, m)
+        for i in [*infos.values(), *d["tiers"].values()]:
+            i["tests"] = allowed_tests(i["caps"])
+        d["max_lights"] = {m: i["max_lights"] for m, i in infos.items()}
+        d["lights_per_segment"] = {m: i["lights_per_segment"] for m, i in infos.items()}
     return {"configured": bool(s and s.configured),
             "error": error,
             "config": config,
@@ -236,6 +252,16 @@ def discover(body: dict):
         drv = drivers.get(t)
         if not drv:
             problems[t] = "unknown controller type"
+            continue
+        if t == "tuya":                           # found even without tinytuya (then not usable yet)
+            try:
+                rows, problem = tuya_scan(body.get("targets", ""), deep=deep, expect=int(expect.get(t) or 0),
+                                          known=[str(ip) for ip in known.get(t) or []])
+            except ValueError as e:
+                rows, problem = [], str(e)
+            devices += rows
+            if problem:
+                problems[t] = problem
             continue
         ok, reason = drv.available()
         if not ok:
@@ -277,11 +303,200 @@ def probe(body: dict):
     return {"devices": rows}
 
 
+# --- Tuya / Smart Life: is anything there, with or without tinytuya? ----------------------------
+TUYA_UDP_PORTS = (6666, 6667)      # Tuya devices announce themselves here every few seconds
+TUYA_TCP_PORT = 6668               # and take local commands here
+TUYA_LISTEN = (6.0, 20.0)          # seconds to listen: quick scan, deep scan
+TUYA_FRAMES = (b"\x00\x00\x55\xaa", b"\x00\x00\x66\x99")    # how Tuya messages start (3.1-3.4, 3.5)
+TUYA_NOT_INSTALLED = "Smart Life light. Install tinytuya to use it"
+
+
+def _tuya_announce(data):
+    """What a Tuya broadcast says about the device ({gwId, version, ...}), when it can be read
+    (port 6666 sends plain JSON; 6667 is encrypted, so then {})."""
+    start, end = data.find(b"{"), data.rfind(b"}")
+    if start < 0 or end < start:
+        return {}
+    try:
+        d = json.loads(data[start:end + 1].decode("utf-8", "replace"))
+    except ValueError:
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
+def tuya_listen(seconds, ports=TUYA_UDP_PORTS, bind="", expect=0):
+    """Listen for Tuya broadcasts for up to `seconds` (sends nothing): {ip: announce}. Stops
+    early at `expect` devices. Only devices on this computer's own network section are heard.
+    Raises OSError when none of the ports can be opened."""
+    socks, errors = [], []
+    for p in ports:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        if os.name != "nt":                   # Windows: sharing the port would hide the broadcasts
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.bind((bind, p))
+        except OSError as e:
+            s.close()
+            errors.append(f"{p} ({e.strerror or e})")
+            continue
+        socks.append(s)
+    if not socks:
+        raise OSError(f"can't listen for Tuya devices on UDP port {' or '.join(errors)}; is another program using it?")
+    found, end = {}, time.time() + seconds
+    try:
+        while time.time() < end and not (expect and len(found) >= expect):
+            ready, _, _ = select.select(socks, [], [], max(0.0, min(0.2, end - time.time())))
+            for s in ready:
+                try:
+                    data, (ip, _) = s.recvfrom(4096)
+                except OSError:
+                    continue
+                if data[:4] in TUYA_FRAMES:
+                    found.setdefault(ip, {}).update(_tuya_announce(data))
+    finally:
+        for s in socks:
+            s.close()
+    return found
+
+
+def tuya_connect(ips, port=TUYA_TCP_PORT, timeout=0.8):
+    """The addresses that accept a connection on Tuya's command port (connects, sends nothing)."""
+    def one(ip):
+        socket.create_connection((ip, port), timeout=timeout).close()
+        return True
+    return set(net.probe_many(one, list(ips), workers=32))
+
+
+def _same_section(targets):
+    """Typed nothing (this network), or typed an address on this computer's own network
+    section: only then can Tuya broadcasts be heard."""
+    from .drivers.govee import expand_targets
+    if not str(targets or "").strip():
+        return True
+    nets = [ipaddress.ip_network(n) for n in net.local_networks()]
+    return any(ipaddress.ip_address(ip) in n for ip in expand_targets(targets) for n in nets)
+
+
+def _tuya_row(ip, info, usable, probable=False):
+    dev = str(info.get("gwId") or info.get("devId") or info.get("id") or "")
+    row = {"ip": ip, "type": "tuya", "model": "Tuya light", "device_id": dev,
+           "version": str(info.get("version") or "3.3"), "device_tail": dev[-5:], "lights": None,
+           "label": "Smart Life / Tuya device" + (" (probably)" if probable else ""), "probable": probable}
+    if usable:
+        row.update(supported=True, needs_key=True)
+    else:
+        row.update(supported=False, reason=TUYA_NOT_INSTALLED, install=drivers.get("tuya").INSTALL)
+    return row
+
+
+def tuya_scan(targets="", deep=False, expect=0, known=(), listen=None, connect=None, usable=None, same_section=None):
+    """Tuya / Smart Life devices: (rows, problem). With tinytuya, its own discovery; without it,
+    listening for their broadcasts tells us they're there (rows not usable until tinytuya is
+    installed). Typed addresses are also tried on the command port ("probably Tuya").
+    listen, connect, usable, same_section: stand-ins for the tests."""
+    from .drivers.govee import expand_targets
+    tuya = drivers.get("tuya")
+    usable = tuya.available()[0] if usable is None else usable
+    listen, connect = listen or tuya_listen, connect or tuya_connect
+    ips = expand_targets(targets) if str(targets or "").strip() else []
+    rows, problem = {}, ""
+    if (same_section or _same_section)(targets):
+        try:
+            if usable:
+                for r in tuya.discover(targets, deep=deep, expect=expect, known=known):
+                    rows[r["ip"]] = r
+            else:
+                for ip, info in listen(TUYA_LISTEN[1 if deep else 0], expect=expect).items():
+                    rows[ip] = _tuya_row(ip, info, False)
+        except OSError as e:
+            problem = str(e)
+    rest = [ip for ip in ips if ip not in rows and ip not in set(known)]
+    for ip in sorted(connect(rest), key=socket.inet_aton):
+        rows[ip] = _tuya_row(ip, {}, usable, probable=True)
+    return sorted(rows.values(), key=lambda r: socket.inet_aton(r["ip"])), problem
+
+
+# --- add by address: which kind of controller is there? ---------------------------------------
+def _ask(kind):
+    def fn(ip):
+        try:
+            return drivers.get(kind).probe({"ip": ip})
+        except (ValueError, OSError):
+            return []
+    return fn
+
+
+def _ask_tuya(ip):
+    return [_tuya_row(ip, {}, drivers.get("tuya").available()[0], probable=True)] if tuya_connect([ip]) else []
+
+
+IDENTIFY_GRACE = 1.0
+IDENTIFY = {"govee": _ask("govee"), "wled": _ask("wled"), "jellyfish": _ask("jellyfish"), "tuya": _ask_tuya}
+
+
+def _what(kind, rows):
+    if kind == "govee":
+        r = rows[0]
+        return f"a Govee controller ({r.get('label') or r.get('model')})"
+    if kind == "wled":
+        return "a WLED controller"
+    if kind == "jellyfish":
+        return f"a JellyFish controller with {len(rows)} zone{'' if len(rows) == 1 else 's'}" if rows else "a JellyFish controller"
+    return "probably a Tuya / Smart Life device"
+
+
+def identify(ip, checks=None):
+    """Ask one address as every kind of controller at once (read-only: who are you?).
+    {devices, kinds, message}. checks: {kind: fn(ip) -> rows}, stand-ins for the tests."""
+    from concurrent.futures import ThreadPoolExecutor
+    from .drivers.govee import expand_targets
+    try:
+        one = expand_targets(ip)
+    except ValueError:
+        one = []
+    if len(one) != 1 or "/" in str(ip):
+        raise HTTPException(400, "type one address, like 192.168.2.50")
+    ip, checks = one[0], checks or IDENTIFY
+    pool = ThreadPoolExecutor(max_workers=len(checks))
+    jobs = {kind: pool.submit(fn, ip) for kind, fn in checks.items()}
+    pool.shutdown(wait=False)
+    # Once one kind has answered, the others get IDENTIFY_GRACE seconds more, not their whole
+    # timeout (a Govee check otherwise keeps asking for 6 s).
+    end = time.time() + 30
+    while time.time() < end and not all(j.done() for j in jobs.values()):
+        if any(j.done() and not j.exception() and j.result() for j in jobs.values()):
+            end = min(end, time.time() + IDENTIFY_GRACE)
+        time.sleep(0.05)
+    rows, kinds = [], []
+    for kind, job in jobs.items():
+        try:
+            got = (job.result() if job.done() else []) or []
+        except Exception:                      # nothing of that kind there
+            got = []
+        if got:
+            rows += got
+            kinds.append(kind)
+    if not kinds:
+        message = (f"Nothing answered at {ip}. Is the controller on, and is that its address (its app or "
+                   "your router lists it)? Govee: is LAN Control on in the Govee Home app?")
+    else:
+        message = f"{ip} is " + " and ".join(_what(k, [r for r in rows if r["type"] == k]) for k in kinds) + "."
+    return {"devices": rows, "kinds": kinds, "message": message}
+
+
+@router.post("/identify")
+def identify_endpoint(body: dict):
+    """Add by address: body {ip}. Tries Govee, WLED, JellyFish and Tuya on that one address."""
+    out = identify(str(body.get("ip") or "").strip())
+    log.info("setup identify %s: %s", body.get("ip"), ",".join(out["kinds"]) or "nothing")
+    return out
+
+
 def _test_controller(c):
     """A Controller for a test, from what the wizard posted (and a saved secret if the key
     wasn't typed again)."""
     drv = drivers.get(c.get("type", "govee"))
-    if not drv or c.get("model") not in drv.MODELS:
+    if not drv or not drivers.model_info(c.get("type", "govee"), c.get("model")):
         raise HTTPException(400, "pick a supported controller first")
     saved = settings.read_secrets().get(c.get("id") or "", {})
     try:
@@ -301,14 +516,14 @@ def test(body: dict):
     TEST_SECONDS (or until /test/stop). Counting and "check" tests ignore reverse: they show
     where light 1 really is."""
     drv, ctrl = _test_controller(body.get("controller") or {})
-    caps = drv.Kit.CAPS
+    model = drivers.model_info(ctrl.type, ctrl.model)          # per model: caps, limits, segments
+    caps = model["caps"]
     name = body.get("test")
     if name not in PATTERNS:
         raise HTTPException(400, "unknown test")
     if name not in allowed_tests(caps):
         raise HTTPException(400, f"this controller can't show the \"{PATTERNS[name][0]}\" test")
     counting = name in COUNTING
-    model = drv.MODELS[ctrl.model]
     try:
         lights = model["max_lights"] if counting else int(body.get("lights"))
         markers = max(1, int(body.get("markers") or 1))
@@ -345,7 +560,8 @@ def test(body: dict):
     TESTS[where] = st
     log.info("setup test %s on %s (%d lights%s)", name, kit.tag, lights, ", reversed" if reverse else "")
     return {"ok": True, "live": kit.live, "label": label, "seconds": TEST_SECONDS, "lights_per_segment": lps,
-            "frame_lights": lights, "restore": caps.get("restore"), "slow": slow}
+            "frame_lights": lights, "restore": caps.get("restore"), "slow": slow, "tier": model.get("tier"),
+            "stream_untested": bool(caps.get("stream_untested")) and not slow}
 
 
 def switch_on(drv, kit, where):
@@ -422,10 +638,10 @@ def preview(body: dict):
         raise HTTPException(400, "lights must be a number")
     c = body.get("controller") or {}
     drv = drivers.get(c.get("type", "govee"))
-    model = drv.MODELS.get(c.get("model"), {}) if drv else {}
+    model = (drivers.model_info(c.get("type", "govee"), c.get("model")) if drv else None) or {}
     lps = model.get("lights_per_segment") or 5
     frame = _frame(name, lights, model.get("max_lights") or 3000) if name == "check" else None
-    slow = drv and not drv.Kit.CAPS.get("stream")
+    slow = drv and not (model.get("caps") or drv.Kit.CAPS).get("stream")
     if slow and name == "identify":
         fps = drv.Kit.slow_fps
         frames = [[f"#{r:02x}{g:02x}{b:02x}" for r, g, b in _identify_slow(lights, k / 2, fps)] for k in range(8)]

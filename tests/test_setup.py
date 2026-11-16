@@ -146,5 +146,117 @@ setup.switch_on(drv, kit, ("192.168.2.50", ""))
 setup.switch_off_tested()
 check("practice mode: doesn't ask", drv.asked == 0 and kit.calls == [True])
 
+# --- add by address: every kind is asked, whatever answers is added ---
+def answers(kind, rows=None, error=None):
+    def fn(ip):
+        if error:
+            raise error
+        return [dict(r, ip=ip) for r in rows or []]
+    return fn
+
+
+NONE = {k: answers(k) for k in ("govee", "wled", "jellyfish", "tuya")}
+r = setup.identify("192.168.2.50", dict(NONE, wled=answers("wled", [{"type": "wled", "model": "WLED", "label": "WLED 0.15"}])))
+check(f"identify: WLED ({r['message']})", r["kinds"] == ["wled"] and r["devices"][0]["ip"] == "192.168.2.50"
+      and r["message"] == "192.168.2.50 is a WLED controller.")
+r = setup.identify(" 192.168.2.51 ", dict(NONE, govee=answers("govee", [{"type": "govee", "model": "H806A", "label": "Lights (H806A)"}]),
+                                         wled=answers("wled", error=OSError("refused"))))
+check(f"identify: Govee, a failing check is just 'not that kind' ({r['message']})",
+      r["kinds"] == ["govee"] and "is a Govee controller (Lights (H806A))" in r["message"])
+r = setup.identify("192.168.2.52", dict(NONE, jellyfish=answers("jellyfish", [{"type": "jellyfish", "zone": "Front"},
+                                                                              {"type": "jellyfish", "zone": "Back"}])))
+check(f"identify: JellyFish zones ({r['message']})", len(r["devices"]) == 2 and "with 2 zones" in r["message"])
+r = setup.identify("192.168.2.53", NONE)
+check(f"identify: nothing answered ({r['message'][:40]}...)", r["devices"] == [] and r["message"].startswith("Nothing answered at 192.168.2.53"))
+asked = []
+setup.identify("192.168.2.54", {k: (lambda ip, k=k: asked.append((k, ip)) or []) for k in NONE})
+check("identify: all four kinds asked, at that address", sorted(asked) == sorted((k, "192.168.2.54") for k in NONE))
+import time  # noqa: E402
+t0 = time.time()
+r = setup.identify("192.168.2.55", dict(NONE, wled=answers("wled", [{"type": "wled", "model": "WLED"}]),
+                                        govee=lambda ip: time.sleep(4) or []))
+check(f"identify: once one kind answers, a slow check isn't waited for ({time.time() - t0:.1f} s)",
+      r["kinds"] == ["wled"] and time.time() - t0 < setup.IDENTIFY_GRACE + 1.5)
+fails("identify: a range is not one address", lambda: setup.identify("192.168.2.0/30", NONE), 400, "one address")
+fails("identify: not an address", lambda: setup.identify("lights", NONE), 400, "one address")
+fails("identify: empty", lambda: setup.identify("", NONE), 400, "one address")
+
+# --- Tuya / Smart Life presence without tinytuya ---
+import socket  # noqa: E402
+import threading  # noqa: E402
+
+
+def free_udp_port():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.bind(("127.0.0.1", 0))
+    p = s.getsockname()[1]
+    s.close()
+    return p
+
+
+port = free_udp_port()
+announce = b"\x00\x00\x55\xaa" + b"\x00" * 16 + json.dumps({"ip": "127.0.0.1", "gwId": "bf00fake00device00ab",
+                                                            "version": "3.3"}).encode() + b"\x00" * 8
+
+
+def send_later(payloads):
+    import time
+    time.sleep(0.3)
+    tx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    for p in payloads:
+        tx.sendto(p, ("127.0.0.1", port))
+    tx.close()
+
+
+threading.Thread(target=send_later, args=([b"not tuya", announce],), daemon=True).start()
+heard = setup.tuya_listen(3.0, ports=(port,), bind="127.0.0.1", expect=1)
+check(f"tuya listen: a broadcast is heard, other packets ignored {heard}",
+      list(heard) == ["127.0.0.1"] and heard["127.0.0.1"].get("gwId") == "bf00fake00device00ab")
+check("tuya listen: an encrypted announcement has no readable details",setup._tuya_announce(b"\x00\x00\x55\xaa\x93\x11garbage") == {})
+blocker = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+blocker.bind(("127.0.0.1", 0))
+try:
+    if os.name == "nt":
+        setup.tuya_listen(0.1, ports=(blocker.getsockname()[1],), bind="127.0.0.1")
+        check("tuya listen: port in use is reported", False)
+    else:
+        check("tuya listen: port in use (skipped off Windows: ports are shared)", True)
+except OSError as e:
+    check(f"tuya listen: port in use is reported ({e})", "can't listen for Tuya" in str(e))
+blocker.close()
+
+srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+srv.bind(("127.0.0.1", 0))
+srv.listen(4)
+tcp = srv.getsockname()[1]
+check("tuya connect: the command port answers", setup.tuya_connect(["127.0.0.1"], port=tcp) == {"127.0.0.1"})
+srv.close()
+check("tuya connect: nothing there", setup.tuya_connect(["127.0.0.1"], port=tcp, timeout=0.3) == set())
+
+rows, prob = setup.tuya_scan("", usable=False, same_section=lambda t: True,
+                             listen=lambda s, expect=0: {"192.168.2.60": {"gwId": "bf1234567890abcdef12"}},
+                             connect=lambda ips: set())
+check(f"tuya scan without tinytuya: found, not usable, says why {rows}", len(rows) == 1 and not rows[0]["supported"]
+      and rows[0]["reason"] == "Smart Life light. Install tinytuya to use it" and "install tinytuya" in rows[0]["install"]
+      and rows[0]["device_id"] == "bf1234567890abcdef12" and not prob)
+listened = []
+rows, prob = setup.tuya_scan("192.168.5.7, 192.168.5.8", usable=False, same_section=lambda t: False,
+                             listen=lambda s, expect=0: listened.append(s) or {},
+                             connect=lambda ips: {ip for ip in ips if ip.endswith(".8")})
+check(f"tuya scan, other network section: no listening, typed addresses tried {rows}",
+      not listened and [r["ip"] for r in rows] == ["192.168.5.8"] and rows[0]["probable"] and rows[0]["label"].endswith("(probably)"))
+rows, prob = setup.tuya_scan("192.168.2.60, 192.168.2.61", usable=False, same_section=lambda t: True, deep=True,
+                             known=["192.168.2.61"],
+                             listen=lambda s, expect=0: listened.append(s) or {"192.168.2.60": {}},
+                             connect=lambda ips: listened.append(sorted(ips)) or set(ips))
+check(f"tuya deep scan: listens longer, doesn't ask again what it heard or knows {listened}",
+      listened == [setup.TUYA_LISTEN[1], []] and [r["ip"] for r in rows] == ["192.168.2.60"])
+rows, prob = setup.tuya_scan("", usable=False, same_section=lambda t: True, connect=lambda ips: set(),
+                             listen=lambda s, expect=0: (_ for _ in ()).throw(OSError("can't listen for Tuya devices on UDP port 6666")))
+check(f"tuya scan: a port problem is reported, not raised ({prob})", rows == [] and "6666" in prob)
+rows, prob = setup.tuya_scan("192.168.5.9", usable=True, same_section=lambda t: False, connect=lambda ips: set(ips))
+check("tuya scan with tinytuya: a typed address is usable once the id and key are typed",
+      rows[0]["supported"] and rows[0]["needs_key"] and rows[0]["device_id"] == "")
+
 print(f"\n{'ALL OK' if not FAILS else f'{len(FAILS)} FAILED'}")
 sys.exit(1 if FAILS else 0)

@@ -1,9 +1,10 @@
 "use strict";
-// Setup wizard: pick the kinds of lights, find controllers, name and count the runs, test them
+// Setup wizard: find the controllers (every kind at once), name and count the runs, test them
 // one controller at a time, set the time zone and location, then save config.json (the server
 // restarts with it).
-// Deep links: setup.html?step=4&controller=<id> tests only that controller; ?step=5 opens at
-// "Time and place". With a saved config, every step at the top can be clicked.
+// Deep links: setup.html?step=test&controller=<id> tests only that controller; ?step=place opens
+// at "Time and place" (find, name, test, place, save, or the step's number 1 to 5). With a saved
+// config, every step at the top can be clicked.
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
 // A file in the settings folder, written with the server's separator (backslashes on Windows).
@@ -17,10 +18,37 @@ async function api(path, body) {
   return data;
 }
 
-const W = {step: 0, info: null, cfg: null, found: [], types: new Set(), counts: {}, testing: {}, anim: null, lps: {},
-           t: null, jump: false};
+const W = {step: 0, info: null, cfg: null, found: [], counts: {}, testing: {}, anim: null, lps: {},
+           t: null, jump: false, kinds: {}, untick: new Set(), autoTick: true, tiers: {}};
 const MAX_COUNT = 12;                      // "How many controllers?" choices; 0 = not sure
-const STEPS = 6;
+const STEPS = 5;
+// Steps by name, for links: setup.html?step=test&controller=<id>, ?step=place
+const STEP_NAMES = ["find", "name", "test", "place", "save"];
+const KINDS = ["govee", "wled", "jellyfish", "tuya"];
+const KIND_NAME = {govee: "Govee", wled: "WLED", jellyfish: "JellyFish", tuya: "Tuya / Smart Life"};
+// Govee models differ (tiers): full = everything, nothing to say.
+const TIER_NOTE = {try: "Basic control; light-by-light animation untested on this model: try it in the Check test",
+                   basic: "One colour at a time"};
+const INSTALL_TUYA = {win: "venv\\Scripts\\pip install tinytuya", nix: "venv/bin/pip install tinytuya"};
+// "Not finding yours?": how to recognise each kind, and how to get it ready.
+const HELP = {
+  govee: {know: "Any Govee light that has LAN Control in the Govee Home app.",
+    note: "The H806A is fully tested. Other models work at a basic level until someone tests them.",
+    steps: ["In the Govee Home app, open the light's settings and switch on LAN Control.",
+            "Check the light is on and works in the app.",
+            "This computer must be on the same network as the lights (not a guest network)."]},
+  wled: {know: "You use the WLED app, or the controller's address opens a WLED page in a browser. DIY controllers, and ASAHOM Pro kits sold with WLED.",
+    steps: ["Find the controller's address in the WLED app or your router.",
+            "Open that address in a browser: you should see the WLED page.",
+            "For animated themes, tick Receive UDP realtime in WLED's Sync Interfaces settings."]},
+  jellyfish: {know: "You use the JellyFish app. Each zone becomes its own run.",
+    steps: ["Set up the zones in the JellyFish app first.",
+            "The controller must be on and reachable on your network."]},
+  tuya: {know: "You use Smart Life, Tuya Smart, or a brand app that links through Smart Life: ASAHOM, TreatLife, likely Astoria.",
+    steps: ["Install tinytuya: on Windows run INSTALL_WIN, on Linux or a Raspberry Pi INSTALL_NIX, then start House Lights again.",
+            "Get each light's local key once: link the Smart Life app to a free iot.tuya.com cloud project, then run python -m tinytuya wizard (see the README).",
+            "Close the Smart Life app while testing: these lights take one connection at a time."]},
+};
 const TEST_HELP = {
   identify: "The whole run blinks. Is it the run you expect?",
   ruler: "Light 1 is red, the last light blue, every 10th light white. If the blue light isn't the very last light, the count is wrong.",
@@ -46,15 +74,29 @@ function button(label, fn, cls = "") {
 
 // --- data helpers --------------------------------------------------------------------------
 const drv = type => W.info.drivers.find(d => d.type === type) || {models: {}, caps: {}, tests: [], max_lights: {}, lights_per_segment: {}};
-const modelLabel = (type, model) => drv(type).models[model] || model;
-const maxLights = c => drv(c.type).max_lights?.[c.model] || 3000;
+// Per model (Govee models differ): label, tier, caps, tests, limits. From the server's
+// model_info, else the tier a scan reported for that model (W.tiers), else Govee "basic".
+function modelInfo(type, model) {
+  const d = drv(type);
+  if (d.model_info?.[model]) return d.model_info[model];
+  const tier = W.tiers[`${type}|${model}`] || (type === "govee" ? "basic" : null);
+  return tier && d.tiers?.[tier] ? {...d.tiers[tier], model, tier, label: `${type === "govee" ? "Govee " : ""}${model}`} : null;
+}
+const tierOf = c => modelInfo(c.type, c.model)?.tier || null;
+const modelLabel = (type, model) => modelInfo(type, model)?.label || drv(type).models[model] || model;
+const maxLights = c => modelInfo(c.type, c.model)?.max_lights || drv(c.type).max_lights?.[c.model] || 3000;
+const testsOf = c => modelInfo(c.type, c.model)?.tests || drv(c.type).tests || [];
+const capsOf = c => modelInfo(c.type, c.model)?.caps || drv(c.type).caps || {};
 const ctrlOf = cid => W.cfg.controllers.find(c => c.id === cid);
 const runOf = cid => W.cfg.runs.find(r => r.controller === cid);
 const where = c => c.ip + (c.zone ? ` · ${c.zone}` : "");
-const sameSpot = (a, b) => a.ip === b.ip && (a.zone || "") === (b.zone || "");
+const sameSpot = (a, b) => a.type === b.type && a.ip === b.ip && (a.zone || "") === (b.zone || "");
+const spotKey = d => `${d.type}|${d.ip}|${d.zone || ""}`;
 const hasLights = r => Number(r.lights) >= 1;
-const canCount = c => drv(c.type).tests.includes("markers");       // Govee: count with markers
-const canCheck = c => drv(c.type).tests.includes("check");         // Govee, WLED: red / blue / orange
+const lpsOf = c => modelInfo(c.type, c.model)?.lights_per_segment ?? drv(c.type).lights_per_segment?.[c.model] ?? 0;
+const canCount = c => testsOf(c).includes("markers") && lpsOf(c) > 0;   // Govee with segments: count with markers
+const canCheck = c => testsOf(c).includes("check");         // Govee, WLED: red / blue / orange
+const ipNum = ip => ip.split(".").reduce((a, n) => a * 256 + Number(n), 0);
 function ctrlId(row) {
   const base = `${row.type}-${row.ip}${row.zone ? "-" + row.zone : ""}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 32);
   let id = base, k = 2;
@@ -69,7 +111,7 @@ function addController(row) {
   if (W.cfg.controllers.some(c => sameSpot(c, row))) return;
   const c = {id: ctrlId(row), type: row.type, model: row.model, ip: row.ip, name: "", enabled: true};
   if (row.zone) c.zone = row.zone;
-  if (row.device_id) { c.device_id = row.device_id; c.version = row.version || "3.3"; }
+  if (row.type === "tuya") { c.device_id = row.device_id || ""; c.version = row.version || "3.3"; }
   if (row.local_key) c.local_key = row.local_key;
   W.cfg.controllers.push(c);
   W.cfg.runs.push(newRun(c, row.zone || `Run ${W.cfg.runs.length + 1}`, row.lights));
@@ -80,212 +122,303 @@ function removeController(id) {
 }
 const controllerBody = c => ({id: c.id, type: c.type, model: c.model, ip: c.ip, zone: c.zone, device_id: c.device_id,
                               version: c.version, local_key: c.local_key});
-// One run per controller: the controller takes the run's name (names are typed in step 3).
+// One run per controller: the controller takes the run's name (names are typed in step 2).
 function syncNames() {
   for (const r of W.cfg.runs) { const c = ctrlOf(r.controller); if (c) c.name = String(r.name || "").slice(0, 40); }
 }
 const light1Text = r => r.light1 === "left" ? "light 1 at the left end" : r.light1 === "right" ? "light 1 at the right end" : "light 1 not checked yet";
 
-// --- step 1: kinds of lights -------------------------------------------------------------------
-function drawDrivers() {
-  $("#drivers").innerHTML = "";
-  for (const d of W.info.drivers) {
-    const l = document.createElement("label");
-    if (!d.available) l.className = "off";
-    l.innerHTML = `<input type="checkbox"><span><b></b><small class="m"></small><small class="n"></small></span>`;
-    $("b", l).textContent = d.label;
-    $(".m", l).textContent = d.available ? Object.values(d.models).join(", ") : d.reason;
-    $(".n", l).textContent = d.note;
-    const r = $("input", l);
-    r.value = d.type; r.disabled = !d.available; r.checked = W.types.has(d.type);
-    if (d.available) {                     // how many: the scan then knows when it has found them all
-      const row = document.createElement("small");
-      row.className = "count";
-      row.innerHTML = `How many controllers? <select>${["Not sure", ...Array.from({length: MAX_COUNT}, (_, i) => i + 1)]
-        .map((v, i) => `<option value="${i}">${v}</option>`).join("")}</select>`;
-      const sel = $("select", row);
-      sel.value = String(W.counts[d.type] || 0);
-      sel.onchange = () => {
-        W.counts[d.type] = Number(sel.value);
-        if (W.counts[d.type] && !r.checked) { r.checked = true; W.types.add(d.type); }
-      };
-      $("span", l).appendChild(row);
-    }
-    r.onchange = () => { r.checked ? W.types.add(d.type) : W.types.delete(d.type); };
-    $("#drivers").appendChild(l);
+// --- step 1: find your lights ------------------------------------------------------------------
+// W.found: rows from scans and "Add by address". Ticked rows are W.cfg.controllers (saved ones
+// included); the list shows both. W.kinds[type]: {state: idle | asking | deep | done | error, msg, left}.
+const usable = d => d.supported && !d.needs_key && !(d.type === "tuya" && !d.device_id);
+function remember(rows) {
+  for (const d of rows) {
+    if (d.tier) W.tiers[`${d.type}|${d.model}`] = d.tier;
+    const i = W.found.findIndex(f => sameSpot(f, d));
+    if (i >= 0) W.found[i] = {...W.found[i], ...d}; else W.found.push(d);
+    if (W.autoTick && usable(d) && !W.untick.has(spotKey(d))) addController(d);
   }
 }
-
-// How many controllers of each kind are known so far: scanned or chosen, one per address.
-function foundCounts() {
-  const ips = {};
-  for (const x of [...W.found.filter(d => d.supported), ...W.cfg.controllers]) (ips[x.type] ||= new Set()).add(x.ip);
-  return Object.fromEntries(Object.entries(ips).map(([t, s]) => [t, s.size]));
-}
-const missingTypes = () => { const have = foundCounts(); return [...W.types].filter(t => W.counts[t] && (have[t] || 0) < W.counts[t]); };
-function countNote(afterDeep = false) {
-  const have = foundCounts();
-  return [...W.types].filter(t => W.counts[t]).map(t => {
-    const n = have[t] || 0, want = W.counts[t], name = drv(t).label.split(" (")[0], miss = want - n === 1 ? "one" : "ones";
-    return n >= want ? `${name}: found all ${want}.`
-      : afterDeep ? `${name}: found ${n} of ${want}, even with a deep scan. Add the missing ${miss} by address below.`
-      : `${name}: found ${n} of ${want}. Run a deep scan, or add the missing ${miss} by address below.`;
-  }).join(" ");
-}
-function showCount() { const n = countNote(); if (n) $("#scan-msg").textContent = n; }
-
-// --- step 2: controllers ----------------------------------------------------------------------
-function drawFound() {
-  const tb = $("#found tbody");
-  tb.innerHTML = "";
-  if (!W.found.length) { tb.innerHTML = '<tr><td colspan="6" class="muted">Nothing scanned yet.</td></tr>'; return; }
-  for (const d of W.found) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = "<td><input type=checkbox></td><td></td><td></td><td></td><td></td><td class=muted></td>";
-    const cb = $("input", tr), used = W.cfg.controllers.some(c => sameSpot(c, d));
-    cb.checked = used; cb.disabled = !d.supported;
-    cb.onchange = () => {
-      if (cb.checked) addController(d);
-      else { const c = W.cfg.controllers.find(x => sameSpot(x, d)); if (c) removeController(c.id); }
-      drawChosen();
-    };
-    tr.cells[1].textContent = d.ip; tr.cells[2].textContent = d.label;
-    tr.cells[3].textContent = d.zone || (d.device_tail ? "…" + d.device_tail : "");
-    tr.cells[4].textContent = d.lights || "";
-    tr.cells[5].textContent = !d.supported ? "not supported yet" : d.needs_key ? "needs its local key" : "";
-    tb.appendChild(tr);
-  }
-}
-function drawChosen() {
-  const tb = $("#chosen tbody");
-  tb.innerHTML = "";
-  if (!W.cfg.controllers.length) { tb.innerHTML = '<tr><td colspan="5" class="muted">None yet: scan, or add one by address.</td></tr>'; return; }
+// Every row to show: found ones, plus chosen controllers no scan has found (yet).
+function allRows() {
+  const rows = [...W.found];
   for (const c of W.cfg.controllers) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = "<td></td><td></td><td class=extra></td><td><input type=checkbox class=en></td><td><button class='small danger'>Remove</button></td>";
-    tr.cells[0].textContent = where(c); tr.cells[1].textContent = modelLabel(c.type, c.model);
-    const en = $(".en", tr);
-    en.checked = c.enabled !== false; en.onchange = () => { c.enabled = en.checked; };
-    if (c.type === "tuya") {
-      const box = $(".extra", tr);
-      box.innerHTML = `<input type=password class=key size=18 maxlength=16 autocomplete=off>
-        <select class=ver>${["3.1", "3.2", "3.3", "3.4", "3.5"].map(v => `<option>${v}</option>`).join("")}</select>`;
-      const key = $(".key", box), ver = $(".ver", box);
-      key.placeholder = c.has_secret ? "key saved (type to change)" : "local key (16 characters)";
-      key.value = c.local_key || ""; key.oninput = () => { c.local_key = key.value.trim(); };
-      ver.value = c.version || "3.3"; ver.onchange = () => { c.version = ver.value; };
+    if (!rows.some(d => sameSpot(d, c))) {
+      const info = modelInfo(c.type, c.model);
+      rows.push({type: c.type, model: c.model, ip: c.ip, zone: c.zone, device_id: c.device_id, version: c.version,
+                 supported: true, tier: info?.tier, label: modelLabel(c.type, c.model), saved: true});
     }
-    $("button", tr).onclick = () => { removeController(c.id); drawChosen(); drawFound(); showCount(); };
-    tb.appendChild(tr);
+  }
+  return rows.sort((a, b) => KINDS.indexOf(a.type) - KINDS.indexOf(b.type) || ipNum(a.ip) - ipNum(b.ip)
+    || String(a.zone || "").localeCompare(String(b.zone || "")));
+}
+// How many controllers of a kind are known: found or chosen, one per address.
+function foundCount(t) {
+  const ips = new Set();
+  for (const x of [...W.found, ...W.cfg.controllers]) if (x.type === t) ips.add(x.ip);
+  return ips.size;
+}
+function drawTiles() {
+  const box = $("#tiles");
+  box.innerHTML = "";
+  for (const t of KINDS) {
+    const k = W.kinds[t] || {state: "idle"}, n = foundCount(t), tile = el("div", `tile k-${t} ${k.state}`);
+    const zones = t === "jellyfish" ? allRows().filter(d => d.type === t).length : 0;
+    tile.append(el("span", "tname", KIND_NAME[t]), el("b", "tnum", String(n)));
+    const sub = k.state === "asking" ? "Asking…" : k.state === "deep" ? `Deep scan, ${k.left ?? ""} s left`
+      : k.state === "error" ? k.msg : t === "tuya" && !drv("tuya").available ? "needs tinytuya to use"
+      : zones && zones !== n ? `${zones} zones` : k.state === "done" ? (n ? (n === 1 ? "controller" : "controllers") : "none found") : "";
+    tile.append(el("small", "tsub", sub));
+    if (k.state === "asking" || k.state === "deep") tile.setAttribute("aria-busy", "true");
+    box.appendChild(tile);
   }
 }
-function drawAddRow() {
-  const sel = $("#add-type");
-  sel.innerHTML = "";
-  for (const d of W.info.drivers.filter(d => d.available && W.types.has(d.type))) sel.appendChild(new Option(d.label, d.type));
-  sel.hidden = sel.options.length === 1;   // one kind ticked: nothing to choose, just say which
-  const extra = () => {
-    const box = $("#add-extra"), models = Object.entries(drv(sel.value).models);
-    box.innerHTML = "";
-    let kind = sel.hidden ? drv(sel.value).label : "";
-    if (sel.value === "govee") {
-      box.innerHTML = "<select id=add-model></select>";
-      for (const [m, label] of models) $("#add-model").appendChild(new Option(label, m));
-      if (models.length === 1) { $("#add-model").hidden = true; kind = [kind, models[0][1]].filter(Boolean).join(" · "); }
-    } else if (sel.value === "tuya") {
-      box.innerHTML = `<input type=text id=add-dev size=22 placeholder="device id">
-        <input type=password id=add-key size=18 maxlength=16 placeholder="local key" autocomplete=off>
-        <select id=add-ver>${["3.1", "3.2", "3.3", "3.4", "3.5"].map(v => `<option${v === "3.3" ? " selected" : ""}>${v}</option>`).join("")}</select>`;
+function drawFound() {
+  const ul = $("#found");
+  ul.innerHTML = "";
+  const rows = allRows();
+  if (!rows.length) { ul.appendChild(el("li", "fempty muted", "Nothing found yet: press Find my lights.")); return; }
+  for (const d of rows) {
+    const li = el("li", "frow" + (d.supported ? "" : " off"));
+    const c = W.cfg.controllers.find(x => sameSpot(x, d));
+    const cb = el("input"); cb.type = "checkbox"; cb.checked = !!c; cb.disabled = !d.supported;
+    cb.setAttribute("aria-label", `Use ${d.label || d.type} at ${d.ip}`);
+    cb.onchange = () => {
+      if (cb.checked) { W.untick.delete(spotKey(d)); addController(d); }
+      else { W.untick.add(spotKey(d)); const x = W.cfg.controllers.find(x => sameSpot(x, d)); if (x) removeController(x.id); }
+      drawFound(); drawTiles();
+    };
+    const main = el("div", "fmain");
+    const title = el("div", "ftitle");
+    title.append(el("b", "", d.label || modelLabel(d.type, d.model)));
+    if (d.zone && !String(d.label || "").includes(d.zone)) title.append(el("span", "fzone", `zone ${d.zone}`));
+    main.append(title);
+    const bits = [d.ip, d.lights ? `${d.lights} lights` : "", d.device_tail && !d.zone ? `…${d.device_tail}` : "",
+                  d.saved ? "in your saved setup" : ""].filter(Boolean);
+    main.append(el("small", "fsub", bits.join(" · ")));
+    if (TIER_NOTE[d.tier]) main.append(el("small", "ftier", TIER_NOTE[d.tier]));
+    if (!d.supported) {
+      const why = el("small", "freason", (d.reason || "Not supported yet") + (d.install ? ": " : "."));
+      if (d.install) why.append(el("code", "", d.install));
+      main.append(why);
     }
-    $("#add-kind").textContent = kind;
-    $("#add-kind").hidden = !kind;
-  };
-  sel.onchange = extra;
-  extra();
-  $("#add-row").hidden = !sel.options.length;
-}
-function drawTypeNotes() {
-  $("#type-notes").innerHTML = "";
-  for (const d of W.info.drivers.filter(d => W.types.has(d.type))) {
-    const li = document.createElement("li");
-    li.textContent = `${d.label}: ${d.note}`;
-    $("#type-notes").appendChild(li);
+    if (c && c.type === "tuya") main.append(tuyaFields(c));
+    if (c && (W.info.configured || c.enabled === false)) {
+      const lab = el("label", "fen"), en = el("input");
+      en.type = "checkbox"; en.checked = c.enabled !== false; en.onchange = () => { c.enabled = en.checked; };
+      lab.append(en, " Enabled");
+      main.append(lab);
+    }
+    const badge = el("span", `badge k-${d.type}`, KIND_NAME[d.type].split(" /")[0]);
+    li.append(cb, badge, main);
+    ul.appendChild(li);
   }
 }
-// Quick scan first. If the user said how many controllers and some are missing, a deep scan
-// follows by itself; otherwise "Missing lights? Run deep scan" offers one.
-async function discover(types, deep, expect) {
-  const body = {types, targets: $("#targets").value, deep};
+// A chosen Tuya light needs its device id (if the scan didn't hear it), local key and version.
+function tuyaFields(c) {
+  const box = el("div", "row ftuya");
+  if (!c.device_id || !W.found.find(d => sameSpot(d, c))?.device_id) {
+    const dev = el("input"); dev.type = "text"; dev.placeholder = "device id"; dev.size = 20; dev.value = c.device_id || "";
+    dev.setAttribute("aria-label", "Tuya device id"); dev.oninput = () => { c.device_id = dev.value.trim(); };
+    box.append(dev);
+  }
+  const key = el("input"); key.type = "password"; key.size = 18; key.maxLength = 16; key.autocomplete = "off";
+  key.placeholder = c.has_secret ? "key saved (type to change)" : "local key (16 characters)";
+  key.setAttribute("aria-label", "Tuya local key");
+  key.value = c.local_key || ""; key.oninput = () => { c.local_key = key.value.trim(); };
+  const ver = el("select");
+  ver.setAttribute("aria-label", "Tuya protocol version");
+  for (const v of ["3.1", "3.2", "3.3", "3.4", "3.5"]) ver.appendChild(new Option(v, v));
+  ver.value = c.version || "3.3"; ver.onchange = () => { c.version = ver.value; };
+  box.append(key, ver);
+  return box;
+}
+
+// One kind: a quick scan, or a deep one (keeps asking for up to DEEP_SECONDS, stops once it
+// knows `expect` controllers). Errors stay on that kind's tile.
+async function scanKind(t, deep, expect = 0) {
+  const body = {types: [t], targets: $("#targets").value, deep};
   if (deep) {
-    body.expect = expect ? Object.fromEntries(types.filter(t => W.counts[t]).map(t => [t, W.counts[t]])) : {};
-    body.known = {};
-    for (const x of [...W.found, ...W.cfg.controllers]) if (types.includes(x.type)) (body.known[x.type] ||= []).push(x.ip);
+    body.expect = expect ? {[t]: expect} : {};
+    body.known = {[t]: [...new Set([...W.found, ...W.cfg.controllers].filter(x => x.type === t).map(x => x.ip))]};
   }
-  const r = await api("/api/setup/discover", body);
-  for (const d of r.devices) if (!W.found.some(f => f.type === d.type && sameSpot(f, d))) W.found.push(d);
-  return r.problems || {};
-}
-function countdown(text) {
-  let left = W.info.deep_scan_seconds || 30;
-  const show = () => { $("#scan-msg").textContent = `${text} About ${left} s left…`; };
-  show();
-  const t = setInterval(() => { left = Math.max(1, left - 1); show(); }, 1000);
-  return () => clearInterval(t);
-}
-async function scan(forceDeep = false) {
-  err(""); $("#scan").disabled = $("#deep").disabled = true;
-  const autoAdd = !W.cfg.controllers.length;
-  let probs = {}, deepRan = false, stop = () => {};
+  W.kinds[t] = {...W.kinds[t], state: deep ? "deep" : "asking", msg: ""};
+  drawTiles();
   try {
-    if (!forceDeep) {
-      W.found = [];
-      $("#scan-msg").textContent = "Scanning…";
-      probs = await discover([...W.types], false, true);
-    }
-    const short = missingTypes();
-    if (forceDeep || short.length) {
-      drawFound();
-      stop = countdown(forceDeep ? "Deep scan: asking every address again, for longer."
-                                 : "Didn't find all the controllers: running a deep scan.");
-      probs = {...probs, ...(await discover(forceDeep ? [...W.types] : short, true, !forceDeep))};
+    const r = await api("/api/setup/discover", body);
+    remember(r.devices || []);
+    const prob = (r.problems || {})[t];
+    W.kinds[t] = prob ? {state: "error", msg: prob} : {state: "done"};
+  } catch (e) { W.kinds[t] = {state: "error", msg: e.message}; }
+  drawTiles(); drawFound();
+}
+// A countdown on the tiles of the kinds in a deep scan (and in `show`, if given).
+function countdown(kinds, show) {
+  let left = W.info.deep_scan_seconds || 30;
+  const tick = () => {
+    for (const t of kinds) if (W.kinds[t]?.state === "deep") W.kinds[t].left = left;
+    drawTiles();
+    if (show) show(left);
+  };
+  tick();
+  const id = setInterval(() => { left = Math.max(1, left - 1); tick(); }, 1000);
+  return () => clearInterval(id);
+}
+function busy(on) { for (const b of $$("#scan, #deep, .kcard .again, .kcard .kdeep")) b.disabled = on; }
+function problems() {
+  return KINDS.filter(t => W.kinds[t]?.state === "error").map(t => `${KIND_NAME[t]}: ${W.kinds[t].msg}`).join(" · ");
+}
+function summary(deepRan) {
+  const n = KINDS.map(t => [t, foundCount(t)]).filter(([, n]) => n);
+  const zones = allRows().filter(d => d.type === "jellyfish").length;
+  const parts = n.map(([t, k]) => `${k} ${KIND_NAME[t]}` + (t === "jellyfish" && zones > k ? ` (${zones} zones)` : ""));
+  const short = KINDS.filter(t => W.counts[t] && foundCount(t) < W.counts[t])
+    .map(t => `${KIND_NAME[t]}: found ${foundCount(t)} of ${W.counts[t]}${deepRan ? ", even with a deep scan" : ""}.`);
+  const head = parts.length ? `Found ${parts.join(", ")}${deepRan ? " after a deep scan" : ""}.` : `Nothing answered${deepRan ? ", even in a deep scan" : ""}.`;
+  return [head, ...short, parts.length ? "" : "Expecting more? Try a deep scan, add one by address, or see Not finding yours? below."]
+    .filter(Boolean).join(" ") + (problems() ? " " + problems() : "");
+}
+// "Find my lights": every kind at once. Kinds where the user said how many (in "Not finding
+// yours?") and some are missing get a deep scan by themselves.
+async function findAll(deep = false) {
+  err(""); busy(true);
+  if (!deep) W.found = [];
+  $("#scan-msg").textContent = deep ? "Deep scan: asking every address again, for longer." : "Asking every controller what it is…";
+  let stop = deep ? countdown(KINDS) : () => {};
+  try {
+    // An asked-for deep scan stops early only when a kind still misses some of the number chosen.
+    await Promise.all(KINDS.map(t => scanKind(t, deep, deep && W.counts[t] > foundCount(t) ? W.counts[t] : 0)));
+    let deepRan = deep;
+    const short = deep ? [] : KINDS.filter(t => W.counts[t] && foundCount(t) < W.counts[t] && W.kinds[t].state !== "error");
+    if (short.length) {
+      $("#scan-msg").textContent = "Didn't find them all: running a deep scan.";
+      stop = countdown(short);
+      await Promise.all(short.map(t => scanKind(t, true, W.counts[t])));
       deepRan = true;
     }
     stop();
-    const p = Object.entries(probs).map(([t, m]) => `${drv(t).label}: ${m}`);
-    $("#scan-msg").textContent = (countNote(deepRan) || (W.found.length ? `Found ${W.found.length}${deepRan ? " after a deep scan" : ""}.`
-      : `Nothing answered${deepRan ? ", even in a deep scan" : ""}.`)) + (p.length ? " " + p.join(" · ") : "");
-    if (autoAdd) for (const d of W.found) if (d.supported && !d.needs_key) addController(d);
-  } catch (e) { stop(); $("#scan-msg").textContent = ""; err(e.message); }
-  $("#scan").disabled = $("#deep").disabled = false;
-  $("#deep").hidden = false;
-  drawFound(); drawChosen();
-}
-async function addByAddress() {
-  const type = $("#add-type").value, ip = $("#add-ip").value.trim();
-  if (!validIp(ip)) return err("Type an IPv4 address like 192.168.2.50.");
-  const body = {type, ip};
-  if (type === "govee") body.model = $("#add-model").value;
-  if (type === "tuya") Object.assign(body, {device_id: $("#add-dev").value.trim(), local_key: $("#add-key").value.trim(), version: $("#add-ver").value});
-  err(""); $("#add").disabled = true;
-  try {
-    const r = await api("/api/setup/probe", body);
-    for (const row of r.devices) addController({...row, local_key: body.local_key});
-    showCount();
-    $("#add-ip").value = "";
-    if ($("#add-key")) $("#add-key").value = "";
-  } catch (e) { err(e.message); }
-  $("#add").disabled = false;
-  drawChosen(); drawFound();
+    $("#scan-msg").textContent = summary(deepRan);
+  } finally { stop(); busy(false); }
+  drawFound(); drawKinds();
 }
 
-// --- step 3: name and count (one card per run, in order along the house) --------------------------
+// "Add by address": every kind is asked at that one address; whatever answers is added.
+async function addByAddress(ip, msgEl, extra = null) {
+  ip = ip.trim();
+  if (!validIp(ip)) { msgEl.textContent = "Type an address like 192.168.2.50."; return false; }
+  msgEl.textContent = `Asking ${ip} what it is…`;
+  let r;
+  if (extra) r = await api("/api/setup/probe", {type: "tuya", ip, ...extra});    // Tuya with its id and key
+  else r = await api("/api/setup/identify", {ip});
+  const rows = r.devices || [];
+  for (const d of rows) { W.untick.delete(spotKey(d)); if (extra) d.local_key = extra.local_key; }
+  const before = W.autoTick;
+  W.autoTick = true;                        // added on purpose: tick it
+  remember(rows);
+  W.autoTick = before;
+  msgEl.textContent = extra ? `${ip}: the key works. Added.` : r.message;
+  drawTiles(); drawFound(); drawKinds();
+  return rows.length > 0;
+}
+
+// --- "Not finding yours?": one card per kind -------------------------------------------------
+function drawKinds() {
+  const box = $("#kinds");
+  const msgs = Object.fromEntries($$(".kcard", box).map(k => [k.dataset.kind, $(".kmsg", k).textContent]));
+  box.innerHTML = "";
+  for (const t of KINDS) {
+    const d = drv(t), h = HELP[t], card = el("div", "kcard");
+    card.dataset.kind = t;
+    card.append(el("b", "", d.label || KIND_NAME[t]), el("p", "kknow", h.know));
+    if (h.note) card.append(el("p", "note", h.note));
+    const ol = el("ol", "ksteps");
+    for (const s of h.steps) {
+      const li = el("li");
+      if (s.includes("INSTALL_WIN")) {
+        li.append("Install tinytuya: on Windows run ", el("code", "", INSTALL_TUYA.win), ", on Linux or a Raspberry Pi ",
+          el("code", "", INSTALL_TUYA.nix), ", then start House Lights again.");
+      } else li.textContent = s;
+      ol.appendChild(li);
+    }
+    card.append(ol);
+    if (t === "tuya") card.append(el("p", d.available ? "note ok-line" : "note warn", d.available ? "tinytuya is installed." : "tinytuya is not installed yet: Smart Life lights are found but can't be used."));
+    // How many, look again, add by address
+    const row = el("div", "row krow"), lab = el("label", "kcount");
+    const sel = el("select");
+    ["Not sure", ...Array.from({length: MAX_COUNT}, (_, i) => i + 1)].forEach((v, i) => sel.appendChild(new Option(String(v), String(i))));
+    sel.value = String(W.counts[t] || 0);
+    sel.onchange = () => { W.counts[t] = Number(sel.value); };
+    lab.append(`How many ${KIND_NAME[t]} controllers?`, sel);
+    const again = button(`Look for ${KIND_NAME[t]} again`, () => lookAgain(t, card), "again");
+    row.append(lab, again);
+    const add = el("div", "row kadd"), ip = el("input");
+    ip.type = "text"; ip.placeholder = "192.168.2.50"; ip.size = 15; ip.setAttribute("aria-label", `${KIND_NAME[t]} address`);
+    add.append(ip);
+    let tuyaIn = null;
+    if (t === "tuya" && d.available) {          // with tinytuya: check the key right away
+      const dev = el("input"), key = el("input"), ver = el("select");
+      dev.type = "text"; dev.placeholder = "device id"; dev.size = 20;
+      key.type = "password"; key.placeholder = "local key"; key.maxLength = 16; key.size = 16; key.autocomplete = "off";
+      for (const v of ["3.1", "3.2", "3.3", "3.4", "3.5"]) ver.appendChild(new Option(v, v));
+      ver.value = "3.3";
+      add.append(dev, key, ver);
+      tuyaIn = () => ({device_id: dev.value.trim(), local_key: key.value.trim(), version: ver.value});
+    }
+    add.append(button("Add by address", async () => {
+      try { if (await addByAddress(ip.value, $(".kmsg", card), tuyaIn && tuyaIn())) ip.value = ""; }
+      catch (e) { $(".kmsg", card).textContent = e.message; }
+    }));
+    const msg = el("p", "note kmsg");
+    msg.setAttribute("aria-live", "polite");
+    msg.textContent = msgs[t] || "";
+    card.append(row, add, msg);
+    box.appendChild(card);
+  }
+}
+// Quick scan for one kind. If it found fewer than the number chosen, a deep scan follows by
+// itself; with "Not sure", a button offers one.
+async function lookAgain(t, card) {
+  const msg = () => $(`.kcard[data-kind=${t}] .kmsg`);         // the cards may be drawn again meanwhile
+  const say = text => { const m = msg(); if (m) m.textContent = text; };
+  busy(true);
+  let stop = () => {};
+  try {
+    say(`Looking for ${KIND_NAME[t]}…`);
+    await scanKind(t, false);
+    const want = W.counts[t] || 0;
+    let n = foundCount(t);
+    if (W.kinds[t].state === "error") { say(W.kinds[t].msg); return; }
+    if (want && n < want) {
+      const head = `Found ${n} of ${want}. Didn't find them all: running a deep scan,`;
+      stop = countdown([t], left => say(`${head} ${left} s left.`));
+      await scanKind(t, true, want);
+      stop();
+      n = foundCount(t);
+      say(n >= want ? `Found all ${want}.` : `Found ${n} of ${want}, even with a deep scan. Add the missing ${want - n === 1 ? "one" : "ones"} by address.`);
+    } else if (want) say(`Found all ${want}.`);
+    else {
+      say(`Found ${n} ${KIND_NAME[t]} controller${n === 1 ? "" : "s"}. Expecting more? `);
+      const m = msg();
+      if (m) m.append(button("Deep scan, 30 s", async () => {
+        busy(true);
+        const st = countdown([t], left => say(`Deep scan: ${left} s left.`));
+        try { await scanKind(t, true, 0); } finally { st(); busy(false); }
+        const k = foundCount(t);
+        say(`Found ${k} ${KIND_NAME[t]} controller${k === 1 ? "" : "s"} after a deep scan.`);
+      }, "small kdeep"));
+    }
+  } finally { stop(); busy(false); }
+}
+
+// --- step 2: name and count (one card per run, in order along the house) --------------------------
 function drawRuns() {
   const box = $("#runs");
   box.innerHTML = "";
   W.cfg.runs.forEach((r, i) => {
     const c = ctrlOf(r.controller);
     if (!c) return;
-    const caps = drv(c.type).caps, card = el("div", "runcard");
+    const caps = capsOf(c), card = el("div", "runcard");
     card.innerHTML = `<div class="row rc-head"><b class="rc-n"></b><span class="muted rc-c"></span><span class="spacer"></span>
         <button class="small rc-up" title="Move left (earlier along the house)">▲ Left</button>
         <button class="small rc-down" title="Move right (later along the house)">▼ Right</button></div>
@@ -298,6 +431,7 @@ function drawRuns() {
       </div>`;
     $(".rc-n", card).textContent = `${i + 1}.`;
     $(".rc-c", card).textContent = `${modelLabel(c.type, c.model)} · ${where(c)}`;
+    if (TIER_NOTE[tierOf(c)]) $(".rc-head", card).after(el("small", "note", TIER_NOTE[tierOf(c)]));
     $(".rc-hl", card).textContent = caps.count === "display" ? "Used for drawing only." : caps.count === "reported" && hasLights(r)
       ? "Reported by the controller." : "Not sure? We'll help you count it in the Test step.";
     const up = $(".rc-up", card), down = $(".rc-down", card);
@@ -320,7 +454,7 @@ function drawRuns() {
   });
 }
 
-// --- step 4: test, one controller at a time ---------------------------------------------------
+// --- step 3: test, one controller at a time ---------------------------------------------------
 // W.t: {order: [controller ids], i, phase: find | count | check | done, only: id or null, ...answers}
 function startTests(only = null, phase = "find") {
   const order = only ? [only] : W.cfg.runs.map(r => r.controller).filter(id => ctrlOf(id));
@@ -342,18 +476,18 @@ function afterFind() {
 }
 function drawTest() {
   const c = curCtrl();
-  if (!c) { $("#t-one").replaceChildren(el("p", "muted", "No controllers to test: add one in step 2.")); return; }
+  if (!c) { $("#t-one").replaceChildren(el("p", "muted", "No controllers to test: add one in step 1.")); return; }
   const r = runOf(c.id), d = drv(c.type), n = W.t.order.length;
   $("#test-intro").textContent = W.info.live
     ? "Each test shows on that controller's lights for up to a minute. Look at the lights and answer."
     : "Practice mode: nothing is sent to the lights. The strip shows what they would do.";
   $("#t-title").textContent = W.t.only ? `Testing ${r.name}` : `Controller ${W.t.i + 1} of ${n}: ${r.name}`;
-  $("#t-sub").textContent = `${modelLabel(c.type, c.model)} · ${where(c)}`;
+  $("#t-sub").textContent = `${modelLabel(c.type, c.model)} · ${where(c)}` + (TIER_NOTE[tierOf(c)] ? ` · ${TIER_NOTE[tierOf(c)]}` : "");
   const steps = ["find", ...(canCount(c) || canCheck(c) ? ["count"] : []), ...(canCheck(c) ? ["check"] : []), "done"];
   const label = {find: "Find it", count: "Count", check: "Check", done: "Done"};
   $("#t-phases").innerHTML = "";
   for (const s of steps) $("#t-phases").appendChild(el("li", s === W.t.phase ? "on" : steps.indexOf(s) < steps.indexOf(W.t.phase) ? "done" : "", label[s]));
-  $("#t-restore").textContent = RESTORE_NOTE[d.caps.restore] || "";
+  $("#t-restore").textContent = RESTORE_NOTE[capsOf(c).restore] || "";
   if (!W.testing[c.id]) {                  // between tests: an unlit strip as long as the run
     if (hasLights(r)) dots(r.lights);
     $("#t-dots").hidden = W.t.phase === "done" || !hasLights(r);
@@ -372,7 +506,7 @@ function drawTest() {
 async function nextController() {
   if (W.t.i < W.t.order.length - 1) return toController(W.t.i + 1);
   await stopTest(curCtrl());
-  return go(W.t.only ? 5 : 4);
+  return go(W.t.only ? 4 : 3);
 }
 const q = (text, cls = "tq") => el("p", cls, text);
 const answers = (...btns) => { const row = el("div", "row answers"); row.append(...btns.filter(Boolean)); return row; };
@@ -413,7 +547,7 @@ function drawFind(c, r, body) {
 
 // B. Count (Govee: segment markers, then the red lights of the last segment)
 function drawCountPhase(c, r, body) {
-  const lps = W.lps[c.id] || drv(c.type).lights_per_segment?.[c.model] || 5, max = maxLights(c);
+  const lps = W.lps[c.id] || lpsOf(c) || 5, max = maxLights(c);
   if (hasLights(r) && !W.t.recount) {
     body.append(q(`${r.name} is set to ${r.lights} lights. Is that right?`), answers(
       button("Yes, check it", () => setPhase(canCheck(c) ? "check" : "done"), "primary"),
@@ -552,7 +686,7 @@ function sweep(r) {
 function drawMore(c) {
   const box = $("#t-more-btns");
   box.innerHTML = "";
-  for (const name of drv(c.type).tests) {
+  for (const name of testsOf(c)) {
     if (["markers", "tail", "check"].includes(name)) continue;
     box.appendChild(button(W.info.tests[name], () => runTest(c, name), "live small" + (W.testing[c.id] === name ? " on" : "")));
   }
@@ -578,6 +712,7 @@ async function runTest(c, name, extra = {}) {
   $("#t-status").textContent = (res.live ? "On the lights now." : "Practice mode: logged only.")
     + (TEST_HELP[name] && !["identify", "chase"].includes(name) ? " " + TEST_HELP[name] : "")
     + (res.slow ? " (This controller changes about once a second.)" : "")
+    + (res.stream_untested && name === "check" ? " This model hasn't been seen playing light by light yet: if the lights show red, dim white and blue as on the strip, it can play light-by-light themes; if they don't change, it can't (please report what you see)." : "")
     + (name === "check" ? ` The strip shows what is sent: the ${res.frame_lights - body.lights} orange lights are past the count, so real lights only show them if the count is too low.` : "");
   const pv = await api("/api/setup/preview", body);
   $("#t-dots").hidden = false;
@@ -616,7 +751,7 @@ async function stopAllTests() {
   W.testing = {};
 }
 
-// --- step 5: time and place --------------------------------------------------------------------------
+// --- step 4: time and place --------------------------------------------------------------------------
 const browserTz = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "";
 function drawPlace() {
   const tz = $("#tz");
@@ -695,7 +830,7 @@ function geolocate() {
   }, () => { msg.textContent = "Not available here (browsers only share location on https or localhost). Use the ZIP code instead."; });
 }
 
-// --- step 6: save ------------------------------------------------------------------------------------
+// --- step 5: save ------------------------------------------------------------------------------------
 function drawSummary() {
   syncNames();
   const t = document.createElement("table");
@@ -714,8 +849,8 @@ function drawSummary() {
     const links = tr.insertCell();
     links.className = "links";
     const a = (text, fn) => { const x = el("a", "", text); x.href = "#"; x.onclick = e => { e.preventDefault(); fn(); }; return x; };
-    links.append(a("Change", () => go(2)), " · ", a(canCount(c) || canCheck(c) ? "Count it" : "Test it", () => {
-      startTests(c.id, canCount(c) || canCheck(c) ? "count" : "find"); go(3, true);
+    links.append(a("Change", () => go(1)), " · ", a(canCount(c) || canCheck(c) ? "Count it" : "Test it", () => {
+      startTests(c.id, canCount(c) || canCheck(c) ? "count" : "find"); go(2, true);
     }));
   });
   const loc = W.cfg.location;
@@ -725,7 +860,7 @@ function drawSummary() {
   $("#save-where").textContent = `Saved to ${inHome(W.info.home, "config.json")} (keys such as Tuya's go to secrets.json, readable only by you). The server restarts with it.`;
 }
 async function save() {
-  const msg = check(2) || check(5);
+  const msg = check(0) || check(1) || check(4);
   if (msg) return err(msg);
   err(""); $("#next").disabled = true; $("#prev").disabled = true;
   await stopAllTests();
@@ -748,13 +883,14 @@ async function waitForRestart() {
 
 // --- navigation ----------------------------------------------------------------------------------
 function check(step) {
-  if (step === 0 && !W.types.size) return "Tick at least one kind of lights.";
-  if (step === 1) {
-    if (!W.cfg.controllers.length) return "Add at least one controller.";
+  if (step === 0) {
+    if (!W.cfg.controllers.length) return "Tick at least one controller, or add one by address.";
+    const noId = W.cfg.controllers.find(c => c.type === "tuya" && !/^[A-Za-z0-9]{8,40}$/.test(c.device_id || ""));
+    if (noId) return `Type the device id for the Tuya device at ${noId.ip}.`;
     const noKey = W.cfg.controllers.find(c => c.type === "tuya" && !c.has_secret && !(c.local_key && c.local_key.length === 16));
     if (noKey) return `Type the 16-character local key for the Tuya device at ${noKey.ip}.`;
   }
-  if (step === 2) {
+  if (step === 1) {
     for (const r of W.cfg.runs) {
       const c = ctrlOf(r.controller);
       if (!String(r.name || "").trim()) return "Every run needs a name.";
@@ -763,19 +899,19 @@ function check(step) {
     const names = W.cfg.runs.map(r => String(r.name).trim().toLowerCase());
     if (new Set(names).size !== names.length) return "Give each run a different name.";
   }
-  if (step === 5) {
+  if (step === 4) {
     const r = W.cfg.runs.find(r => !hasLights(r));
-    if (r) return `${r.name}: how many lights? Type it in step 3, or count it in step 4.`;
+    if (r) return `${r.name}: how many lights? Type it in step 2, or count it in step 3.`;
   }
   return "";
 }
-// keepTests: step 4 was set up by the caller (a deep link or a "Count it" link).
+// keepTests: step 3 (Test) was set up by the caller (a deep link or a "Count it" link).
 async function go(step, keepTests = false) {
   if (step > W.step) for (let s = W.step; s < step; s++) { const msg = check(s); if (msg) { if (s !== W.step) await go(s); return err(msg); } }
   err("");
-  if (W.step === 3 && step !== 3) await stopAllTests();
-  if (W.step === 4) readPlace();
-  if (W.step === 2) syncNames();
+  if (W.step === 2 && step !== 2) await stopAllTests();
+  if (W.step === 3) readPlace();
+  if (W.step === 1) syncNames();
   W.step = step;
   $$("[data-page]").forEach(p => { p.hidden = Number(p.dataset.page) !== step; });
   $$("#steps li").forEach(li => {
@@ -784,11 +920,11 @@ async function go(step, keepTests = false) {
   });
   $("#prev").hidden = step === 0;
   $("#next").textContent = step === STEPS - 1 ? "Save and start" : "Next";
-  if (step === 1) { drawTypeNotes(); drawAddRow(); drawFound(); drawChosen(); if (W.cfg.controllers.length) showCount(); }
-  if (step === 2) drawRuns();
-  if (step === 3) { if (!keepTests || !W.t) startTests(); drawTest(); }
-  if (step === 4) drawPlace();
-  if (step === 5) drawSummary();
+  if (step === 0) { drawTiles(); drawFound(); drawKinds(); }
+  if (step === 1) drawRuns();
+  if (step === 2) { if (!keepTests || !W.t) startTests(); drawTest(); }
+  if (step === 3) drawPlace();
+  if (step === 4) drawSummary();
   scrollTo(0, 0);
 }
 
@@ -819,10 +955,10 @@ async function init() {
   for (const c of W.cfg.controllers) (ips[c.type] ||= new Set()).add(c.ip);
   for (const [t, s] of Object.entries(ips)) W.counts[t] = Math.min(s.size, MAX_COUNT);  // running the wizard again
   for (const c of W.cfg.controllers) {
-    W.types.add(c.type);
     if (!W.cfg.runs.some(r => r.controller === c.id)) W.cfg.runs.push(newRun(c, c.name || c.ip, null));
   }
-  if (!W.types.size) { const g = W.info.drivers.find(d => d.type === "govee" && d.available); if (g) W.types.add("govee"); }
+  // Editing a saved setup: newly found controllers aren't ticked by themselves.
+  W.autoTick = !W.cfg.controllers.length;
   const pill = $("#mode");
   pill.textContent = W.info.live ? "LIVE" : "PRACTICE";
   pill.className = "pill " + (W.info.live ? "live" : "dry");
@@ -830,10 +966,17 @@ async function init() {
   if (W.info.error) { b.hidden = false; b.textContent = `Your settings file has a problem: ${W.info.error}. Go through the steps to fix it.`; }
   else if (W.info.configured) $("#back").hidden = false;
   else { b.hidden = false; b.textContent = "Welcome! No settings yet: this wizard sets up your lights. It takes a few minutes."; }
-  drawDrivers();
-  $("#scan").onclick = () => scan(false);
-  $("#deep").onclick = () => scan(true);
-  $("#add").onclick = addByAddress;
+  $("#scan").onclick = () => findAll(false).catch(e => err(e.message));
+  $("#targets").onkeydown = e => { if (e.key === "Enter") $("#scan").click(); };
+  $("#deep").onclick = () => findAll(true).catch(e => err(e.message));
+  const addIp = async () => {
+    $("#add").disabled = true;
+    try { if (await addByAddress($("#add-ip").value, $("#add-msg"))) $("#add-ip").value = ""; }
+    catch (e) { $("#add-msg").textContent = e.message; }
+    $("#add").disabled = false;
+  };
+  $("#add").onclick = addIp;
+  $("#add-ip").onkeydown = e => { if (e.key === "Enter") addIp(); };
   $("#geo").onclick = e => { e.preventDefault(); geolocate(); };
   $("#ll-show").onclick = e => { e.preventDefault(); $("#ll").hidden = !$("#ll").hidden; };
   $("#tz-change").onclick = e => { e.preventDefault(); $("#tz-edit").hidden = !$("#tz-edit").hidden; if (!$("#tz-edit").hidden) $("#tz").focus(); };
@@ -848,11 +991,12 @@ async function init() {
   // With a saved config every step can be opened from the list at the top.
   W.jump = !W.info.error && W.cfg.runs.length > 0 && W.cfg.controllers.length > 0;
   for (const li of $$("#steps li")) li.onclick = () => { if (W.jump && Number(li.dataset.step) !== W.step) go(Number(li.dataset.step)); };
-  // Deep links: ?step=4&controller=<id>, ?step=5
-  const qs = new URLSearchParams(location.search), want = Number(qs.get("step")) - 1;
+  // Deep links: ?step=test&controller=<id>, ?step=place (or the step's number, 1 to 5)
+  const qs = new URLSearchParams(location.search), sv = String(qs.get("step") || "").toLowerCase();
+  const want = STEP_NAMES.includes(sv) ? STEP_NAMES.indexOf(sv) : /^[1-9]$/.test(sv) ? Number(sv) - 1 : -1;
   if (W.jump && want >= 0 && want < STEPS) {
     const cid = qs.get("controller");
-    if (want === 3 && cid && ctrlOf(cid)) { startTests(cid); return go(3, true); }
+    if (want === 2 && cid && ctrlOf(cid)) { startTests(cid); return go(2, true); }
     return go(want);
   }
   go(0);
