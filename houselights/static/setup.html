@@ -40,7 +40,7 @@
     <div class="row">
       <button id="scan" class="primary">Scan</button>
       <label class="lbl">addresses to scan <input type="text" id="targets" size="30"
-        placeholder="empty = this network, or e.g. 192.168.1.0/24"></label>
+        placeholder="empty = this network, or e.g. 192.168.2.0/24"></label>
       <span class="muted" id="scan-msg"></span>
     </div>
     <p class="note">If your lights are on a different network or subnet than this computer, type that network
@@ -50,7 +50,8 @@
     <div class="row" id="add-row">
       <span class="lbl">Or add one by address:</span>
       <select id="add-type"></select>
-      <input type="text" id="add-ip" size="16" placeholder="192.168.1.50">
+      <b id="add-kind" hidden></b>
+      <input type="text" id="add-ip" size="16" placeholder="192.168.2.50">
       <span id="add-extra" class="row"></span>
       <button id="add">Add</button>
     </div>

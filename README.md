@@ -111,7 +111,9 @@ python -m houselights [--home DIR] [--host HOST] [--port PORT] [--dry]
 The first time you open the page there are no settings yet, so the setup wizard opens. You
 can run it again later from the **Settings** tab (**Change setup**).
 
-1. **Lights**: tick every kind of controller you have. You can mix them.
+1. **Lights**: tick every kind of controller you have. You can mix them. If you know how
+   many controllers of each kind you have, pick the number: the scan then tells you when
+   it has found them all, and scans once more if some didn't answer.
 2. **Controllers**: press **Scan**. It asks controllers on your network to identify
    themselves and changes nothing. Tick the ones to use. If your lights are on another
    network or subnet than this computer, type that network (like `192.168.2.0/24`) or the

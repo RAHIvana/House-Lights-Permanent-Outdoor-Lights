@@ -260,6 +260,8 @@ a.button.primary { background: var(--fg); color: var(--bg); border-color: var(--
   border-radius: var(--radius); background: var(--panel2); cursor: pointer; }
 .choice label.off { opacity: .55; cursor: default; }
 .choice small { display: block; color: var(--muted); }
+.choice small.count { margin-top: 8px; color: var(--fg); }
+.choice small.count select { margin-left: 4px; }
 .wiz table { border-collapse: collapse; width: 100%; font-size: 14px; }
 .wiz th, .wiz td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .wiz th { color: var(--muted); font-weight: 600; font-size: 13px; }

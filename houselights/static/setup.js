@@ -14,7 +14,8 @@ async function api(path, body) {
   return data;
 }
 
-const W = {step: 0, info: null, cfg: null, found: [], types: new Set(), testing: {}, anim: {}, lps: {}};
+const W = {step: 0, info: null, cfg: null, found: [], types: new Set(), counts: {}, testing: {}, anim: {}, lps: {}};
+const MAX_COUNT = 12;                      // "How many controllers?" choices; 0 = not sure
 const STEPS = 6;
 const TEST_HELP = {
   markers: "Every segment starts with a red or green light; every 10th marker is blue. Count the markers along the whole run and type the number.",
@@ -76,10 +77,40 @@ function drawDrivers() {
     $(".n", l).textContent = d.note;
     const r = $("input", l);
     r.value = d.type; r.disabled = !d.available; r.checked = W.types.has(d.type);
+    if (d.available) {                     // how many: the scan then knows when it has found them all
+      const row = document.createElement("small");
+      row.className = "count";
+      row.innerHTML = `How many controllers? <select>${["Not sure", ...Array.from({length: MAX_COUNT}, (_, i) => i + 1)]
+        .map((v, i) => `<option value="${i}">${v}</option>`).join("")}</select>`;
+      const sel = $("select", row);
+      sel.value = String(W.counts[d.type] || 0);
+      sel.onchange = () => {
+        W.counts[d.type] = Number(sel.value);
+        if (W.counts[d.type] && !r.checked) { r.checked = true; W.types.add(d.type); }
+      };
+      $("span", l).appendChild(row);
+    }
     r.onchange = () => { r.checked ? W.types.add(d.type) : W.types.delete(d.type); };
     $("#drivers").appendChild(l);
   }
 }
+
+// How many controllers of each kind are known so far: scanned or chosen, one per address.
+function foundCounts() {
+  const ips = {};
+  for (const x of [...W.found.filter(d => d.supported), ...W.cfg.controllers]) (ips[x.type] ||= new Set()).add(x.ip);
+  return Object.fromEntries(Object.entries(ips).map(([t, s]) => [t, s.size]));
+}
+const missingTypes = () => { const have = foundCounts(); return [...W.types].filter(t => W.counts[t] && (have[t] || 0) < W.counts[t]); };
+function countNote() {
+  const have = foundCounts();
+  return [...W.types].filter(t => W.counts[t]).map(t => {
+    const n = have[t] || 0, want = W.counts[t], name = drv(t).label.split(" (")[0];
+    return n >= want ? `${name}: found all ${want}.`
+      : `${name}: found ${n} of ${want}. Scan again, or add the missing ${want - n === 1 ? "one" : "ones"} by address below.`;
+  }).join(" ");
+}
+function showCount() { const n = countNote(); if (n) $("#scan-msg").textContent = n; }
 
 // --- step 2: controllers ----------------------------------------------------------------------
 function drawFound() {
@@ -123,7 +154,7 @@ function drawChosen() {
       key.value = c.local_key || ""; key.oninput = () => { c.local_key = key.value.trim(); };
       ver.value = c.version || "3.3"; ver.onchange = () => { c.version = ver.value; };
     }
-    $("button", tr).onclick = () => { removeController(c.id); drawChosen(); drawFound(); };
+    $("button", tr).onclick = () => { removeController(c.id); drawChosen(); drawFound(); showCount(); };
     tb.appendChild(tr);
   }
 }
@@ -131,17 +162,22 @@ function drawAddRow() {
   const sel = $("#add-type");
   sel.innerHTML = "";
   for (const d of W.info.drivers.filter(d => d.available && W.types.has(d.type))) sel.appendChild(new Option(d.label, d.type));
+  sel.hidden = sel.options.length === 1;   // one kind ticked: nothing to choose, just say which
   const extra = () => {
-    const box = $("#add-extra");
+    const box = $("#add-extra"), models = Object.entries(drv(sel.value).models);
     box.innerHTML = "";
+    let kind = sel.hidden ? drv(sel.value).label : "";
     if (sel.value === "govee") {
       box.innerHTML = "<select id=add-model></select>";
-      for (const [m, label] of Object.entries(drv("govee").models)) $("#add-model").appendChild(new Option(label, m));
+      for (const [m, label] of models) $("#add-model").appendChild(new Option(label, m));
+      if (models.length === 1) { $("#add-model").hidden = true; kind = [kind, models[0][1]].filter(Boolean).join(" · "); }
     } else if (sel.value === "tuya") {
       box.innerHTML = `<input type=text id=add-dev size=22 placeholder="device id">
         <input type=password id=add-key size=18 maxlength=16 placeholder="local key" autocomplete=off>
         <select id=add-ver>${["3.1", "3.2", "3.3", "3.4", "3.5"].map(v => `<option${v === "3.3" ? " selected" : ""}>${v}</option>`).join("")}</select>`;
     }
+    $("#add-kind").textContent = kind;
+    $("#add-kind").hidden = !kind;
   };
   sel.onchange = extra;
   extra();
@@ -157,19 +193,33 @@ function drawTypeNotes() {
 }
 async function scan() {
   err(""); $("#scan").disabled = true; $("#scan-msg").textContent = "Scanning… (a network scan can take up to 10 seconds)";
+  const autoAdd = !W.cfg.controllers.length, targets = $("#targets").value;
+  const merge = rows => { for (const d of rows) if (!W.found.some(f => f.type === d.type && sameSpot(f, d))) W.found.push(d); };
   try {
-    const r = await api("/api/setup/discover", {types: [...W.types], targets: $("#targets").value});
-    W.found = r.devices;
-    const probs = Object.entries(r.problems || {}).map(([t, p]) => `${drv(t).label}: ${p}`);
-    $("#scan-msg").textContent = (r.devices.length ? `Found ${r.devices.length}.` : "Nothing answered.") + (probs.length ? " " + probs.join(" · ") : "");
-    if (!W.cfg.controllers.length) for (const d of r.devices) if (d.supported && !d.needs_key) addController(d);
+    W.found = [];
+    const r = await api("/api/setup/discover", {types: [...W.types], targets});
+    merge(r.devices);
+    let probs = r.problems || {};
+    const short = missingTypes();            // fewer than the user said: ask those kinds once more
+    if (short.length) {
+      $("#scan-msg").textContent = "Not all of them answered yet; scanning once more…";
+      drawFound();
+      const r2 = await api("/api/setup/discover", {types: short, targets});
+      merge(r2.devices);
+      probs = {...probs, ...(r2.problems || {})};
+    }
+    const p = Object.entries(probs).map(([t, m]) => `${drv(t).label}: ${m}`);
+    const counted = countNote();
+    $("#scan-msg").textContent = (counted || (W.found.length ? `Found ${W.found.length}.` : "Nothing answered."))
+      + (p.length ? " " + p.join(" · ") : "");
+    if (autoAdd) for (const d of W.found) if (d.supported && !d.needs_key) addController(d);
   } catch (e) { $("#scan-msg").textContent = ""; err(e.message); }
   $("#scan").disabled = false;
   drawFound(); drawChosen();
 }
 async function addByAddress() {
   const type = $("#add-type").value, ip = $("#add-ip").value.trim();
-  if (!validIp(ip)) return err("Type an IPv4 address like 192.168.1.50.");
+  if (!validIp(ip)) return err("Type an IPv4 address like 192.168.2.50.");
   const body = {type, ip};
   if (type === "govee") body.model = $("#add-model").value;
   if (type === "tuya") Object.assign(body, {device_id: $("#add-dev").value.trim(), local_key: $("#add-key").value.trim(), version: $("#add-ver").value});
@@ -177,6 +227,7 @@ async function addByAddress() {
   try {
     const r = await api("/api/setup/probe", body);
     for (const row of r.devices) addController({...row, local_key: body.local_key});
+    showCount();
     $("#add-ip").value = "";
     if ($("#add-key")) $("#add-key").value = "";
   } catch (e) { err(e.message); }
@@ -420,7 +471,7 @@ async function go(step) {
   $$("#steps li").forEach(li => { const s = Number(li.dataset.step); li.className = s === step ? "on" : s < step ? "done" : ""; });
   $("#prev").hidden = step === 0;
   $("#next").textContent = step === STEPS - 1 ? "Save and start" : "Next";
-  if (step === 1) { drawTypeNotes(); drawAddRow(); drawFound(); drawChosen(); }
+  if (step === 1) { drawTypeNotes(); drawAddRow(); drawFound(); drawChosen(); if (W.cfg.controllers.length) showCount(); }
   if (step === 2) drawRuns();
   if (step === 3) drawTests();
   if (step === 4) drawPlace();
@@ -433,6 +484,9 @@ async function init() {
   W.cfg = JSON.parse(JSON.stringify(W.info.config));
   W.cfg.controllers = Array.isArray(W.cfg.controllers) ? W.cfg.controllers : [];
   W.cfg.runs = Array.isArray(W.cfg.runs) ? W.cfg.runs : [];
+  const ips = {};
+  for (const c of W.cfg.controllers) (ips[c.type] ||= new Set()).add(c.ip);
+  for (const [t, s] of Object.entries(ips)) W.counts[t] = Math.min(s.size, MAX_COUNT);  // running the wizard again
   for (const c of W.cfg.controllers) {
     W.types.add(c.type);
     if (!W.cfg.runs.some(r => r.controller === c.id))
