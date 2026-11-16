@@ -44,11 +44,13 @@ def main():
                        "streaming": False, "frames": 0, "last_frame": None, "segment_packets": 0, "commands": 0}
         for port in (scan_port, cmd_port):
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            if os.name != "nt":               # on Windows it would share the port with a second copy
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
                 s.bind((ip, port))
             except OSError as e:
-                sys.exit(f"can't use {ip}:{port} ({e}). On macOS use --base 127.0.0.1 --count 1.")
+                sys.exit(f"can't use {ip}:{port} ({e}). Is another simulator running? "
+                         "On macOS use --base 127.0.0.1 --count 1.")
             socks[s] = ip
     print(f"{a.count} simulated {a.model} device(s): {', '.join(devices)} "
           f"(ports scan {scan_port}, reply {reply_port}, command {cmd_port})", flush=True)

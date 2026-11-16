@@ -47,8 +47,17 @@ class Lan:
 
     def _listen(self):
         rx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        rx.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        rx.bind(("", REPLY_PORT))
+        if os.name != "nt":
+            # Not on Windows: there the bind then succeeds beside another program already on
+            # this port, and that program keeps getting every reply, so a scan silently finds
+            # nothing. Without it, the bind fails and says why.
+            rx.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            rx.bind(("", REPLY_PORT))
+        except OSError as e:
+            rx.close()
+            raise OSError(f"can't listen for Govee replies on UDP port {REPLY_PORT}; is another program "
+                          f"using it? ({e.strerror or e})") from None
         rx.settimeout(0.2)
         return rx
 
