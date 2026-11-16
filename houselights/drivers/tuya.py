@@ -9,6 +9,7 @@ Tested only with a stand-in for tinytuya so far, not a real Tuya device.
 """
 import colorsys
 import logging
+import os
 import re
 
 from . import net
@@ -23,6 +24,7 @@ TESTED = False
 
 MODELS = {"Tuya light": {"label": "Tuya / Smart Life light strip", "lights_per_segment": 0, "max_lights": 2000}}
 VERSIONS = ("3.1", "3.2", "3.3", "3.4", "3.5")
+INSTALL = ("venv\\Scripts\\pip" if os.name == "nt" else "venv/bin/pip") + " install tinytuya"
 
 
 def _lib():
@@ -34,7 +36,7 @@ def _lib():
 
 
 def available():
-    return (True, "") if _lib() else (False, "Needs the tinytuya package: venv/bin/pip install tinytuya")
+    return (True, "") if _lib() else (False, f"Needs the tinytuya package: {INSTALL}")
 
 
 def options(c, secret):
@@ -53,7 +55,7 @@ def options(c, secret):
 def _device(dev_id, ip, key, version):
     tt = _lib()
     if not tt:
-        raise ValueError("tinytuya is not installed (venv/bin/pip install tinytuya)")
+        raise ValueError(f"tinytuya is not installed ({INSTALL})")
     try:
         d = tt.BulbDevice(dev_id, ip, key, version=float(version), connection_timeout=3, connection_retry_limit=2)
     except TypeError:                                 # older tinytuya without those arguments
@@ -104,7 +106,7 @@ def discover(targets=""):
     Only devices on this computer's own network are heard; typed addresses are ignored."""
     tt = _lib()
     if not tt:
-        raise ValueError("tinytuya is not installed (venv/bin/pip install tinytuya)")
+        raise ValueError(f"tinytuya is not installed ({INSTALL})")
     found = tt.deviceScan(False, 6) or {}
     rows = []
     for ip, d in found.items():
