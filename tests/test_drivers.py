@@ -249,6 +249,70 @@ deep = govee.discover("127.0.0.15, 127.0.0.16", deep=True, expect=2, known=["127
 check("Govee deep scan finds it, skips the known one, stops once all are found",
       [r["ip"] for r in deep] == ["127.0.0.15"] and ASKED["127.0.0.16"] == before and time.time() - t0 < 10)
 
+# --- Govee models in tiers, against the simulator --------------------------------------------------
+fg_try = tool("fake_govee").serve("127.0.0.17", 1, "H706B", [50])
+fg_basic = tool("fake_govee").serve("127.0.0.18", 1, "H7060", [40], razer=False)
+time.sleep(0.2)
+rows = {r["ip"]: r for r in govee.discover("127.0.0.17, 127.0.0.18")}
+check("Govee scan: an H706B is supported, tier try", rows.get("127.0.0.17", {}).get("supported")
+      and rows["127.0.0.17"]["tier"] == "try" and rows["127.0.0.17"]["label"] == "Govee H706B")
+check("Govee scan: an H7060 is supported, tier basic", rows.get("127.0.0.18", {}).get("supported")
+      and rows["127.0.0.18"]["tier"] == "basic" and rows["127.0.0.18"]["model"] == "H7060")
+check("Govee scan row for garbage: not supported", not govee._row("127.0.0.19", {"sku": "?"})["supported"])
+kfull = drivers.make_kit(Controller("gf", "govee", "H806A", "127.0.0.17", "", True), live=False)
+ktry = drivers.make_kit(Controller("gt", "govee", "H706B", "127.0.0.17", "", True), live=True)
+kbasic = drivers.make_kit(Controller("gb", "govee", "H7060", "127.0.0.18", "", True), live=True)
+check("Govee kit caps per model", kfull.caps["pick"] and ktry.caps["stream_untested"] and not ktry.caps["pick"]
+      and not kbasic.caps["stream"] and kbasic.caps["restore"] == "snapshot")
+
+
+def refuses(kit, fn):
+    try:
+        with kit.lock:
+            fn()
+    except drivers.NotAllowed:
+        return True
+    return False
+
+
+check("Govee try and basic kits refuse segment colours",
+      refuses(ktry, lambda: ktry.segments([0], (1, 2, 3), 10)) and refuses(kbasic, lambda: kbasic.segments([0], (1, 2, 3), 10))
+      and fg_try["127.0.0.17"]["segment_packets"] == 0)
+check("Govee basic kit refuses streaming", refuses(kbasic, kbasic.stream_begin)
+      and refuses(kbasic, lambda: kbasic.stream_frame([(1, 1, 1)])) and fg_basic["127.0.0.18"]["ignored"] == 0)
+s = Streamer(ktry, 50, 15)
+s.start("diya_glow", {}, 100)
+time.sleep(0.8)
+d = fg_try["127.0.0.17"]
+check("Govee try kit streams per light", d["streaming"] and d["frames"] > 3 and len(d["last_frame"]) == 50)
+s.stop()
+time.sleep(0.2)
+check("Govee try kit: stream stopped", not d["streaming"])
+kbasic.power(True)
+kbasic.brightness(70)
+kbasic.color((10, 20, 30))
+b = fg_basic["127.0.0.18"]
+check("Govee basic kit: on, brightness, colour", (b["onOff"], b["brightness"], b["color"]) == (1, 70, {"r": 10, "g": 20, "b": 30}))
+kbasic.kelvin(3000)
+check("Govee basic kit: white", b["colorTemInKelvin"] == 3000)
+st = govee.read_status([kbasic])["gb"]
+check("Govee basic kit: status", st and st["brightness"] == 70 and st["colorTemInKelvin"] == 3000)
+try:
+    Streamer(kbasic, 40).start("diya_glow", {})
+    check("Govee basic kit: animated themes refused", False)
+except ValueError:
+    check("Govee basic kit: animated themes refused", True)
+st = Streamer(kbasic, 40)
+st.start_fn("test", lambda t: [(255, 0, 0)] * 40, False, seconds=3, slow_ok=True)
+time.sleep(2.0)
+shown = dict(b["color"])
+st.stop()
+check("Govee basic test: shows the colour, then puts the light back",
+      shown == {"r": 255, "g": 0, "b": 0} and b["colorTemInKelvin"] == 3000 and b["brightness"] == 70 and b["onOff"] == 1)
+check("Govee tests per model", setup.allowed_tests(drivers.model_caps("govee", "H7060")) == ["identify"]
+      and "markers" in setup.allowed_tests(drivers.model_caps("govee", "H706B"))
+      and "segments" not in setup.allowed_tests(drivers.model_caps("govee", "H706B")))
+
 # --- settings with secrets ------------------------------------------------------------------------
 cfg = {"controllers": [{"id": "t1", "type": "tuya", "model": "Tuya light", "ip": "127.0.0.41",
                         "device_id": "abcdef0123456789abcd", "local_key": "0123456789abcdef"},

@@ -78,14 +78,24 @@ class Section:
         return self.lights
 
     @property
-    def caps(self):
+    def info(self):
+        """The controller model's {label, tier, caps, max_lights, lights_per_segment, note}."""
         from . import drivers
-        return drivers.caps(self.controller.type)
+        return drivers.model_info(self.controller.type, self.controller.model) or {}
+
+    @property
+    def caps(self):
+        """What this run's controller can do: per model (e.g. a Govee model's tier)."""
+        from . import drivers
+        return drivers.model_caps(self.controller.type, self.controller.model)
 
     def public(self):
+        info = self.info
         return {"id": self.id, "name": self.name, "short": self.short, "subtitle": self.subtitle,
                 "start": self.start, "ip": self.controller.ip, "controller": self.controller.id,
                 "model": self.controller.model, "type": self.controller.type,
+                "model_label": info.get("label", self.controller.model), "tier": info.get("tier"),
+                "tier_note": info.get("note", ""),
                 "zone": self.controller.options.get("zone", ""), "caps": self.caps,
                 "enabled": self.enabled, "lights": self.lights,
                 "segments": self.segments, "lights_per_segment": self.lights_per_segment,
@@ -205,8 +215,12 @@ def validate(raw, secrets=None):
         if not drv:
             raise ValueError(f"{what}: controller type {ctype!r} is not supported")
         model = _text(c.get("model"), f"{what} model", 32, True)
-        if model not in drv.MODELS:
-            raise ValueError(f"{what}: model {model!r} is not supported yet (supported: {', '.join(drv.MODELS)})")
+        info = drivers.model_info(ctype, model)
+        if not info:
+            hint = (f"a {ctype} model name looks like H806A" if hasattr(drv, "model_info")
+                    else f"supported: {', '.join(drv.MODELS)}")
+            raise ValueError(f"{what}: model {model!r} is not supported yet ({hint})")
+        model = info["model"]
         try:
             ip = str(ipaddress.ip_address(_text(c.get("ip"), f"{what} IP address", 45, True)))
         except ValueError:
@@ -242,7 +256,7 @@ def validate(raw, secrets=None):
         if cid in used:
             raise ValueError(f"{what} ({name}): controller {cid} already has a run (one run per controller)")
         used.add(cid)
-        model = drivers.get(by_id[cid]["type"]).MODELS[by_id[cid]["model"]]
+        model = drivers.model_info(by_id[cid]["type"], by_id[cid]["model"])
         base = r.get("baseline") or {}
         light1, reverse = _light1(r, f"{what} ({name})")
         runs.append({"id": rid, "name": name,
@@ -368,7 +382,7 @@ def load():
         sections[r["id"]] = Section(
             id=r["id"], name=r["name"], short=r["short"], subtitle=r["subtitle"], start=r["start"],
             controller=ctrl, lights=r["lights"], reverse=r["reverse"], baseline=r["baseline"], light1=r["light1"],
-            lights_per_segment=drivers.get(ctrl.type).MODELS[ctrl.model].get("lights_per_segment", 0))
+            lights_per_segment=(drivers.model_info(ctrl.type, ctrl.model) or {}).get("lights_per_segment", 0))
     loc = c["location"]
     return Settings(mode="dry" if forced_dry() else c["mode"], host=c["listen"]["host"], port=c["listen"]["port"],
                     controllers=controllers, sections=sections, stream_fps=c["stream_fps"],

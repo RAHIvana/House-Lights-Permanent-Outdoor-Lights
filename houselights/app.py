@@ -37,7 +37,8 @@ HOUSE_T0 = time.monotonic()               # one clock for whole-house themes: ev
 
 if S.configured:
     log.info("start: mode=%s, %d run(s): %s", S.mode.upper(), len(S.sections),
-             ", ".join(f"{s.name} ({s.controller.model} {s.controller.ip}, {s.lights} lights)" for s in S.sections.values()))
+             ", ".join(f"{s.name} ({s.controller.model}{' ' + s.info['tier'] if s.info.get('tier') else ''} "
+                       f"{s.controller.ip}, {s.lights} lights)" for s in S.sections.values()))
 else:
     log.info("start: no settings yet in %s; open the page to run the setup wizard", settings.home())
 
@@ -168,7 +169,10 @@ def config():
             "location": bool(S.location),
             "home": settings.home(),
             "controllers": [{"id": c.id, "type": c.type, "model": c.model, "ip": c.ip, "name": c.name,
-                             "enabled": c.enabled} for c in S.controllers.values()],
+                             "enabled": c.enabled, "caps": KITS[c.id].caps,
+                             "tier": (drivers.model_info(c.type, c.model) or {}).get("tier"),
+                             "model_label": (drivers.model_info(c.type, c.model) or {}).get("label", c.model)}
+                            for c in S.controllers.values()],
             "sections": [s.public() for s in S.sections.values()],
             "patterns": P.catalogue(),
             "categories": P.categories(),

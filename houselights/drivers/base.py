@@ -14,6 +14,11 @@ Capabilities (CAPS) tell the dashboard and the setup wizard what a controller ca
            "reported" (the controller says), "display" (only used to draw the run)
   restore  after a test: "auto" (controller goes back by itself), "snapshot" (we save and
            put back its state), "none" (can't: the wizard says so)
+  stream_untested  (optional) streaming is allowed but not yet seen working on this model:
+           the page and the wizard say "try it"
+
+CAPS can differ per model of one driver (e.g. Govee): ask drivers.model_caps(kind, model) or
+a kit's .caps, not Kit.CAPS, for one controller.
 """
 import logging
 import threading
@@ -23,6 +28,12 @@ log = logging.getLogger("houselights")
 
 class NotAllowed(Exception):
     pass
+
+
+# A controller that shows one colour at a time (one "segment": the whole run), reports its
+# state, and is saved and put back after a wizard test. Static themes show their main colour.
+ONE_COLOUR_CAPS = {"stream": False, "static": "segments", "pick": False, "status": True, "count": "display",
+                   "restore": "snapshot"}
 
 
 class Kit:

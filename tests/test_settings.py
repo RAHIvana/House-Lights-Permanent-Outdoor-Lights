@@ -88,6 +88,63 @@ rejects("bad time zone", good(timezone="Mars/Olympus"), "unknown time zone")
 rejects("bad latitude", good(location={"lat": 95, "lon": 0}), "latitude")
 rejects("bad mode", good(mode="maybe"), "mode")
 
+# --- Govee models in tiers: full (H806A), try (permanent outdoor families), basic (any other SKU) ---
+from houselights import drivers  # noqa: E402
+
+mi = {m: drivers.model_info("govee", m) for m in ("H806A", "H706B", "H7060", "h705a")}
+check("model_info tiers", [mi[m]["tier"] for m in ("H806A", "H706B", "H7060")] == ["full", "try", "basic"])
+check("model_info labels", mi["H806A"]["label"] == "Govee H806A" and mi["H7060"]["label"] == "Govee H7060")
+check("model_info limits", (mi["H806A"]["max_lights"], mi["H806A"]["lights_per_segment"]) == (255, 5)
+      and (mi["H706B"]["max_lights"], mi["H706B"]["lights_per_segment"]) == (255, 0)
+      and (mi["H7060"]["max_lights"], mi["H7060"]["lights_per_segment"]) == (3000, 0))
+check("model_info caps", mi["H806A"]["caps"]["stream"] and mi["H806A"]["caps"]["pick"]
+      and not mi["H806A"]["caps"].get("stream_untested")
+      and mi["H706B"]["caps"]["stream"] and mi["H706B"]["caps"]["stream_untested"] and not mi["H706B"]["caps"]["pick"]
+      and not mi["H7060"]["caps"]["stream"] and not mi["H7060"]["caps"]["pick"]
+      and mi["H7060"]["caps"]["restore"] == "snapshot")
+check("model_info: lower case SKU read as upper case", mi["h705a"]["model"] == "H705A" and mi["h705a"]["tier"] == "try")
+check("model_info: garbage is not a model", all(drivers.model_info("govee", m) is None
+                                                for m in ("", "H99", "H999", "X806A", "H806A!", "H806AB7", None)))
+check("model_info: other drivers from MODELS", drivers.model_info("wled", "WLED")["max_lights"] == 1500
+      and drivers.model_info("wled", "WLED")["tier"] is None and drivers.model_info("wled", "H806A") is None)
+check("model_caps per model", drivers.model_caps("govee", "H7060")["stream"] is False
+      and drivers.model_caps("govee", "H806A")["stream"] is True)
+cat = {d["type"]: d for d in drivers.catalog()}
+check("catalog: Govee summary, tiers and a models note", cat["govee"]["models"] == {"H806A": "Govee H806A"}
+      and set(cat["govee"]["tiers"]) == {"full", "try", "basic"} and "H706A" in cat["govee"]["models_note"]
+      and cat["govee"]["model_info"]["H706B"]["tier"] == "try")
+
+tiers = good(controllers=[{"id": "a", "model": "H806A", "ip": "192.0.2.21"},
+                          {"id": "b", "model": "H706B", "ip": "192.0.2.22"},
+                          {"id": "c", "model": "H7060", "ip": "192.0.2.23"}],
+             runs=[{"name": "A", "controller": "a", "lights": 50}, {"name": "B", "controller": "b", "lights": 200},
+                   {"name": "C", "controller": "c", "lights": 2500}])
+check("H706B and H7060 runs accepted", [r["lights"] for r in settings.validate(tiers)["runs"]] == [50, 200, 2500])
+rejects("too many lights on a try model", dict(tiers, runs=[{"name": "B", "controller": "b", "lights": 300}]),
+        "between 1 and 255")
+rejects("too many lights on a basic model", dict(tiers, runs=[{"name": "C", "controller": "c", "lights": 3001}]),
+        "between 1 and 3000")
+rejects("garbage Govee model", good(controllers=[{"id": "x", "model": "lamp", "ip": "192.0.2.1"}],
+                                    runs=[{"name": "a", "controller": "x", "lights": 5}]), "not supported")
+settings.save(tiers)
+ts = settings.load()
+pa, pb, pc = (ts.sections[k].public() for k in ("a", "b", "c"))
+check("Section.public: tier and caps per run",
+      (pa["tier"], pb["tier"], pc["tier"]) == ("full", "try", "basic")
+      and pa["caps"]["stream"] and pa["caps"]["pick"] and pb["caps"]["stream"] and pb["caps"]["stream_untested"]
+      and not pb["caps"]["pick"] and not pc["caps"]["stream"] and pc["model_label"] == "Govee H7060")
+check("segments: 5 per segment on H806A, one (the whole run) on the others",
+      (pa["segments"], pa["lights_per_segment"]) == (10, 5) and (pb["segments"], pb["lights_per_segment"]) == (1, 0)
+      and pc["segments"] == 1)
+sw = setup.state()
+gv = next(d for d in sw["drivers"] if d["type"] == "govee")
+check("wizard state: per-model limits, tiers and tests (also for a basic model in the config)",
+      gv["max_lights"]["H706B"] == 255 and gv["max_lights"]["H7060"] == 3000
+      and gv["model_info"]["H7060"]["tier"] == "basic" and gv["model_info"]["H7060"]["tests"] == ["identify"]
+      and "markers" in gv["model_info"]["H706B"]["tests"] and "segments" not in gv["model_info"]["H706B"]["tests"]
+      and gv["tiers"]["basic"]["tests"] == ["identify"] and "segments" in gv["tests"])
+os.remove(settings.path("config.json"))
+
 # --- save and load ---
 check("no file: not configured", settings.load().configured is False)
 settings.save(good())

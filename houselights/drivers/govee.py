@@ -4,18 +4,29 @@ Protocol: JSON over UDP. Commands go to the device on port 4003, discovery ("sca
 4001 (multicast 239.255.255.250 or unicast), and devices answer on port 4002 of the sender.
 LAN control has to be switched on for each device in the Govee Home app.
 
-Segment colours use "ptReal" packets (BLE-style 20-byte frames); per-light animation uses
-the "razer" (DreamView) streaming mode. Both were verified on model H806A.
+Govee documents only the basic LAN commands: turn, brightness, colorwc (colour or colour
+temperature) and devStatus. Segment colours use "ptReal" packets (BLE-style 20-byte frames)
+and per-light animation the "razer" (DreamView) streaming mode; neither is documented, and
+both were verified on model H806A only. So what a controller may do depends on its model
+(SKU), in three tiers (model_info()):
+  full   H806A: per-light streaming, segment colours (5 lights each), up to 255 lights
+  try    permanent outdoor families with LAN control (H705x, H706x, H707x, H805x, H3A5x):
+         basic control, per-light streaming allowed but untested ("stream_untested"), no
+         segment colours: a static theme shows its main colour (or plays as a stream)
+  basic  any other model that answers the scan: on/off, brightness, one colour, white,
+         status, schedules; a theme shows its main colour
 """
 import base64
 import ipaddress
 import json
 import logging
 import os
+import re
 import socket
 import threading
 import time
 
+from .base import ONE_COLOUR_CAPS, NotAllowed
 from .base import Kit as BaseKit
 
 log = logging.getLogger("houselights")
@@ -24,11 +35,57 @@ LABEL = "Govee (Wi-Fi, LAN control)"
 NOTE = "Switch on LAN Control for each device in the Govee Home app first."
 TESTED = True
 
-# Models known to work. lights_per_segment: how many lights one segment colours, counted
-# from light 1. max_lights: a streaming frame carries at most 255 lights.
-MODELS = {
-    "H806A": {"label": "Permanent Outdoor Lights Pro (H806A)", "lights_per_segment": 5, "max_lights": 255},
+# What each tier may do (see base.py for the keys). "stream_untested": per-light streaming is
+# allowed but has not been seen working on that model: the page and wizard say "try it".
+FULL_CAPS = {"stream": True, "static": "segments", "pick": True, "status": True, "count": "manual",
+             "restore": "auto"}
+TRY_CAPS = {"stream": True, "stream_untested": True, "static": "segments", "pick": False, "status": True,
+            "count": "manual", "restore": "auto"}
+BASIC_CAPS = dict(ONE_COLOUR_CAPS)        # like a Tuya strip: one colour at a time, put back after a test
+
+# lights_per_segment: how many lights one segment colours, counted from light 1 (0: no
+# segments, the whole run is one colour). max_lights: a streaming frame carries at most 255
+# lights; a run that doesn't stream only needs a count to draw it on the page.
+TIERS = {
+    "full": {"label": "Full support", "caps": FULL_CAPS, "lights_per_segment": 5, "max_lights": 255,
+             "note": "Everything: themes light by light, segment colours. Tested on real controllers."},
+    "try": {"label": "Basic control; light-by-light themes to try", "caps": TRY_CAPS, "lights_per_segment": 0,
+            "max_lights": 255,
+            "note": "On/off, brightness, colours and schedules work. Light-by-light themes (Play live) are "
+                    "untested on this model: try them. Static themes show their main colour."},
+    "basic": {"label": "Basic control", "caps": BASIC_CAPS, "lights_per_segment": 0, "max_lights": 3000,
+              "note": "On/off, brightness, one colour, white and schedules. Themes show their main colour."},
 }
+
+TRY_FAMILIES = ("H705A", "H705B", "H705C", "H705D", "H705E", "H705F",      # Permanent Outdoor Lights (2)
+                "H706A", "H706B", "H706C",                                 # Permanent Outdoor Lights Pro
+                "H707A", "H707B", "H707C",                                 # Prism (community lists)
+                "H805A", "H805B", "H805C",                                 # Elite
+                "H3A51", "H3A52", "H3A53")                                 # 2 Pro (LAN control unconfirmed)
+
+# Models known by name: the full tier and the "try" families. Any other SKU-shaped model is
+# accepted in the basic tier (model_info()).
+MODELS = {"H806A": {"label": "Govee H806A", "tier": "full", "lights_per_segment": 5, "max_lights": 255},
+          **{m: {"label": f"Govee {m}", "tier": "try", "lights_per_segment": 0, "max_lights": 255}
+             for m in TRY_FAMILIES}}
+MODELS_NOTE = ("H806A: everything (tested). H705A-F, H706A-C, H707A-C, H805A-C, H3A51-53: basic control, "
+               "light-by-light themes to try. Any other Govee model with LAN Control: basic control.")
+SKU = re.compile(r"H[0-9A-Z]{4,5}")
+
+
+def model_info(sku):
+    """{model, label, tier, caps, max_lights, lights_per_segment, note} for a Govee model
+    (SKU, e.g. "H806A"), or None if it doesn't look like one. Unknown SKUs are "basic"."""
+    sku = str(sku or "").strip().upper()
+    if not SKU.fullmatch(sku):
+        return None
+    known = MODELS.get(sku)
+    tier = known["tier"] if known else "basic"
+    t = TIERS[tier]
+    return {"model": sku, "label": known["label"] if known else f"Govee {sku}", "tier": tier,
+            "caps": dict(t["caps"]), "max_lights": known["max_lights"] if known else t["max_lights"],
+            "lights_per_segment": known["lights_per_segment"] if known else t["lights_per_segment"],
+            "note": t["note"]}
 
 # HOUSELIGHTS_GOVEE_PORTS="scan,reply,command" moves the ports, only for the simulator
 # (tools/fake_govee.py) so it can run beside real devices. Real devices use 4001,4002,4003.
@@ -193,10 +250,15 @@ def options(c, secret):
 
 
 def _row(ip, d):
+    """One scan answer for the wizard. Every SKU-shaped model is supported, in its tier."""
     sku = str(d.get("sku", "?"))
     dev = str(d.get("device", ""))
-    return {"ip": ip, "type": "govee", "model": sku, "device_tail": dev[-5:], "lights": None,
-            "supported": sku in MODELS, "label": MODELS.get(sku, {}).get("label", f"Govee {sku} (not supported yet)")}
+    info = model_info(sku)
+    if not info:
+        return {"ip": ip, "type": "govee", "model": sku, "device_tail": dev[-5:], "lights": None,
+                "supported": False, "tier": None, "label": f"Govee {sku} (not supported yet)"}
+    return {"ip": ip, "type": "govee", "model": info["model"], "device_tail": dev[-5:], "lights": None,
+            "supported": True, "tier": info["tier"], "label": info["label"]}
 
 
 def probe(info):
@@ -272,13 +334,25 @@ def razer_frame(colors, mode=0x00):
 
 # --- one device ----------------------------------------------------------------------------
 class Kit(BaseKit):
-    CAPS = {"stream": True, "static": "segments", "pick": True, "status": True, "count": "manual",
-            "restore": "auto"}
+    """One Govee controller. What it may do comes from its model's tier (self.caps); CAPS is
+    the driver-level summary (the full tier)."""
+    CAPS = FULL_CAPS
     max_stream_lights = 255
 
     def __init__(self, controller, live):
         super().__init__(controller, live)
         self.lan = LAN
+        self.info = model_info(controller.model) or dict(model_info("H0000"), model=controller.model,
+                                                          label=f"Govee {controller.model}")    # not a SKU: basic
+        self.max_stream_lights = min(255, self.info["max_lights"])
+
+    @property
+    def caps(self):
+        return self.info["caps"]
+
+    def _need(self, cap, what):
+        if not self.caps.get(cap):
+            raise NotAllowed(f"{self.info['label']} can't {what} (basic LAN control only)")
 
     def _lan(self, cmd, data):
         self.guard()
@@ -307,6 +381,8 @@ class Kit(BaseKit):
 
     def segments(self, segs, rgb, nseg):
         self.guard()
+        if not self.caps.get("pick"):
+            raise NotAllowed(f"{self.info['label']} can't colour segments one by one (checked on H806A only)")
         segs = sorted(set(int(s) for s in segs))
         if not segs or segs[0] < 0 or segs[-1] >= nseg:
             raise ValueError(f"segments out of range 0..{nseg - 1}: {segs}")
@@ -322,10 +398,37 @@ class Kit(BaseKit):
 
     def stream_begin(self):
         self.guard()
+        self._need("stream", "play light-by-light themes")
         self._razer(RAZER_ON)
 
     def stream_frame(self, colors):
+        self._need("stream", "play light-by-light themes")
         self._razer(razer_frame(colors))
 
     def stream_end(self):
+        self._need("stream", "play light-by-light themes")
         self._razer(RAZER_OFF)
+
+    # --- tests on models that don't stream: save the state and put it back -----------------
+    def snapshot(self):
+        if not self.live:
+            return None
+        try:
+            return self.lan.status([self.c.ip]).get(self.c.ip)
+        except OSError:
+            return None
+
+    def restore(self, snap):
+        if not snap or not self.live:
+            return
+        col = snap.get("color") or {}
+        k = int(snap.get("colorTemInKelvin") or 0)
+        with self.lock:
+            log.info("%s %s restore %s", self.prefix, self.tag, json.dumps(snap))
+            if k:
+                self._lan("colorwc", {"color": {"r": 0, "g": 0, "b": 0}, "colorTemInKelvin": k})
+            else:
+                self._lan("colorwc", {"color": {c: int(col.get(c, 0)) for c in "rgb"}, "colorTemInKelvin": 0})
+            if snap.get("brightness"):
+                self._lan("brightness", {"value": max(1, min(100, int(snap["brightness"])))})
+            self._lan("turn", {"value": 1 if snap.get("onOff") else 0})
