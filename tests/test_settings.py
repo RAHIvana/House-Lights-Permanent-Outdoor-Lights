@@ -48,6 +48,29 @@ check("good config passes", c["runs"][0]["id"] == "porch_eaves" and c["runs"][0]
 check("defaults filled", c["mode"] == "live" and c["listen"]["port"] == 8090 and c["runs"][1]["baseline"]["kelvin"] == 2200)
 check("location kept", c["location"] == {"lat": 40.7128, "lon": -74.006})
 check("empty location -> none", settings.validate(good(location={"lat": "", "lon": ""}))["location"] is None)
+
+# where light 1 is: light1 decides reverse; old files without it keep their reverse
+check("old file: reverse kept, light1 from it", (c["runs"][0]["light1"], c["runs"][0]["reverse"]) == ("", False)
+      and (c["runs"][1]["light1"], c["runs"][1]["reverse"]) == ("right", True))
+lr = settings.validate(good(runs=[{"name": "A", "controller": "porch", "lights": 5, "light1": "right"},
+                                  {"name": "B", "controller": "garage", "lights": 5, "light1": "left", "reverse": True}]))
+check("light1 right -> reverse; left wins over a stale reverse",
+      [(r["light1"], r["reverse"]) for r in lr["runs"]] == [("right", True), ("left", False)])
+check("light1 '' (not checked yet) is allowed, not reversed",
+      [(r["light1"], r["reverse"]) for r in settings.validate(good(runs=[
+          {"name": "A", "controller": "porch", "lights": 5, "light1": "", "reverse": True}]))["runs"]] == [("", False)])
+rejects("bad light1", good(runs=[{"name": "A", "controller": "porch", "lights": 5, "light1": "middle"}]), "left or right")
+check("run order kept (left to right along the house)",
+      [r["name"] for r in settings.validate(good(runs=list(reversed(good()["runs"]))))["runs"]] == ["Garage", "Porch eaves"])
+
+# location: optional ZIP and place, lat/lon rounded to 4 decimals
+lc = settings.validate(good(location={"lat": 40.712812, "lon": "-74.00601", "zip": " 12345 ", "place": "Springfield, IL"}))
+check("location with zip and place", lc["location"] == {"lat": 40.7128, "lon": -74.006, "zip": "12345", "place": "Springfield, IL"})
+check("location without zip/place has no empty keys",
+      settings.validate(good(location={"lat": 1, "lon": 2, "zip": "", "place": None}))["location"] == {"lat": 1.0, "lon": 2.0})
+rejects("zip too long", good(location={"lat": 1, "lon": 2, "zip": "12345678901"}), "ZIP code")
+rejects("place too long", good(location={"lat": 1, "lon": 2, "place": "x" * 65}), "place name")
+
 rejects("no runs", good(runs=[]), "at least one run")
 rejects("unknown model", good(controllers=[{"id": "x", "model": "H999", "ip": "192.0.2.1"}],
                               runs=[{"name": "a", "controller": "x", "lights": 5}]), "not supported")
@@ -74,6 +97,9 @@ sec = s.sections["garage"]
 check("segments from the model (120 / 5)", sec.segments == 24 and sec.lights_per_segment == 5)
 check("disabled controller", not sec.enabled and s.sections["porch_eaves"].enabled)
 check("location tuple", s.location == (40.7128, -74.006) and s.timezone == "America/New_York")
+pub = sec.public()
+check("section.public() has light1 and reverse", pub["light1"] == "right" and pub["reverse"] is True
+      and s.sections["porch_eaves"].public()["light1"] == "")
 os.environ["HOUSELIGHTS_DRY"] = "1"
 check("--dry forces practice mode", settings.load().mode == "dry")
 del os.environ["HOUSELIGHTS_DRY"]

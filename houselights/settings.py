@@ -58,6 +58,7 @@ class Section:
     reverse: bool
     baseline: dict = field(default_factory=dict)
     lights_per_segment: int = 0
+    light1: str = ""          # "left", "right" (as you face the lights) or "" (not checked yet)
 
     @property
     def enabled(self):
@@ -89,7 +90,7 @@ class Section:
                 "enabled": self.enabled, "lights": self.lights,
                 "segments": self.segments, "lights_per_segment": self.lights_per_segment,
                 "reachable": self.reachable, "transport": "lan", "reverse": self.reverse,
-                "baseline": self.baseline}
+                "light1": self.light1, "baseline": self.baseline}
 
 
 @dataclass
@@ -100,7 +101,7 @@ class Settings:
     controllers: dict
     sections: dict
     stream_fps: int = 15
-    location: tuple | None = None       # (lat, lon) for sunrise/sunset schedules
+    location: tuple | None = None       # (lat, lon) for sunrise/sunset schedules (config: also zip, place)
     timezone: str = "UTC"
     configured: bool = True
     raw: dict = field(default_factory=dict)
@@ -146,6 +147,22 @@ def slug(text):
     return s or "run"
 
 
+LIGHT1 = ("left", "right", "")
+
+
+def _light1(r, what):
+    """Where light 1 is, as you face the lights: "left", "right" or "" (not checked yet).
+    reverse (themes run from the last light) follows from it: light 1 at the right end. Old
+    files without light1 keep their reverse."""
+    if r.get("light1") is None:
+        reverse = bool(r.get("reverse", False))
+        return ("right" if reverse else ""), reverse
+    light1 = str(r.get("light1")).strip().lower()
+    if light1 not in LIGHT1:
+        raise ValueError(f"{what}: light 1 must be at the left or right end")
+    return light1, light1 == "right"
+
+
 def validate(raw, secrets=None):
     """Check a config (from the wizard or the file) and return a clean copy.
     Raises ValueError with a message the wizard can show. Secrets typed in the wizard (e.g. a
@@ -172,6 +189,10 @@ def validate(raw, secrets=None):
     if loc.get("lat") not in (None, "") or loc.get("lon") not in (None, ""):
         out["location"] = {"lat": round(_num(loc.get("lat"), "latitude", -90, 90, float), 4),
                            "lon": round(_num(loc.get("lon"), "longitude", -180, 180, float), 4)}
+        for k, what, limit in (("zip", "ZIP code", 10), ("place", "place name", 64)):
+            v = _text(loc.get(k), what, limit)
+            if v:
+                out["location"][k] = v
 
     ctrls, ips, found_secrets = [], set(), {}
     for i, c in enumerate(raw.get("controllers") or []):
@@ -223,13 +244,15 @@ def validate(raw, secrets=None):
         used.add(cid)
         model = drivers.get(by_id[cid]["type"]).MODELS[by_id[cid]["model"]]
         base = r.get("baseline") or {}
+        light1, reverse = _light1(r, f"{what} ({name})")
         runs.append({"id": rid, "name": name,
                      "short": _text(r.get("short") or name[:12], f"{what} short name", 12, True),
                      "subtitle": _text(r.get("subtitle"), f"{what} note", 60),
                      "start": _text(r.get("start"), f"{what} start", 80),
                      "controller": cid,
                      "lights": _num(r.get("lights"), f"{what} ({name}) lights", 1, model["max_lights"]),
-                     "reverse": bool(r.get("reverse", False)),
+                     "light1": light1,
+                     "reverse": reverse,
                      "baseline": {"brightness": _num(base.get("brightness", 50), f"{what} brightness", 1, 100),
                                   "kelvin": _num(base.get("kelvin", 2200), f"{what} kelvin", 2000, 9000)}})
     if len({r["id"] for r in runs}) != len(runs):
@@ -344,7 +367,7 @@ def load():
         ctrl = controllers[r["controller"]]
         sections[r["id"]] = Section(
             id=r["id"], name=r["name"], short=r["short"], subtitle=r["subtitle"], start=r["start"],
-            controller=ctrl, lights=r["lights"], reverse=r["reverse"], baseline=r["baseline"],
+            controller=ctrl, lights=r["lights"], reverse=r["reverse"], baseline=r["baseline"], light1=r["light1"],
             lights_per_segment=drivers.get(ctrl.type).MODELS[ctrl.model].get("lights_per_segment", 0))
     loc = c["location"]
     return Settings(mode="dry" if forced_dry() else c["mode"], host=c["listen"]["host"], port=c["listen"]["port"],
