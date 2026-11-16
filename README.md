@@ -1,9 +1,10 @@
 # House Lights
 
 A web dashboard for permanent outdoor lights (roofline and eave lights), run on a computer in
-your home. It works with **Govee**, **JellyFish**, **ASAHOM**, **TreatLife** and the many
-other brands that use the Smart Life / Tuya app, and open-source **WLED** controllers (see
-[Supported controllers](#supported-controllers)). Play animated themes light by light, apply
+your home. It works with **Govee**, **JellyFish**, **ASAHOM**, **TreatLife**, likely
+**Astoria**, and the many other brands that use the Smart Life / Tuya platform, and
+open-source **WLED** controllers (see [Supported controllers](#supported-controllers)).
+Play animated themes light by light, apply
 static themes, schedule them by clock time or sunrise/sunset, and make your own themes. No
 cloud account and no app login: it talks to the light controllers directly over your home
 network.
@@ -38,11 +39,15 @@ Look at the app your lights use:
 |---|---|---|
 | **Govee Home** app | Govee | Govee |
 | **Smart Life** or **Tuya Smart** app | Most **ASAHOM** kits, **TreatLife**, and many other (often unbranded) Amazon permanent-light kits | Tuya / Smart Life |
+| A brand app that links to Google Home or Alexa **through Smart Life** | **Astoria** (its own Astoria Lighting app, built on the Smart Life / Tuya platform as far as we can tell) | Tuya / Smart Life (likely; not tried yet, see below) |
 | **WLED** app, or a WLED page when you open the controller's address in a browser | DIY and open-source controllers, controllers sold "with WLED", **ASAHOM Pro** models sold as having WLED. Some owners of other brands swap in a WLED controller | WLED |
 | **JellyFish** app | JellyFish Lighting | JellyFish |
 
 The app is the clue, not the brand: many brands rebuild the Smart Life app under their own
-name. If your box or manual says "Smart Life" or "Tuya", pick Tuya / Smart Life.
+name. If your box or manual says "Smart Life" or "Tuya", or the brand's Alexa / Google Home
+setup goes through Smart Life, pick Tuya / Smart Life. With a brand's own app, getting the
+local key (see [Getting each kind of controller ready](#getting-each-kind-of-controller-ready))
+may only work after you add the controller to the Smart Life app itself.
 
 ### Not supported
 
@@ -52,7 +57,6 @@ checked yet):
 | Brand | Why not (yet) |
 |---|---|
 | **Oelo** | Its controllers are run through Oelo's cloud, behind an Oelo account login; no documented local API |
-| **Astoria** | Its own Astoria Lighting app; no local API we know of |
 | **Eufy** | Its own app (newer S4 models also speak Matter, which this project doesn't use); no local API |
 | **Gemstone**, **Trimlight**, **Enbrighten**, **Lumary**, **Nanoleaf** | Their own apps; not checked yet |
 
