@@ -61,6 +61,14 @@ const lanHex = lan => lan.colorTemInKelvin ? kelvinToHex(lan.colorTemInKelvin)
 const patternById = id => CONFIG.patterns.find(p => p.id === id);
 const labelOf = id => id === "warm" ? "Warm white" : (patternById(id) || {label: id}).label;
 const shortName = sid => SEC[sid] ? SEC[sid].short || SEC[sid].name : sid;
+const capsOf = sec => sec.caps || {stream: true, pick: true, status: true};
+// "50 lights / 10 segments × 5", or what the controller does instead
+function runSize(sec) {
+  const c = capsOf(sec);
+  if (!c.pick && c.static === "segments") return `${sec.lights} lights · one color at a time`;
+  if (sec.lights_per_segment === 1) return `${sec.lights} lights, each its own color` + (c.static === "palette" ? " (up to 30 colors)" : "");
+  return `${sec.lights} lights / ${sec.segments} segments × ${sec.lights_per_segment}`;
+}
 const enabledIds = () => CONFIG.sections.filter(s => s.enabled).map(s => s.id);
 const targetIds = () => enabledIds().filter(id => TARGETS.has(id));
 const names = ids => ids.map(shortName).join(", ");
@@ -269,7 +277,7 @@ function drawStatus(card) {
   const box = $(".status", el), st = status && status.stream;
   if (!sec.enabled) { box.textContent = "not enabled"; return; }
   const lan = status && status.lan;
-  if (!lan) box.innerHTML = '<span class="dot"></span>no reply' + (st ? `<br><span class="live-tag">● Playing ${labelOf(st.pattern)}</span>` : "");
+  if (!lan) box.innerHTML = '<span class="dot"></span>' + (capsOf(sec).status === false ? "status not reported by this controller" : "no reply") + (st ? `<br><span class="live-tag">● Playing ${labelOf(st.pattern)}</span>` : "");
   else {
     const col = lan.colorTemInKelvin ? `${lan.colorTemInKelvin} K` : `rgb ${lan.color.r},${lan.color.g},${lan.color.b}`;
     box.innerHTML = `<span class="dot ${lan.onOff ? "on" : ""}"></span>${lan.onOff ? "On" : "Off"} · ${lan.brightness}%`
@@ -294,7 +302,7 @@ function buildStrip(card) {
       card.lightEls[i] = d;
       seg.appendChild(d);
     }
-    const toggle = () => { if (!sec.enabled) return; card.selected.has(s) ? card.selected.delete(s) : card.selected.add(s); drawMeta(card); };
+    const toggle = () => { if (!sec.enabled || !capsOf(sec).pick) return; card.selected.has(s) ? card.selected.delete(s) : card.selected.add(s); drawMeta(card); };
     seg.onclick = toggle;
     seg.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } };
     card.segEls.push(seg);
@@ -331,8 +339,11 @@ function drawMeta(card) {
   });
   $(".strip", el).classList.toggle("preview", !!p);
   const n = card.selected.size;
-  $(".sel", el).textContent = n ? `${n} segment${n > 1 ? "s" : ""} selected` : "Tap segments to select";
-  $('[data-act="segments"]', el).disabled = !n;
+  const pick = capsOf(sec).pick, unit = sec.lights_per_segment === 1 ? "light" : "segment";
+  $(".sel", el).textContent = !pick ? (capsOf(sec).static === "segments" ? "This controller shows one color at a time"
+      : "Picking single lights isn't supported on this controller")
+    : n ? `${n} ${unit}${n > 1 ? "s" : ""} selected` : `Tap ${unit}s to select`;
+  $('[data-act="segments"]', el).disabled = !n || !pick;
 }
 
 function patternBody(card) {
@@ -377,8 +388,7 @@ function buildCard(sec) {
   const el = $("#section-tpl").content.firstElementChild.cloneNode(true);
   const card = CARDS[sec.id] = {el, sec, selected: new Set(), picked: {name: "Warm white 2200 K", hex: "#ffa04a", kelvin: 2200}, syncedKey: null};
   $(".name", el).textContent = sec.name;
-  $(".sub", el).textContent = [sec.subtitle, sec.ip,
-    `${sec.lights} lights / ${sec.segments} segments` + (sec.lights_per_segment ? ` × ${sec.lights_per_segment}` : "")
+  $(".sub", el).textContent = [sec.subtitle, sec.ip + (sec.zone ? ` · ${sec.zone}` : ""), runSize(sec)
       + (sec.reachable < sec.lights ? ` (last ${sec.lights - sec.reachable} not reachable by segment)` : "")
   ].filter(Boolean).join(" · ");
   if (!sec.enabled) el.classList.add("disabled");
@@ -496,7 +506,9 @@ async function quickTheme(id) {
       toast(CONFIG.mode === "dry" ? "Dry run: warm white logged" : "Warm white");
     } else if (patternById(id).animated) {
       const r = await api("/api/play-all", {pattern: id, params: {}, level: 100, sections: ids});
-      toast((r.mode === "dry" ? "Dry run: " : "Playing ") + labelOf(id));
+      toast((r.mode === "dry" ? "Dry run: " : "Playing ") + labelOf(id)
+        + (r.still && r.still.length ? ` (a still picture on ${names(r.still)}: those controllers can't animate)` : "")
+        + (Object.keys(r.skipped || {}).length ? ` · skipped ${names(Object.keys(r.skipped))}` : ""));
     } else {
       const r = await api("/api/apply-all", {pattern: id, params: {}, sections: ids});
       toast((r.mode === "dry" ? "Dry run: " : "Applied ") + labelOf(id));
@@ -567,8 +579,9 @@ function syncVizTheme() {
 function buildViz() {
   // flat strips, one row per run, with segment numbers underneath
   $("#vruns").innerHTML = CONFIG.sections.map(s => {
-    const lps = s.lights_per_segment || s.lights, segs = Math.ceil(s.lights / lps);
-    const ticks = Array.from({length: segs}, (_, k) => `<span style="grid-column:span ${Math.min(lps, s.lights - k * lps)}">${k + 1}</span>`).join("");
+    const lps = s.lights_per_segment >= 3 ? s.lights_per_segment : 10, segs = Math.ceil(s.lights / lps);
+    const label = k => s.lights_per_segment >= 3 ? k + 1 : k * lps + 1;   // segment numbers, or light numbers
+    const ticks = Array.from({length: segs}, (_, k) => `<span style="grid-column:span ${Math.min(lps, s.lights - k * lps)}">${label(k)}</span>`).join("");
     return `<div class="vrun"><div class="vl"><span>${s.name} · ${s.lights} lights</span><span data-vs="${s.id}"></span></div>
       <div class="dots" data-n="${s.lights}" data-v="${s.id}">${"<i></i>".repeat(s.lights)}</div>
       <div class="ticks" data-n="${s.lights}">${ticks}</div></div>`;
@@ -699,7 +712,7 @@ function sync() {
     $('[data-act="on"]', el).classList.toggle("on", lanOn === true);
     $('[data-act="off"]', el).classList.toggle("on", lanOn === false);
     const play = $('[data-act="play"]', el);
-    play.textContent = pat.animated ? "Play live" : "Apply";
+    play.textContent = pat.animated ? (capsOf(sec).stream ? "Play live" : "Show still") : "Apply";
     play.classList.toggle("on", !!s && s.pattern === sel.value);
     $('[data-act="stop"]', el).disabled = !(st && st.stream);
     $('[data-act="preview"]', el).classList.toggle("on", !!PREVIEW && PREVIEW.source === "card" && PREVIEW.card === sec.id);
@@ -738,7 +751,7 @@ async function refresh(fast = false) {
 const esc = t => String(t).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
 function buildSettings() {
   const rows = CONFIG.sections.map(s => `<tr><td>${esc(s.name)}</td><td>${esc(s.short)}</td><td>${s.lights}</td>
-    <td>${esc(s.model)} · ${esc(s.ip)}</td><td>${esc(s.start || "")}</td><td>${s.reverse ? "yes" : ""}</td>
+    <td>${esc(s.model)} · ${esc(s.ip)}${s.zone ? " · " + esc(s.zone) : ""}</td><td>${esc(s.start || "")}</td><td>${s.reverse ? "yes" : ""}</td>
     <td>${s.enabled ? "" : "disabled"}</td></tr>`).join("");
   $("#settings-body").innerHTML = `
     <table class="settings-table"><thead><tr><th>Run</th><th>Short name</th><th>Lights</th><th>Controller</th>

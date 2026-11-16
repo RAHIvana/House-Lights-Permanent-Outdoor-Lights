@@ -16,6 +16,7 @@ log = logging.getLogger("houselights")
 
 PKG = os.path.dirname(os.path.abspath(__file__))
 CONFIG_NAME = "config.json"
+SECRETS_NAME = "secrets.json"          # e.g. Tuya local keys: kept out of config.json, mode 600
 VERSION = 1
 
 
@@ -35,11 +36,13 @@ def forced_dry():
 @dataclass
 class Controller:
     id: str
-    type: str                 # driver: "govee"
+    type: str                 # driver: "govee", "wled", "jellyfish", "tuya"
     model: str                # e.g. "H806A"
     ip: str
     name: str = ""
     enabled: bool = True
+    options: dict = field(default_factory=dict)     # per driver, e.g. {"zone": "Zone1"}
+    secret: dict = field(default_factory=dict)      # from secrets.json, never sent to the page
 
 
 @dataclass
@@ -73,10 +76,16 @@ class Section:
     def reachable(self):
         return self.lights
 
+    @property
+    def caps(self):
+        from . import drivers
+        return drivers.caps(self.controller.type)
+
     def public(self):
         return {"id": self.id, "name": self.name, "short": self.short, "subtitle": self.subtitle,
                 "start": self.start, "ip": self.controller.ip, "controller": self.controller.id,
                 "model": self.controller.model, "type": self.controller.type,
+                "zone": self.controller.options.get("zone", ""), "caps": self.caps,
                 "enabled": self.enabled, "lights": self.lights,
                 "segments": self.segments, "lights_per_segment": self.lights_per_segment,
                 "reachable": self.reachable, "transport": "lan", "reverse": self.reverse,
@@ -137,10 +146,12 @@ def slug(text):
     return s or "run"
 
 
-def validate(raw):
+def validate(raw, secrets=None):
     """Check a config (from the wizard or the file) and return a clean copy.
-    Raises ValueError with a message the wizard can show."""
+    Raises ValueError with a message the wizard can show. Secrets typed in the wizard (e.g. a
+    Tuya local key) are moved out of the config into the returned "_secrets" entry."""
     from . import drivers                       # drivers know their models
+    secrets = secrets if secrets is not None else read_secrets()
     if not isinstance(raw, dict):
         raise ValueError("config must be a JSON object")
     out = default_config()
@@ -162,7 +173,7 @@ def validate(raw):
         out["location"] = {"lat": round(_num(loc.get("lat"), "latitude", -90, 90, float), 4),
                            "lon": round(_num(loc.get("lon"), "longitude", -180, 180, float), 4)}
 
-    ctrls, ips = [], set()
+    ctrls, ips, found_secrets = [], set(), {}
     for i, c in enumerate(raw.get("controllers") or []):
         what = f"controller {i + 1}"
         cid = _text(c.get("id"), f"{what} id", 32, True).lower()
@@ -179,11 +190,19 @@ def validate(raw):
             ip = str(ipaddress.ip_address(_text(c.get("ip"), f"{what} IP address", 45, True)))
         except ValueError:
             raise ValueError(f"{what}: {c.get('ip')!r} is not an IP address") from None
-        if ip in ips:
-            raise ValueError(f"{what}: IP address {ip} is used twice")
-        ips.add(ip)
+        try:
+            opts, sec = drv.options(c, secrets.get(cid) or {})
+        except ValueError as e:
+            raise ValueError(f"{what} ({ip}): {e}") from None
+        where = (ip, opts.get("zone", ""))
+        if where in ips:
+            raise ValueError(f"{what}: {ip}{' zone ' + where[1] if where[1] else ''} is used twice")
+        ips.add(where)
+        if sec:
+            found_secrets[cid] = sec
         ctrls.append({"id": cid, "type": ctype, "model": model, "ip": ip,
-                      "name": _text(c.get("name"), f"{what} name", 40), "enabled": bool(c.get("enabled", True))})
+                      "name": _text(c.get("name"), f"{what} name", 40), "enabled": bool(c.get("enabled", True)),
+                      **opts})
     if len({c["id"] for c in ctrls}) != len(ctrls):
         raise ValueError("two controllers have the same id")
     out["controllers"] = ctrls
@@ -218,7 +237,34 @@ def validate(raw):
     if not runs:
         raise ValueError("add at least one run of lights")
     out["runs"] = runs
+    out["_secrets"] = found_secrets
     return out
+
+
+def public_config(clean):
+    """The config for the page: no secrets, but say which controllers have one."""
+    out = {k: v for k, v in clean.items() if k != "_secrets"}
+    have = clean.get("_secrets") or {}
+    out["controllers"] = [dict(c, has_secret=c["id"] in have) for c in clean["controllers"]]
+    return out
+
+
+def read_secrets():
+    try:
+        with open(path(SECRETS_NAME)) as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _write_private(name, data):
+    os.makedirs(home(), exist_ok=True)
+    tmp = path(name + ".tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump(data, f, indent=2)
+    os.replace(tmp, path(name))
 
 
 def read_raw():
@@ -238,12 +284,16 @@ def read_raw():
 def save(raw):
     """Validate and write the config atomically. Returns the clean config."""
     clean = validate(raw)
+    secrets = clean.pop("_secrets")
     os.makedirs(home(), exist_ok=True)
     tmp = path(CONFIG_NAME + ".tmp")
     with open(tmp, "w") as f:
         json.dump(clean, f, indent=2)
         f.write("\n")
     os.replace(tmp, path(CONFIG_NAME))
+    if secrets or os.path.exists(path(SECRETS_NAME)):
+        _write_private(SECRETS_NAME, secrets)
+    clean["_secrets"] = secrets
     log.info("config saved: %d controller(s), %d run(s)", len(clean["controllers"]), len(clean["runs"]))
     return clean
 
@@ -263,7 +313,10 @@ def load():
         d = default_config()
         return Settings(mode="dry" if forced_dry() else "live", host=d["listen"]["host"], port=d["listen"]["port"],
                         controllers={}, sections={}, configured=False, raw=d, error=error)
-    controllers = {x["id"]: Controller(x["id"], x["type"], x["model"], x["ip"], x["name"], x["enabled"])
+    base = ("id", "type", "model", "ip", "name", "enabled")
+    controllers = {x["id"]: Controller(x["id"], x["type"], x["model"], x["ip"], x["name"], x["enabled"],
+                                       {k: v for k, v in x.items() if k not in base},
+                                       c["_secrets"].get(x["id"], {}))
                    for x in c["controllers"]}
     sections = {}
     for r in c["runs"]:

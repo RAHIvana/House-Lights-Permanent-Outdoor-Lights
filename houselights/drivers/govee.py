@@ -21,6 +21,8 @@ from .base import Kit as BaseKit
 log = logging.getLogger("houselights")
 
 LABEL = "Govee (Wi-Fi, LAN control)"
+NOTE = "Switch on LAN Control for each device in the Govee Home app first."
+TESTED = True
 
 # Models known to work. lights_per_segment: how many lights one segment colours, counted
 # from light 1. max_lights: a streaming frame carries at most 255 lights.
@@ -145,16 +147,44 @@ def expand_targets(text, limit=1024):
     return out
 
 
+def available():
+    return True, ""
+
+
+def options(c, secret):
+    """Govee needs nothing beyond the address and model."""
+    return {}, {}
+
+
+def _row(ip, d):
+    sku = str(d.get("sku", "?"))
+    dev = str(d.get("device", ""))
+    return {"ip": ip, "type": "govee", "model": sku, "device_tail": dev[-5:], "lights": None,
+            "supported": sku in MODELS, "label": MODELS.get(sku, {}).get("label", f"Govee {sku} (not supported yet)")}
+
+
+def probe(info):
+    """Add by address: ask that one device who it is."""
+    ip = expand_targets(info.get("ip", ""))
+    if len(ip) != 1:
+        raise ValueError("type one IP address")
+    found = LAN.scan(ip, wait=2.0, multicast=False)
+    if not found:
+        raise ValueError(f"no Govee device answered at {ip[0]}. Is LAN Control on in the Govee Home app?")
+    return [_row(a, d) for a, d in found.items()]
+
+
 def discover(targets=""):
     """Devices that answered a scan: [{ip, model, device_tail, supported, label}]."""
     found = LAN.scan(expand_targets(targets))
-    out = []
-    for ip, d in sorted(found.items(), key=lambda kv: tuple(int(x) for x in kv[0].split(".")) if kv[0].count(".") == 3 else (999,)):
-        sku = str(d.get("sku", "?"))
-        dev = str(d.get("device", ""))
-        out.append({"ip": ip, "type": "govee", "model": sku, "device_tail": dev[-5:],
-                    "supported": sku in MODELS, "label": MODELS.get(sku, {}).get("label", f"Govee {sku} (not supported yet)")})
-    return out
+    return [_row(ip, d) for ip, d in sorted(found.items(), key=lambda kv: _ipkey(kv[0]))]
+
+
+def _ipkey(ip):
+    try:
+        return (0, int(ipaddress.ip_address(ip)))
+    except ValueError:
+        return (1, 0)
 
 
 def read_status(kits):
@@ -200,6 +230,8 @@ def razer_frame(colors, mode=0x00):
 
 # --- one device ----------------------------------------------------------------------------
 class Kit(BaseKit):
+    CAPS = {"stream": True, "static": "segments", "pick": True, "status": True, "count": "manual",
+            "restore": "auto"}
     max_stream_lights = 255
 
     def __init__(self, controller, live):

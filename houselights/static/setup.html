@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>House Lights setup</title>
 <script>try { const t = localStorage.getItem("hl-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=11">
 <link rel="icon" href="icon-192.png">
 <meta name="theme-color" content="#2b2e33">
 </head>
@@ -24,44 +24,47 @@
     <li data-step="3">4 Test</li><li data-step="4">5 Time and place</li><li data-step="5">6 Save</li>
   </ol>
 
-  <!-- 1: kind of lights -->
+  <!-- 1: kinds of lights -->
   <section class="panel" data-page="0">
     <div class="ph"><h2>What lights do you have?</h2></div>
-    <p class="muted">House Lights talks to the controllers over your home network. Pick the kind you have.</p>
+    <p class="muted">House Lights talks to the controllers over your home network. Tick every kind you have;
+      you can mix them.</p>
     <div class="choice" id="drivers"></div>
-    <p class="note" id="driver-note"></p>
   </section>
 
   <!-- 2: find controllers -->
   <section class="panel" data-page="1" hidden>
     <div class="ph"><h2>Find your controllers</h2></div>
-    <p class="muted">For Govee: switch on <b>LAN Control</b> for each device in the Govee Home app first
-      (device settings). Scanning only asks devices to say who they are; it changes nothing.</p>
+    <p class="muted">Scanning only asks controllers who they are; it changes nothing.</p>
+    <ul class="note" id="type-notes"></ul>
     <div class="row">
-      <button id="scan" class="primary">Scan this network</button>
-      <label class="lbl">and these addresses <input type="text" id="targets" size="28"
-        placeholder="e.g. 192.168.1.0/24 or 10.0.0.7"></label>
+      <button id="scan" class="primary">Scan</button>
+      <label class="lbl">addresses to scan <input type="text" id="targets" size="30"
+        placeholder="empty = this network, or e.g. 192.168.1.0/24"></label>
       <span class="muted" id="scan-msg"></span>
     </div>
-    <p class="note">If your lights are on a different network or subnet than this computer, a scan of
-      "this network" won't reach them: type their network (like 192.168.2.0/24) or their addresses.</p>
-    <div class="tablewrap"><table id="found"><thead><tr><th>Use</th><th>Address</th><th>Model</th><th>Device</th><th></th></tr></thead><tbody></tbody></table></div>
-    <div class="row">
+    <p class="note">If your lights are on a different network or subnet than this computer, type that network
+      (like 192.168.2.0/24) or the controllers' addresses. Tuya devices are only heard on this computer's own network.</p>
+    <div class="tablewrap"><table id="found"><thead><tr><th>Use</th><th>Address</th><th>Controller</th><th>Zone / device</th>
+      <th>Lights</th><th></th></tr></thead><tbody></tbody></table></div>
+    <div class="row" id="add-row">
       <span class="lbl">Or add one by address:</span>
+      <select id="add-type"></select>
       <input type="text" id="add-ip" size="16" placeholder="192.168.1.50">
-      <select id="add-model"></select>
+      <span id="add-extra" class="row"></span>
       <button id="add">Add</button>
     </div>
     <h3 class="lbl">Controllers you'll use</h3>
-    <div class="tablewrap"><table id="chosen"><thead><tr><th>Address</th><th>Model</th><th>Name (optional)</th><th>Enabled</th><th></th></tr></thead><tbody></tbody></table></div>
+    <div class="tablewrap"><table id="chosen"><thead><tr><th>Address</th><th>Controller</th><th>Name (optional)</th>
+      <th>Settings</th><th>Enabled</th><th></th></tr></thead><tbody></tbody></table></div>
   </section>
 
   <!-- 3: runs -->
   <section class="panel" data-page="2" hidden>
     <div class="ph"><h2>Name each run of lights</h2></div>
-    <p class="muted">A run is the string of lights on one controller. Use the light count from the
-      maker's app (the Test step lets you check it). "Light 1 is at" is just a note for you, like
-      "left end, seen from the street".</p>
+    <p class="muted">A run is the string of lights on one controller (or one JellyFish zone). Counts that the
+      controller reported are filled in; for Govee, the Test step helps you count. "Light 1 is at" is a note
+      for you, like "left end, seen from the street".</p>
     <div class="tablewrap"><table id="runs"><thead><tr><th>Controller</th><th>Name</th><th>Short name</th>
       <th>Lights</th><th>Light 1 is at</th><th>Reverse</th></tr></thead><tbody></tbody></table></div>
   </section>
@@ -107,6 +110,6 @@
     <button id="next" class="primary">Next</button>
   </div>
 </div>
-<script src="setup.js?v=10"></script>
+<script src="setup.js?v=11"></script>
 </body>
 </html>

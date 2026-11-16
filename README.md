@@ -1,62 +1,91 @@
 # House Lights
 
-A web dashboard for permanent outdoor lights (roofline/eave lights) on your home network.
-Play animated themes light by light, apply static themes, schedule them by clock time or
-sunrise/sunset, and design new looks in a scene editor. No cloud account, no app login: it
-talks to the light controllers directly over your LAN.
+A web dashboard for permanent outdoor lights (roofline and eave lights), run on a computer in
+your home. Play animated themes light by light, apply static themes, schedule them by clock
+time or sunrise/sunset, and design new looks in a scene editor. No cloud account and no app
+login: it talks to the light controllers directly over your home network.
 
 - 79 themes: everyday, Diwali and Hindu festivals, Christmas, Halloween, Thanksgiving, US
-  holidays, celebrations and birthdays, school spirit. Animated themes are streamed one
-  colour per light.
-- Quick Settings with theme tiles, a Visualization of every run, per-run Controllers, a
-  Scene editor (strip and time-strip views) and Schedules.
-- A setup wizard on first start: find your controllers, name each run of lights, run test
-  patterns to check the light count, direction and colours, then save.
-- Light and dark page themes; works on a phone.
+  holidays, celebrations and birthdays, school spirit.
+- Quick Settings with theme tiles, a Visualization of every run, a panel per run, a Scene
+  editor and Schedules. Light and dark page themes; works on a phone.
+- A setup wizard on first start: it finds your controllers, helps you count the lights,
+  plays test patterns, and saves your settings.
 
-## Supported lights
+## Supported controllers
 
-| Controller | Status |
-|---|---|
-| Govee Permanent Outdoor Lights Pro **H806A** | Supported and tested |
-| Other Govee models with LAN control | Not yet: the wizard lists them as "not supported yet" |
-| WLED (ESP32/ESP8266, open source) | Planned |
+| Controller | What works | Tested with real hardware? |
+|---|---|---|
+| **Govee** Permanent Outdoor Lights Pro **H806A** | Everything: animated themes light by light, static themes, colours, schedules | **Yes** |
+| **WLED**: the open-source controller firmware (ESP8266/ESP32), also on some brand-name kits | Everything: animated themes light by light, static themes, colours, schedules | Not yet: tested against a simulator built from the WLED documentation |
+| **JellyFish Lighting** | Static themes (up to 30 colours per pattern: exact for banded themes, rounded otherwise), colours, on/off, brightness, schedules. Animated themes show as a still picture | Not yet: simulator built from JellyFish's API documentation |
+| **Tuya / Smart Life**: the app platform behind many Amazon brands, e.g. most ASAHOM kits | One colour at a time: colours, warm white, on/off, brightness, schedules. Themes show their main colour | Not yet: tested with a stand-in for the tinytuya library |
 
-Adding a controller type means adding a driver in `houselights/drivers/` (see
-`drivers/base.py` for what a driver provides).
+If you try one of the untested kinds, please report what works and what doesn't.
 
-## Requirements
+### Which one is my brand?
 
-- Python 3.10 or newer.
-- A computer on the same network as the lights that stays on: a home server, NAS or mini
-  PC. Tested on x86-64 Linux. macOS and Raspberry Pi (64-bit OS) should work, since
-  everything is Python, but haven't been tested yet.
-- For Govee: **LAN Control** switched on for each device in the Govee Home app.
+Look at the app your lights use:
 
-## Install and run
+| Your lights use | Brands (examples) | Pick in the wizard |
+|---|---|---|
+| **Govee Home** app | Govee | Govee |
+| **Smart Life** or **Tuya Smart** app | Most **ASAHOM** kits, and many other Amazon permanent-light brands | Tuya / Smart Life |
+| **WLED** app, or a WLED page when you open the controller's address in a browser | DIY and open-source controllers, controllers sold "with WLED", **ASAHOM Pro** models sold as having WLED. Some owners of other brands swap in a WLED controller | WLED |
+| **JellyFish** app | JellyFish Lighting | JellyFish |
+| Another app (Gemstone, Oelo, Trimlight, Eufy, Nanoleaf, Lumary, ...) | | Not supported yet: no local API we could use, or not checked yet |
+
+WLED is the most capable choice: every light can have its own colour, and animated themes
+play smoothly. Tuya / Smart Life lights take one colour at a time.
+
+## Install
+
+You need **Python 3.10 or newer** and about 50 MB of disk. Everything is Python; nothing to
+compile.
+
+**Linux** (Ubuntu, Debian, Raspberry Pi OS 64-bit):
 
 ```sh
-git clone <this repository> houselights
+sudo apt install python3 python3-venv git
+git clone https://github.com/RAHIvana/Permanent-Outdoor-Liight-Controller.git houselights
 cd houselights
 python3 -m venv venv
 venv/bin/pip install -r requirements.txt
-venv/bin/python -m houselights
 ```
 
-Open `http://<this computer's address>:8090/`. The first time, the setup wizard opens:
+**macOS**: install Python from [python.org](https://www.python.org/downloads/) or with
+Homebrew (`brew install python`), then the same `git clone`, `python3 -m venv venv` and
+`venv/bin/pip install -r requirements.txt`.
 
-1. **Lights**: pick the kind of lights you have.
-2. **Controllers**: scan the network (or type addresses) and pick the controllers to use.
-   If the lights are on a different subnet than this computer, type that network, like
-   `192.168.2.0/24`.
-3. **Runs**: name each run of lights and enter its light count.
-4. **Test**: send test patterns to each run (blink, light count, direction, colours,
-   segments). Tests stop by themselves after a minute; when they stop, the lights go back to
-   what they showed before.
-5. **Time and place**: time zone, and your location if you want sunrise/sunset schedules.
-6. **Save**: the settings go to `data/config.json` and the server restarts with them.
+**Windows** (PowerShell): install Python from [python.org](https://www.python.org/downloads/)
+and tick "Add python.exe to PATH". Then:
 
-Change the setup any time from the **Settings** tab.
+```powershell
+git clone https://github.com/RAHIvana/Permanent-Outdoor-Liight-Controller.git houselights
+cd houselights
+py -m venv venv
+venv\Scripts\pip install -r requirements.txt
+```
+
+**Tuya / Smart Life lights only**: also install `tinytuya`:
+
+```sh
+venv/bin/pip install tinytuya          # Windows: venv\Scripts\pip install tinytuya
+```
+
+Tested on x86-64 Linux. macOS, Windows and Raspberry Pi (64-bit OS) should work the same way
+but haven't been tested yet. On a Raspberry Pi use the 64-bit OS: on the 32-bit one, pip may
+have to compile a dependency.
+
+## Start the dashboard
+
+```sh
+venv/bin/python -m houselights          # Windows: venv\Scripts\python -m houselights
+```
+
+Then open **http://localhost:8090/** on this computer, or **http://ADDRESS:8090/** from a
+phone or another computer, where ADDRESS is this computer's address (`hostname -I` on Linux,
+`ipconfig getifaddr en0` on macOS, `ipconfig` on Windows). Stop it with Ctrl+C.
 
 Options:
 
@@ -64,46 +93,128 @@ Options:
 python -m houselights [--home DIR] [--host HOST] [--port PORT] [--dry]
 ```
 
-- `--home`: where settings, schedules, state and logs live (default: `data/` in this folder).
+- `--home DIR`: where settings, schedules and logs are kept (default: `data/` in this folder).
+- `--port PORT`: another port if 8090 is taken.
 - `--dry`: practice mode. Commands are logged and nothing is sent to the lights.
 
-To keep it running, start it from a service manager (systemd on Linux, launchd on macOS)
-or a terminal multiplexer such as tmux.
+## The setup wizard
+
+The first time you open the page there are no settings yet, so the setup wizard opens. You
+can run it again later from the **Settings** tab (**Change setup**).
+
+1. **Lights**: tick every kind of controller you have. You can mix them.
+2. **Controllers**: press **Scan**. It asks controllers on your network to identify
+   themselves and changes nothing. Tick the ones to use. If your lights are on another
+   network or subnet than this computer, type that network (like `192.168.2.0/24`) or the
+   controllers' addresses before scanning. You can also add a controller by its address.
+   A JellyFish controller shows one line per zone; each zone becomes its own run.
+3. **Runs**: name each run of lights. WLED and JellyFish report their light counts. For
+   Govee, use the count from the Govee Home app or count it in the next step.
+4. **Test**: show test patterns on each run to check it:
+   - **Blink**: which run is this?
+   - **Count the lights** (Govee): first every segment's first light lights up red or green,
+     and you type how many of those markers you see. Then the last segment lights up red,
+     and you type how many red lights you see. The wizard works out the count.
+   - **Check the count**: light 1 red, the last light blue. If blue isn't the very last
+     light, the count is wrong.
+   - **Direction**: a dot runs from light 1. Tick **Reverse** if themes should run the other
+     way.
+   - **Colours**, **Segment groups**.
+
+   Tests stop by themselves after a minute. Govee and WLED go back to what they showed; Tuya
+   lights are saved before the test and put back afterwards. JellyFish can't report what it
+   showed, so after testing pick a theme or use the JellyFish app.
+5. **Time and place**: your time zone, and your location if you want sunrise/sunset
+   schedules (two decimals is enough).
+6. **Save**: settings go to `data/config.json` and the server restarts with them.
+
+## Getting each kind of controller ready
+
+**Govee**: in the Govee Home app, open each device's settings and switch on **LAN
+Control**. Discovery uses UDP ports 4001 to 4003; another program listening on port 4002
+(for example a Govee integration in Home Assistant) can take the replies, so stop it while
+scanning.
+
+**WLED**: nothing to do beyond having WLED on your network. Animated themes use WLED's UDP
+realtime protocol on port 21324; in WLED's *Sync Interfaces* settings, make sure **Receive
+UDP realtime** is ticked.
+
+**JellyFish**: the controller must be reachable on your network (it listens on port 9000).
+Set up the zones in the JellyFish app first.
+
+**Tuya / Smart Life**: local control needs each device's **local key**, which comes from
+Tuya's cloud once. Install tinytuya (above), pair the lights in the Smart Life app, create a
+free developer account at iot.tuya.com with a cloud project linked to your app account, then
+run `venv/bin/python -m tinytuya wizard`. It lists every device with its id and local key.
+The tinytuya README has the step-by-step guide. Tuya devices accept one connection at a time,
+so close the Smart Life app while testing. The key is stored in `data/secrets.json`, readable
+only by you, never in `config.json` and never sent to the web page.
 
 ## Try it without lights
 
-`tools/fake_govee.py` simulates Govee H806A controllers on this computer (Linux):
+Simulators for Govee, WLED and JellyFish run on this computer (Linux; on macOS add
+`--base 127.0.0.1 --count 1`):
 
 ```sh
-HOUSELIGHTS_GOVEE_PORTS=14001,14002,14003 venv/bin/python tools/fake_govee.py --count 3 &
-HOUSELIGHTS_GOVEE_PORTS=14001,14002,14003 venv/bin/python -m houselights --home /tmp/hl-demo --port 8094
+export HOUSELIGHTS_GOVEE_PORTS=14001,14002,14003 HOUSELIGHTS_WLED_PORTS=18080,21325 HOUSELIGHTS_JELLYFISH_PORT=19000
+venv/bin/python tools/fake_govee.py --count 1 --lights 50 &
+venv/bin/python tools/fake_wled.py --count 1 --lights 150 &
+venv/bin/python tools/fake_jellyfish.py --zones Front:120,Back:45 &
+venv/bin/python -m houselights --home /tmp/hl-demo --port 8094
 ```
 
-In the wizard, scan `127.0.0.8/29`. The extra ports keep the simulator apart from any real
-Govee devices on your network.
+In the wizard, tick Govee, WLED and JellyFish and scan `127.0.0.11, 127.0.0.21, 127.0.0.31`.
+The extra ports keep the simulators apart from real controllers.
+
+## Keep it running
+
+Run it from a terminal multiplexer (tmux, screen), or as a service. A systemd example for
+Linux (`/etc/systemd/system/houselights.service`; change the user and paths):
+
+```ini
+[Unit]
+Description=House Lights
+After=network-online.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/houselights
+ExecStart=/home/pi/houselights/venv/bin/python -m houselights
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then `sudo systemctl enable --now houselights`. Animated themes play only while the server
+runs; when it stops, the lights go back to their last static look.
 
 ## Good to know
 
 - **No login.** Anyone who can open the page can control the lights. Keep it on your home
-  network; don't forward the port to the internet.
-- How Govee LAN control works: JSON over UDP. Commands go to port 4003 on the device,
-  discovery to port 4001 (multicast 239.255.255.250), and devices answer on port 4002.
-  Animated themes use Govee's per-light streaming mode; static themes are sent as segment
-  colours (5 lights per segment on H806A) and stay on the controller.
-- Animated themes play only while the server runs. When it stops, the lights go back to
-  their last static look.
-- Your files in `data/`: `config.json` (settings), `schedules.json`, `state.json` (what was
-  last applied: controllers can't report segment colours), `logs/`.
+  network and don't forward the port to the internet.
+- Your files in `data/`: `config.json` (settings), `secrets.json` (Tuya keys, if any),
+  `schedules.json`, `state.json` (what was last applied) and `logs/`. Back up this folder to
+  keep your setup.
+- To update: `git pull`, then `venv/bin/pip install -r requirements.txt`, then restart.
 
 ## Tests
 
-No lights or network needed:
+No lights needed:
 
 ```sh
 venv/bin/python tests/test_settings.py
 venv/bin/python tests/test_schedule.py
+venv/bin/python tests/test_drivers.py      # Linux: uses 127.0.0.x addresses
 ```
+
+## Adding another kind of controller
+
+Each kind is a driver in `houselights/drivers/`. `base.py` describes what a driver provides
+and its capabilities (per-light streaming, static frames or segments, status, how the light
+count is found); the setup wizard and the dashboard adapt to them.
 
 ## License
 
-MIT, see `LICENSE`. This project is not affiliated with or endorsed by Govee.
+MIT, see `LICENSE`. This project is not affiliated with or endorsed by Govee, WLED,
+JellyFish Lighting or Tuya.

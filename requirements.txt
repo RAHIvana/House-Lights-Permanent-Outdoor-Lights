@@ -3,3 +3,4 @@ fastapi>=0.110
 uvicorn>=0.29
 astral>=3.2        # sunrise and sunset times for schedules
 tzdata; sys_platform == "win32"     # time zones on Windows
+# Optional, only for Tuya / Smart Life lights:  pip install tinytuya

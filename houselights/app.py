@@ -111,11 +111,15 @@ def _start_job(sec, kit, label, calls):
         with kit.lock:
             job["status"] = "running"
             try:
-                for rgb, segs in calls:
+                for call in calls:
                     if job["cancel"]:
                         job["status"] = "cancelled"
                         return
-                    kit.segments(segs, rgb, sec.segments)
+                    if callable(call):                      # e.g. a whole frame at once
+                        call()
+                    else:
+                        rgb, segs = call
+                        kit.segments(segs, rgb, sec.segments)
                     job["done"] += 1
                 job["status"] = "done"
             except Exception as e:
@@ -253,8 +257,19 @@ def colour(sid: str, body: Colour):
 
 
 def _segments_for(sec, lights):
+    """What Apply sends: (colours as shown, which are rounded, calls). Controllers that take a
+    whole frame get one call; the others one packet per colour group of segments."""
+    kit = KITS[sec.controller.id]
+    if sec.caps.get("static") in ("lights", "palette"):
+        shown = [tuple(c) for c in kit.preview_static(lights)]
+        mixed = [tuple(a) != tuple(b) for a, b in zip(shown, lights)]
+        return shown, mixed, [lambda: kit.show_lights(shown)]
     segs, mixed = P.quantise(lights, sec.used_segments, sec.lights_per_segment)
     return segs, mixed, P.plan_calls(segs)
+
+
+def _can_stream(sec):
+    return bool(sec.caps.get("stream"))
 
 
 @app.post("/api/sections/{sid}/preview")
@@ -268,14 +283,15 @@ def preview(sid: str, body: PatternReq, seconds: float = 8.0, fps: int = 12):
                                   sec.lights_per_segment or 5))
     segs, mixed, calls = _segments_for(sec, lights)
     one = len(calls) == 1
-    out = {"animated": bool(pat.get("animated")),
+    out = {"animated": bool(pat.get("animated")) and _can_stream(sec),
            "lights": [P.rgb_to_hex(c) for c in lights],
            "segments": [P.rgb_to_hex(c) for c in segs],
            "mixed": mixed,
            "reachable": sec.reachable,
            "path": "lan",
            "calls": len(calls),
-           "estimate_s": 1 if one else round(len(calls) * 0.3)}
+           "estimate_s": 1 if one else round(len(calls) * 0.3),
+           "still": out_still(sec)}
     if out["animated"]:
         seconds, fps = max(1.0, min(seconds, 20.0)), max(4, min(fps, 20))
         out["fps"] = fps
@@ -285,18 +301,24 @@ def preview(sid: str, body: PatternReq, seconds: float = 8.0, fps: int = 12):
     return out
 
 
+def out_still(sec):
+    """True when animated themes can only be shown as a still picture on this run."""
+    return not _can_stream(sec)
+
+
 @app.post("/api/sections/{sid}/pattern")
-def apply_pattern(sid: str, body: PatternReq):
-    """Static patterns as segment colours (persist on the kit). Animated ones need /play."""
+def apply_pattern(sid: str, body: PatternReq, still: bool = False):
+    """Static patterns as segment colours (persist on the controller). Animated ones need
+    /play, except as a still picture (still=true) on controllers that can't stream."""
     sec, kit = _section(sid)
-    if _run(lambda: P.is_animated(body.pattern)):
+    if _run(lambda: P.is_animated(body.pattern)) and not (still and not _can_stream(sec)):
         raise HTTPException(400, "animated themes play per light: use Play live")
     _stop_stream(sid)
     lights = _run(lambda: P.frame(body.pattern, sec.lights, body.params, 0.0, sec.reverse,
                                   sec.lights_per_segment or 5))
     segs, mixed, calls = _segments_for(sec, lights)
     seg_hex = [P.rgb_to_hex(c) for c in segs]
-    if len(calls) == 1:                                # one colour: whole kit
+    if len(calls) == 1 and not callable(calls[0]):     # one colour: whole controller
         _run(lambda: kit.color(calls[0][0]))
         _remember(sid, segments=seg_hex, pattern=body.pattern, params=body.params,
                   color=seg_hex[0], kelvin=None)
@@ -309,6 +331,8 @@ def apply_pattern(sid: str, body: PatternReq):
 @app.post("/api/sections/{sid}/segments")
 def set_segments(sid: str, body: Segments):
     sec, kit = _section(sid)
+    if not sec.caps.get("pick"):
+        raise HTTPException(409, f"{sec.name}: this controller can't colour segments one by one")
     rgb = _run(lambda: P.hex_to_rgb(body.color))
     segs = sorted(set(body.segments))
     if not segs or segs[0] < 0 or segs[-1] >= sec.used_segments:
@@ -328,6 +352,9 @@ def play(sid: str, body: PlayReq):
     """Stream one colour per light (static or animated) until stopped."""
     sec, kit = _section(sid)
     _run(lambda: P.frame(body.pattern, sec.lights, body.params))          # validate first
+    if not _can_stream(sec):                                              # show it as a still picture
+        r = apply_pattern(sid, PatternReq(pattern=body.pattern, params=body.params), still=True)
+        return {**r, "still": True}
     _run(lambda: kit.power(True))                                         # streaming into a dark kit shows nothing
     _run(lambda: STREAMS[sid].start(body.pattern, body.params, body.level, sec.reverse))
     _remember(sid, power=True, streaming={"pattern": body.pattern, "params": body.params, "level": body.level})
@@ -343,7 +370,7 @@ def stop(sid: str):
 
 @app.post("/api/play-all")
 def play_all(body: PlayAllReq):
-    started, skipped = [], {}
+    started, skipped, still = [], {}, []
     for sid, sec in S.sections.items():
         if body.sections and sid not in body.sections:
             continue
@@ -352,6 +379,13 @@ def play_all(body: PlayAllReq):
             continue
         params = body.per_section.get(sid, body.params)
         _manual(sid)
+        if not _can_stream(sec):
+            try:
+                apply_pattern(sid, PatternReq(pattern=body.pattern, params=params), still=True)
+                still.append(sid)
+            except HTTPException as e:
+                skipped[sid] = e.detail
+            continue
         try:
             P.frame(body.pattern, sec.lights, params)
             KITS[sec.controller.id].power(True)
@@ -360,7 +394,7 @@ def play_all(body: PlayAllReq):
             started.append(sid)
         except (ValueError, NotAllowed) as e:
             skipped[sid] = str(e)
-    return {"ok": bool(started), "started": started, "skipped": skipped, "mode": S.mode}
+    return {"ok": bool(started or still), "started": started, "still": still, "skipped": skipped, "mode": S.mode}
 
 
 @app.post("/api/stop-all")
@@ -463,6 +497,7 @@ class _ScheduleActions:
         try:
             pat, level = theme["pattern"], theme["level"]
             if pat not in ("keep", "warm_white") and P.is_animated(pat):
+                power(sid, Power(on=True))
                 play(sid, PlayReq(pattern=pat, params=theme["params"], level=level))
                 return
             power(sid, Power(on=True))

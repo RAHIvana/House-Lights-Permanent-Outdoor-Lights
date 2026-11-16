@@ -1,13 +1,16 @@
-"""Controller drivers. Each driver module provides LABEL, MODELS, Kit, read_status(kits)
-and discover(targets). Add a driver here to support another kind of controller."""
-from . import govee
+"""Controller drivers. Each driver module provides:
+  LABEL, NOTE, TESTED, MODELS          shown in the setup wizard
+  available() -> (ok, reason)         e.g. an optional package is missing
+  options(c, secret) -> (opts, secret) checks the controller's own settings
+  discover(targets) -> [device rows]   find controllers on the network
+  probe(info) -> [device rows]         check one controller added by address
+  read_status(kits) -> {id: status}    power, brightness, colour (or None)
+  Kit                                  commands; Kit.CAPS says what it can do (see base.py)
+"""
+from . import govee, jellyfish, tuya, wled
 from .base import NotAllowed
 
-DRIVERS = {"govee": govee}
-
-# Shown in the setup wizard but not available yet.
-PLANNED = [{"type": "wled", "label": "WLED (open source, ESP32/ESP8266)",
-            "note": "Planned. Not supported yet."}]
+DRIVERS = {"govee": govee, "wled": wled, "jellyfish": jellyfish, "tuya": tuya}
 
 
 def get(kind):
@@ -18,6 +21,10 @@ def make_kit(controller, live):
     return DRIVERS[controller.type].Kit(controller, live)
 
 
+def caps(kind):
+    return DRIVERS[kind].Kit.CAPS
+
+
 def read_status(kits):
     """{controller id: status or None} for all kits, asked per driver."""
     out = {}
@@ -25,14 +32,21 @@ def read_status(kits):
     for k in kits:
         by_type.setdefault(k.c.type, []).append(k)
     for kind, group in by_type.items():
-        out.update(DRIVERS[kind].read_status(group))
+        try:
+            out.update(DRIVERS[kind].read_status(group))
+        except Exception:                      # one kind of controller failing mustn't hide the rest
+            out.update({k.c.id: None for k in group})
     return out
 
 
 def catalog():
-    return ([{"type": t, "label": d.LABEL, "available": True,
-              "models": {m: v["label"] for m, v in d.MODELS.items()}} for t, d in DRIVERS.items()]
-            + [dict(p, available=False, models={}) for p in PLANNED])
+    out = []
+    for t, d in DRIVERS.items():
+        ok, reason = d.available()
+        out.append({"type": t, "label": d.LABEL, "note": d.NOTE, "tested": d.TESTED, "available": ok,
+                    "reason": reason, "caps": d.Kit.CAPS,
+                    "models": {m: v["label"] for m, v in d.MODELS.items()}})
+    return out
 
 
-__all__ = ["DRIVERS", "NotAllowed", "get", "make_kit", "read_status", "catalog"]
+__all__ = ["DRIVERS", "NotAllowed", "get", "make_kit", "caps", "read_status", "catalog"]
