@@ -175,8 +175,11 @@ venv/bin/pip install tinytuya          # Windows: venv\Scripts\pip install tinyt
 ```
 
 Tested on x86-64 Linux, and on Windows 11 with the simulators (below). macOS and Raspberry Pi
-(3 or newer, 64-bit OS) should work the same way but haven't been tested yet. On a Raspberry
-Pi use the 64-bit Raspberry Pi OS: on the 32-bit one, pip may have to compile a dependency.
+(3 or newer, 64-bit OS) should work the same way but haven't been tested yet.
+
+**Raspberry Pi**: see [README_Raspberry.md](README_Raspberry.md) for which boards work
+(Pi 3, 4, 5, Zero 2 W; not Arduino or ESP32), writing the SD card, and starting House Lights
+at boot.
 
 ## Start the dashboard
 
