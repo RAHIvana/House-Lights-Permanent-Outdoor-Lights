@@ -251,7 +251,7 @@ def public_config(clean):
 
 def read_secrets():
     try:
-        with open(path(SECRETS_NAME)) as f:
+        with open(path(SECRETS_NAME), encoding="utf-8-sig") as f:
             data = json.load(f)
         return data if isinstance(data, dict) else {}
     except (OSError, ValueError):
@@ -291,7 +291,7 @@ def _write_private(name, data):
 def read_raw():
     """The config file as written, or None if there is none yet (first start: wizard)."""
     try:
-        with open(path(CONFIG_NAME)) as f:
+        with open(path(CONFIG_NAME), encoding="utf-8-sig") as f:
             raw = json.load(f)
     except FileNotFoundError:
         return None
@@ -310,7 +310,7 @@ def save(raw):
         _write_private(SECRETS_NAME, secrets)       # first: if it fails, config.json is unchanged
     os.makedirs(home(), exist_ok=True)
     tmp = path(CONFIG_NAME + ".tmp")
-    with open(tmp, "w") as f:
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(clean, f, indent=2)
         f.write("\n")
     os.replace(tmp, path(CONFIG_NAME))

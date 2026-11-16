@@ -29,7 +29,7 @@ def main():
 
     os.makedirs(settings.path("logs"), exist_ok=True)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
-                        handlers=[logging.FileHandler(settings.path("logs", "houselights.log")),
+                        handlers=[logging.FileHandler(settings.path("logs", "houselights.log"), encoding="utf-8"),
                                   logging.StreamHandler()])
     try:
         raw = settings.read_raw() or {}

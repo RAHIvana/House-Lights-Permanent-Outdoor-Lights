@@ -43,7 +43,7 @@ else:
 # --- assumed state (segments are write-only on the kits) ----------------------------
 def _load_state():
     try:
-        with open(STATE_FILE) as f:
+        with open(STATE_FILE, encoding="utf-8-sig") as f:
             return json.load(f)
     except (OSError, ValueError):
         return {}
@@ -57,7 +57,7 @@ def _remember(section_id, **kw):
         st = STATE.setdefault(section_id, {})
         st.update(kw, updated=time.strftime("%Y-%m-%d %H:%M:%S"), mode=S.mode)
         tmp = STATE_FILE + ".tmp"
-        with open(tmp, "w") as f:
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(STATE, f, indent=1)
         os.replace(tmp, STATE_FILE)
 

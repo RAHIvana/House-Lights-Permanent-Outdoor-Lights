@@ -178,7 +178,7 @@ def clean(d, section_ids, location, check_theme):
 # --- the scheduler ---------------------------------------------------------------------------
 def _load(path, default):
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8-sig") as f:
             return json.load(f)
     except (OSError, ValueError):
         return default
@@ -186,7 +186,7 @@ def _load(path, default):
 
 def _save(path, data):
     tmp = path + ".tmp"
-    with open(tmp, "w") as f:
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=1)
     os.replace(tmp, path)
 

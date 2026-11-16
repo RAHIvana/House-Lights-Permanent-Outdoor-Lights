@@ -2,6 +2,7 @@
 
     python tests/test_settings.py
 """
+import json
 import os
 import sys
 import tempfile
@@ -76,6 +77,13 @@ check("location tuple", s.location == (40.7128, -74.006) and s.timezone == "Amer
 os.environ["HOUSELIGHTS_DRY"] = "1"
 check("--dry forces practice mode", settings.load().mode == "dry")
 del os.environ["HOUSELIGHTS_DRY"]
+
+# --- config.json edited by hand (Notepad: UTF-8, maybe with a BOM), names beyond ASCII ---
+NAME = "Façade ✨ दीप"
+with open(settings.path("config.json"), "w", encoding="utf-8-sig") as f:
+    json.dump(good(runs=[{"name": NAME, "controller": "porch", "lights": 60}]), f, ensure_ascii=False)
+u = settings.load()
+check("hand-edited UTF-8 config.json with a BOM loads", u.configured and [x.name for x in u.sections.values()] == [NAME])
 
 # --- a broken config.json opens the wizard instead of stopping the server ---
 with open(settings.path("config.json"), "w") as f:
