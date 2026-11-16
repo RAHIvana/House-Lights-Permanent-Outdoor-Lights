@@ -1,14 +1,21 @@
 # House Lights
 
 A web dashboard for permanent outdoor lights (roofline and eave lights), run on a computer in
-your home. Play animated themes light by light, apply static themes, schedule them by clock
-time or sunrise/sunset, and design new looks in a scene editor. No cloud account and no app
-login: it talks to the light controllers directly over your home network.
+your home. It works with **Govee**, **JellyFish**, **ASAHOM** and other brands that use the
+Smart Life / Tuya app, and open-source **WLED** controllers (see
+[Supported controllers](#supported-controllers)). Play animated themes light by light, apply
+static themes, schedule them by clock time or sunrise/sunset, and make your own themes. No
+cloud account and no app login: it talks to the light controllers directly over your home
+network.
 
-- 79 themes: everyday, Diwali and Hindu festivals, Christmas, Halloween, Thanksgiving, US
-  holidays, celebrations and birthdays, school spirit.
-- Quick Settings with theme tiles, a Visualization of every run, a panel per run, a Scene
-  editor and Schedules. Light and dark page themes; works on a phone.
+Run it on a computer you already have (**Windows**, **Mac** or Linux) or on a
+**Raspberry Pi 3 or newer**, on the same home network as the lights. Leave it running for
+schedules to work; any phone or computer on that network can open the dashboard.
+
+- 79 built-in themes: everyday, Diwali and Hindu festivals, Christmas, Halloween,
+  Thanksgiving, US holidays, celebrations and birthdays, school spirit.
+- Quick Settings with theme tiles, a Visualization of every run, a panel per run, a Themes tab
+  to make your own, and Schedules. Light and dark page themes; works on a phone.
 - A setup wizard on first start: it finds your controllers, helps you count the lights,
   plays test patterns, and saves your settings.
 
@@ -74,8 +81,8 @@ venv/bin/pip install tinytuya          # Windows: venv\Scripts\pip install tinyt
 ```
 
 Tested on x86-64 Linux, and on Windows 11 with the simulators (below). macOS and Raspberry Pi
-(64-bit OS) should work the same way but haven't been tested yet. On a Raspberry Pi use the
-64-bit OS: on the 32-bit one, pip may have to compile a dependency.
+(3 or newer, 64-bit OS) should work the same way but haven't been tested yet. On a Raspberry
+Pi use the 64-bit Raspberry Pi OS: on the 32-bit one, pip may have to compile a dependency.
 
 ## Start the dashboard
 
