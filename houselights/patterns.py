@@ -8,6 +8,7 @@ Every animated pattern is stateless: colour(i, t) depends only on its inputs, so
 browser preview (frames computed here) and the live stream look the same.
 """
 import colorsys
+import json
 import math
 import random
 
@@ -760,49 +761,481 @@ PATTERNS = {
 }
 
 
+# --- themes you make (Themes tab): movements, layers, shape, sequences ---------------------
+# A theme of your own is plain data:
+#   {id: "my_<slug>", name, group, layers: [{movement, params, blend}], direction, mirror, span,
+#    sequence: [{theme, seconds}], fade}
+# Each layer is one movement (below) or "builtin:<id>" (a built-in theme with its settings).
+# Layers are combined light by light; every movement is a stateless colour(i, t), so the
+# page's preview (rendered here) and the live stream match exactly.
+def _m_gradient(n, t, p, w):
+    pal = _colors(p["colors"])
+    if len(pal) == 1:
+        return [pal[0]] * n
+    out = []
+    for i in range(n):
+        x = i / max(1, n - 1) * (len(pal) - 1)
+        k = min(int(x), len(pal) - 2)
+        out.append(_mix(pal[k], pal[k + 1], x - k))
+    return out
+
+
+def _m_breathe(n, t, p, w):
+    """Breathing in and out; with several colours, each breath is the next colour."""
+    pal, ph = _colors(p["colors"]), t * 0.25 * p["speed"]
+    c = pal[math.floor(ph) % len(pal)]
+    return [_scale(c, 0.15 + 0.85 * (0.5 - 0.5 * math.cos(2 * math.pi * ph)))] * n
+
+
+def _m_heartbeat(n, t, p, w):
+    pal = _colors(p["colors"])
+    return _heartbeat(n, t, {"color": rgb_to_hex(pal[0]), "beat": rgb_to_hex(pal[min(1, len(pal) - 1)]), "bpm": p["bpm"]})
+
+
+def _m_flicker(n, t, p, w):
+    c, style = rgb_to_hex(_colors(p["colors"])[0]), p["style"]
+    if style == "failing bulb":
+        return _haunted(n, t, {"color": c})
+    if style == "lightning":
+        return _storm(n, t, {"color": c, "rate": p["rate"]})
+    if style == "fire":
+        return _fire(n, t, {"speed": p["speed"]})
+    return _diya_glow(n, t, {"color": c, "speed": p["speed"]})
+
+
+def _m_sparkle(n, t, p, w):
+    """Sparks popping on black (a layer over another theme)."""
+    pal, dens, rate = _colors(p["colors"]), p["density"], 12.0 * max(0.1, p["speed"])
+    out = []
+    k = math.floor(t * rate)
+    fr = t * rate - k
+    for i in range(n):
+        col = (0, 0, 0)
+        for back in range(3):
+            if _h(i, k - back, 121) < dens:
+                f = (1 - fr) if back == 0 else 0.5 ** (back + fr)
+                col = _add(col, _scale(pal[int(_h(i, k - back, 122) * len(pal)) % len(pal)], f))
+        out.append(col)
+    return out
+
+
+def _m_comet(n, t, p, w):
+    """Now and then a comet streaks along the run with a fading tail (on black)."""
+    pal, every = _colors(p["colors"]), 1.0 / max(0.02, p["rate"])
+    speed, trail = max(1.0, p["speed"]), max(0, int(p["trail"]))
+    out = [(0, 0, 0)] * n
+    now = math.floor(t / every)
+    back = min(60, int((n + trail) / speed / every) + 1)
+    for s in range(now - back, now + 1):
+        age = t - (s + 0.6 * _h(0, s, 130)) * every
+        head = age * speed
+        if age < 0 or head - trail > n:
+            continue
+        col = pal[int(_h(1, s, 131) * len(pal)) % len(pal)]
+        for j in range(trail + 1):
+            i = int(head) - j
+            if 0 <= i < n:
+                out[i] = _add(out[i], _scale(col, (1 - j / (trail + 1)) ** 1.5))
+    return out
+
+
+def _wrap(fn, **fixed):
+    """A built-in effect fn(n, t, p) as a movement fn(n, t, p, seg_width)."""
+    return lambda n, t, p, w: fn(n, t, {**p, **fixed})
+
+
+def _M(label, kind, describe, fn, params):
+    return dict(label=label, kind=kind, describe=describe, fn=fn, params=params)
+
+
+_WARM = "#ff8a1c,#ffc850,#ff4500"
+# kind: "still" (no time), "moving", "layer" (made to go over another theme: black = see-through)
+MOVEMENTS = {
+    "bands": _M("Bands", "still", "Colour bands side by side, repeating along the run.",
+                lambda n, t, p, w: _bands(n, _colors(p["colors"]), p["width"] or w),
+                {"colors": ("colors", RANGOLI), "width": ("int", 0)}),
+    "gradient": _M("Gradient", "still", "Colours blending smoothly from one end to the other.", _m_gradient,
+                   {"colors": ("colors", "#ff0000,#ffd000,#0000ff")}),
+    "solid": _M("Solid", "still", "One colour on every light.",
+                lambda n, t, p, w: [_colors(p["colors"])[0]] * n, {"colors": ("colors", "#ffb347")}),
+    "random": _M("Random", "still", "Colours picked at random from the list, in groups.",
+                 lambda n, t, p, w: _random(n, _colors(p["colors"]), p["width"] or w, p["seed"]),
+                 {"colors": ("colors", "#ff0000,#00a000,#ffffff,#ffb000"), "width": ("int", 0), "seed": ("int", 1)}),
+    "painted": _M("Painted by hand", "still", "Colors you painted segment by segment; repeats if the run is longer.",
+                  lambda n, t, p, w: _bands(n, _colors(p["cells"]), p["width"] or w),
+                  {"cells": ("colors", "#ff8a1c,#ffffff"), "width": ("int", 5)}),
+    "chase": _M("Chase", "moving", "Bands of colour sliding along the run with soft edges.", _wrap(_rangoli_chase),
+                {"colors": ("colors", RANGOLI), "width": ("int", 5), "speed": ("float", 6.0)}),
+    "twinkle": _M("Twinkle", "moving", "Base colours; some lights glow up to an accent colour and fade back.",
+                  _wrap(_twinkle), TW("#ff963c", "#ffc878,#ffffff", 0.25, 1.0, 0.6)),
+    "drift": _M("Drift", "moving", "Things floating along over a background: snow, leaves, lanterns, a comet.",
+                _wrap(_drift), DR("#ffffff,#c8e6ff", "#001e46", 6, 3.0, 1.0, 0, 1.5)),
+    "fireworks": _M("Fireworks", "moving", "Bursts at random spots: a flash, then a ring spreading out and fading.",
+                    _wrap(_bursts), BU(FIREWORK, "#0a0500", 1.2)),
+    "swirl": _M("Swirl", "moving", "Colours blending slowly into each other, drifting about.", _wrap(_swirl),
+                SWP("#0032c8,#00aa96,#6400b4", 0.6)),
+    "flow": _M("Flow", "moving", "Bands gliding along; soft blends them, blink makes colours flicker like flames.",
+               _wrap(_glide), GL(_WARM, 6, 2.0, 0.5, 0.0)),
+    "steps": _M("Steps", "moving", "The whole run holds one colour, then cross-fades to the next.", _wrap(_steps),
+                {"colors": ("colors", RANGOLI), "hold": ("float", 4.0)}),
+    "beat": _M("Beat", "moving", "Colours step one group along and flash on every beat.", _wrap(_rhythm),
+               {"colors": ("colors", RANGOLI), "width": ("int", 3), "bpm": ("float", 116.0)}),
+    "breathe": _M("Breathe", "moving", "Slowly brightening and dimming; each breath the next colour.", _m_breathe,
+                  {"colors": ("colors", "#ff8a1c"), "speed": ("float", 1.0)}),
+    "heartbeat": _M("Heartbeat", "moving", "A double pulse (lub-dub) from the first colour to the second.",
+                    _m_heartbeat, {"colors": ("colors", "#ff4f9a,#ff0020"), "bpm": ("float", 66.0)}),
+    "flicker": _M("Flicker", "moving", "Candle or diya flames, a failing bulb, lightning, or fire.", _m_flicker,
+                  {"colors": ("colors", "#ff8a1c"), "style": ("choice", "candle", ["candle", "failing bulb", "lightning", "fire"]),
+                   "speed": ("float", 1.0), "rate": ("float", 0.35)}),
+    "candles": _M("Candles", "moving", "One flame per year over party colours; blown out and relit every 15 s.",
+                  _wrap(_candles), CAND(30, "#ff0078,#00a0ff,#ffc800,#8c00ff")),
+    "gameday": _M("Game day", "moving", "Team colours chasing along with white sparkles.", _wrap(_gameday),
+                  {"colors": ("colors", "#ff0000,#ffffff"), "width": ("int", 4), "speed": ("float", 4.0)}),
+    "sparkle": _M("Sparkle", "layer", "Sparks popping all over (good as a layer on top).", _m_sparkle,
+                  {"colors": ("colors", "#ffffff,#ffc850"), "density": ("float", 0.04), "speed": ("float", 1.0)}),
+    "comet": _M("Comet", "layer", "Now and then a comet streaks across (good as a layer on top).", _m_comet,
+                {"colors": ("colors", "#ffffff"), "rate": ("float", 0.3), "speed": ("float", 25.0), "trail": ("int", 8)}),
+}
+
+# (min, max) for numbers, by setting name; anything else 0-100.
+RANGES = {"width": (0, 60), "speed": (-30, 30), "density": (0, 1), "level": (0, 1), "count": (0, 40),
+          "size": (0.3, 10), "trail": (0, 60), "sway": (0, 10), "rate": (0.02, 10), "spread": (0, 60),
+          "life": (0.3, 10), "soft": (0, 1), "blink": (0, 1), "hold": (0.5, 120), "bpm": (30, 240),
+          "age": (1, 150), "seed": (0, 99999), "wavelength": (4, 200)}
+DIRECTIONS = {"ltr": "Left to right", "rtl": "Right to left", "bounce": "Back and forth", "out": "From the middle outward"}
+BLENDS = ("over", "add", "max")
+SPANS = ("run", "house")
+MAX_LAYERS, MAX_STEPS, MAX_COLORS, MAX_NAME, MAX_THEMES, MAX_CELLS = 3, 8, 12, 40, 200, 400
+MY_GROUP = "My themes"
+CUSTOM = {}                  # id -> clean theme; kept up to date by themes.py
+_DRAFTS = {}                 # json of an unsaved theme -> clean theme (the editor's preview / play)
+
+
+def _spec(movement):
+    """{name: (type, default[, options])} for a layer's movement."""
+    if movement.startswith("builtin:"):
+        pid = movement[8:]
+        if pid not in PATTERNS:
+            raise ValueError(f"unknown built-in theme {pid!r}")
+        return PATTERNS[pid]["params"]
+    if movement not in MOVEMENTS:
+        raise ValueError(f"unknown movement {movement!r}")
+    return MOVEMENTS[movement]["params"]
+
+
+def _check_param(name, typ, v, spec):
+    if typ in ("int", "float"):
+        lo, hi = RANGES.get(name, (0, 100))
+        if not lo <= v <= hi:
+            raise ValueError(f"{name.replace('_', ' ')} must be between {lo} and {hi}")
+    elif typ == "colors":
+        cols = [c.strip() for c in str(v).split(",") if c.strip()]
+        most = MAX_CELLS if name == "cells" else MAX_COLORS
+        if len(cols) > most:
+            raise ValueError(f"{name}: at most {most} colours")
+        return ",".join(rgb_to_hex(hex_to_rgb(c)) for c in cols)
+    elif typ == "color":
+        return rgb_to_hex(hex_to_rgb(v))
+    elif typ == "choice" and v not in spec[2]:
+        raise ValueError(f"{name}: choose one of {', '.join(spec[2])}")
+    return v
+
+
+def _clean_params(spec, params):
+    if not isinstance(params, dict):
+        raise ValueError("settings must be an object")
+    p = _coerce(spec, {k: v for k, v in params.items() if k in spec})
+    return {k: _check_param(k, spec[k][0], v, spec[k]) for k, v in p.items()}
+
+
+def clean_theme(d, known=None):
+    """A validated theme of your own (ValueError with a readable reason otherwise).
+    known: theme ids a sequence may use (default: built-ins and saved themes)."""
+    if not isinstance(d, dict):
+        raise ValueError("a theme must be an object")
+    name = " ".join(str(d.get("name") or "").split())
+    if not name:
+        raise ValueError("give the theme a name")
+    if len(name) > MAX_NAME:
+        raise ValueError(f"the name can be at most {MAX_NAME} characters")
+    group = " ".join(str(d.get("group") or MY_GROUP).split())[:MAX_NAME] or MY_GROUP
+    direction = d.get("direction") or "ltr"
+    if direction not in DIRECTIONS:
+        raise ValueError(f"direction: choose one of {', '.join(DIRECTIONS)}")
+    span = d.get("span") or "run"
+    if span not in SPANS:
+        raise ValueError("span: 'run' (each run) or 'house' (whole house)")
+    out = {"id": str(d.get("id") or ""), "name": name, "group": group, "layers": [], "direction": direction,
+           "mirror": bool(d.get("mirror")), "span": span}
+    seq = d.get("sequence") or []
+    if seq:
+        if not isinstance(seq, list) or len(seq) > MAX_STEPS:
+            raise ValueError(f"a sequence has 1 to {MAX_STEPS} steps")
+        known = known if known is not None else set(PATTERNS) | set(CUSTOM)
+        steps = []
+        for st in seq:
+            tid = str((st or {}).get("theme") or "")
+            if tid not in known:
+                raise ValueError(f"sequence step: unknown theme {tid!r}")
+            if tid in CUSTOM and CUSTOM[tid].get("sequence"):
+                raise ValueError("a sequence step can't be another sequence")
+            try:
+                secs = float(st.get("seconds", 10))
+            except (TypeError, ValueError):
+                raise ValueError("sequence step: seconds must be a number")
+            if not 1 <= secs <= 3600:
+                raise ValueError("each sequence step lasts 1 s to 1 hour")
+            steps.append({"theme": tid, "seconds": secs})
+        fade = float(d.get("fade", 2) or 0)
+        if not 0 <= fade <= 30:
+            raise ValueError("cross-fade must be 0-30 s")
+        out.update(sequence=steps, fade=fade)
+        return out
+    layers = d.get("layers") or []
+    if not isinstance(layers, list) or not 1 <= len(layers) <= MAX_LAYERS:
+        raise ValueError(f"a theme has 1 to {MAX_LAYERS} layers")
+    for k, ly in enumerate(layers):
+        if not isinstance(ly, dict):
+            raise ValueError("each layer must be an object")
+        mv = str(ly.get("movement") or "")
+        spec = _spec(mv)
+        blend = ly.get("blend") or ("over" if k == 0 else "add")
+        if blend not in BLENDS:
+            raise ValueError(f"blend: choose one of {', '.join(BLENDS)}")
+        out["layers"].append({"movement": mv, "params": _clean_params(spec, ly.get("params") or {}), "blend": blend})
+    return out
+
+
+def _layer_animated(ly):
+    mv = ly["movement"]
+    return bool(PATTERNS[mv[8:]].get("animated")) if mv.startswith("builtin:") else MOVEMENTS[mv]["kind"] != "still"
+
+
+def theme_animated(th):
+    return bool(th.get("sequence")) or any(_layer_animated(ly) for ly in th["layers"])
+
+
+def _render_layer(ly, n, t, w):
+    mv = ly["movement"]
+    if mv.startswith("builtin:"):
+        pat = PATTERNS[mv[8:]]
+        p = _coerce(pat["params"], ly["params"])
+        return pat["fn"](n, t, p) if pat.get("animated") else pat["fn"](n, w, p)
+    m = MOVEMENTS[mv]
+    return m["fn"](n, t, _coerce(m["params"], ly["params"]), w)
+
+
+def _blend(base, top, how):
+    if how == "add":
+        return [_add(a, b) for a, b in zip(base, top)]
+    if how == "max":
+        return [tuple(max(a[j], b[j]) for j in range(3)) for a, b in zip(base, top)]
+    return [_mix(a, b, max(b) / 255) for a, b in zip(base, top)]          # over: black is see-through
+
+
+def _core(th, n, t, w):
+    if th.get("sequence"):
+        steps, fade = th["sequence"], th.get("fade", 0)
+        tt, acc, k = t % sum(s["seconds"] for s in steps), 0.0, 0
+        for k, s in enumerate(steps):
+            if tt < acc + s["seconds"]:
+                break
+            acc += s["seconds"]
+        step = steps[k]
+        cur = _step_frame(step["theme"], n, t, w)
+        rem = step["seconds"] - (tt - acc)
+        if fade and rem < fade and len(steps) > 1:
+            nxt = _step_frame(steps[(k + 1) % len(steps)]["theme"], n, t, w)
+            cur = [_mix(a, b, 1 - rem / fade) for a, b in zip(cur, nxt)]
+        return cur
+    out = None
+    for ly in th["layers"]:
+        cols = _render_layer(ly, n, t, w)
+        out = cols if out is None else _blend(out, cols, ly["blend"])
+    return out
+
+
+def _step_frame(tid, n, t, w):
+    if tid in CUSTOM and CUSTOM[tid].get("sequence"):
+        raise ValueError("a sequence step can't be another sequence")
+    return frame(tid, n, {}, t, False, w)
+
+
+BOUNCE_S = 8.0                # back-and-forth: forwards this long, then backwards
+
+
+def render_theme(th, n, t=0.0, seg_width=5):
+    """One colour per light for a theme of your own (shape applied: direction, mirror)."""
+    d = th["direction"]
+    if d == "bounce":
+        ph = t % (2 * BOUNCE_S)
+        t = ph if ph < BOUNCE_S else 2 * BOUNCE_S - ph
+    if n <= 0:
+        return []
+    if d == "out" or th["mirror"]:
+        m = (n + 1) // 2
+        half = _core(th, m, t, seg_width)
+        if d == "rtl":
+            half = half[::-1]
+        if d == "out":
+            return [half[m - 1 - min(i, n - 1 - i)] for i in range(n)]
+        return [half[min(i, n - 1 - i)] for i in range(n)]
+    cols = _core(th, n, t, seg_width)
+    return cols[::-1] if d == "rtl" else cols
+
+
+def _face(th):
+    if th.get("sequence"):
+        return ",".join(lookup(s["theme"])[0].get("face", "#888888").split(",")[0] for s in th["sequence"]
+                        if s["theme"] in PATTERNS or s["theme"] in CUSTOM) or "#888888"
+    p = th["layers"][0]["params"]
+    if "colors" in p:
+        return p["colors"]
+    mv = th["layers"][0]["movement"]
+    return PATTERNS[mv[8:]].get("face", "#888888") if mv.startswith("builtin:") else "#888888"
+
+
+def _compiled(th, tid):
+    anim = theme_animated(th)
+    desc = (f"Your theme: {len(th['layers'])} layer(s), " + ", ".join(
+        PATTERNS[ly["movement"][8:]]["label"] if ly["movement"].startswith("builtin:") else MOVEMENTS[ly["movement"]]["label"]
+        for ly in th["layers"]) if th["layers"] else f"Your sequence of {len(th['sequence'])} themes") + "."
+    cats = [MY_GROUP] + ([th["group"]] if th["group"] != MY_GROUP else [])
+    return dict(label=th["name"], cats=cats, animated=anim, params={}, theme=th, face=_face(th),
+                describe=("Dynamic. " if anim else "") + desc, tile=True, custom=True, span=th["span"])
+
+
+def set_custom(themes):
+    """Replace the saved themes (from themes.py)."""
+    CUSTOM.clear()
+    for th in themes:
+        CUSTOM[th["id"]] = th
+    _DRAFTS.clear()
+
+
+def lookup(name, params=None):
+    """(pattern dict, params) for a built-in, a saved theme or "_draft" (params {"theme": {...}})."""
+    if name in PATTERNS:
+        return PATTERNS[name], params or {}
+    if name in CUSTOM:
+        return _compiled(CUSTOM[name], name), {}
+    if name == "_draft":
+        raw = (params or {}).get("theme")
+        key = json.dumps(raw, sort_keys=True)
+        if key not in _DRAFTS:
+            if len(_DRAFTS) > 50:
+                _DRAFTS.clear()
+            _DRAFTS[key] = clean_theme(raw)
+        pat = _compiled(_DRAFTS[key], "_draft")
+        pat["label"] = "Unsaved: " + pat["label"]
+        return pat, {}
+    if str(name).startswith("my_"):
+        raise ValueError(f"theme {name!r} no longer exists (it was deleted); pick another theme")
+    raise ValueError(f"unknown pattern {name!r}")
+
+
 def catalogue():
-    return [{"id": k, "label": v["label"], "group": v["cats"][0], "categories": v["cats"],
-             "animated": bool(v.get("animated")), "describe": v.get("describe", ""), "face": v.get("face", ""),
-             "tile": v.get("tile", True),
-             "params": {p: {"type": t, "default": d} for p, (t, d) in v["params"].items()}}
-            for k, v in PATTERNS.items()]
+    out = [{"id": k, "label": v["label"], "group": v["cats"][0], "categories": v["cats"],
+            "animated": bool(v.get("animated")), "describe": v.get("describe", ""), "face": v.get("face", ""),
+            "tile": v.get("tile", True),
+            "params": {p: {"type": s[0], "default": s[1]} for p, s in v["params"].items()}}
+           for k, v in PATTERNS.items()]
+    mine = []
+    for tid in CUSTOM:
+        try:
+            v = _compiled(CUSTOM[tid], tid)
+        except (ValueError, KeyError):
+            continue
+        mine.append({"id": tid, "label": v["label"], "group": MY_GROUP, "categories": v["cats"], "custom": True,
+                     "animated": v["animated"], "describe": v["describe"], "face": v["face"], "tile": True,
+                     "span": v["span"], "params": {}})
+    return mine + out
+
+
+def categories():
+    return [MY_GROUP] + CATEGORIES
+
+
+def movements():
+    """For the Themes editor: each movement with its settings and their ranges."""
+    def ps(spec):
+        out = {}
+        for k, s in spec.items():
+            e = {"type": s[0], "default": s[1]}
+            if s[0] == "choice":
+                e["options"] = s[2]
+            if s[0] in ("int", "float"):
+                e["min"], e["max"] = RANGES.get(k, (0, 100))
+            out[k] = e
+        return out
+    return {"movements": [{"id": k, "label": m["label"], "kind": m["kind"], "describe": m["describe"],
+                           "params": ps(m["params"])} for k, m in MOVEMENTS.items()],
+            "builtin_params": {k: ps(v["params"]) for k, v in PATTERNS.items()},
+            "directions": DIRECTIONS, "blends": list(BLENDS),
+            "limits": {"layers": MAX_LAYERS, "steps": MAX_STEPS, "colors": MAX_COLORS, "name": MAX_NAME}}
 
 
 def _coerce(spec, params):
     out = {}
-    for name, (typ, default) in spec.items():
+    for name, s in spec.items():
+        typ, default = s[0], s[1]
         v = params.get(name, default)
-        if typ == "int":
-            v = int(v or 0)
-        elif typ == "float":
-            v = float(v if v not in (None, "") else default)
-        elif typ == "bool":
+        try:
+            if typ == "int":
+                v = int(float(v or 0))
+            elif typ == "float":
+                v = float(v if v not in (None, "") else default)
+                if not math.isfinite(v):
+                    raise ValueError
+        except (TypeError, ValueError):
+            raise ValueError(f"{name.replace('_', ' ')} must be a number") from None
+        if typ == "bool":
             v = v if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes", "on")
         elif typ == "color":
-            hex_to_rgb(v)
+            hex_to_rgb(str(v))
         elif typ == "colors":
             if not _colors(v):
                 raise ValueError(f"{name}: need at least one colour")
+        elif typ == "choice":
+            v = str(v)
         out[name] = v
     return out
 
 
-def get(name):
-    if name not in PATTERNS:
-        raise ValueError(f"unknown pattern {name!r}")
-    return PATTERNS[name]
+def get(name, params=None):
+    return lookup(name, params)[0]
 
 
-def is_animated(name):
-    return bool(get(name).get("animated"))
+def is_animated(name, params=None):
+    return bool(get(name, params).get("animated"))
+
+
+def span_of(name, params=None):
+    """"house": one strip along every run (whole house), else each run on its own."""
+    return get(name, params).get("span", "run")
 
 
 def frame(name, lights, params, t=0.0, reverse=False, seg_width=5):
     """One colour per light at time t (static patterns ignore t)."""
-    pat = get(name)
-    p = _coerce(pat["params"], params or {})
-    colors = pat["fn"](lights, t, p) if pat.get("animated") else pat["fn"](lights, seg_width, p)
+    pat, params = lookup(name, params)
+    if pat.get("theme"):
+        colors = render_theme(pat["theme"], lights, t, seg_width)
+    else:
+        p = _coerce(pat["params"], params or {})
+        colors = pat["fn"](lights, t, p) if pat.get("animated") else pat["fn"](lights, seg_width, p)
     return list(reversed(colors)) if reverse else colors
+
+
+def house_frames(name, params, t, runs, seg_width=5):
+    """Whole-house span: one frame for all runs end to end (runs in order along the house,
+    [(id, lights, reverse)]), sliced per run; a reversed run gets its slice back to front."""
+    full = frame(name, sum(n for _, n, _ in runs), params, t, False, seg_width)
+    out, off = {}, 0
+    for rid, n, rev in runs:
+        part = full[off:off + n]
+        out[rid] = part[::-1] if rev else part
+        off += n
+    return out
 
 
 def segment_of(i, lights, segments, lps=0):

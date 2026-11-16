@@ -15,7 +15,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import drivers, settings, setup
+from . import drivers, settings, setup, themes
 from . import patterns as P
 from .drivers import NotAllowed
 from .schedule import Scheduler
@@ -32,6 +32,8 @@ STREAMS = {sid: Streamer(KITS[s.controller.id], s.lights, S.stream_fps) for sid,
 POOL = ThreadPoolExecutor(max_workers=4)
 JOBS = {}
 STATE_LOCK = threading.Lock()
+THEMES = themes.Store()                   # themes you make; also registers them with patterns.py
+HOUSE_T0 = time.monotonic()               # one clock for whole-house themes: every run shows the same moment
 
 if S.configured:
     log.info("start: mode=%s, %d run(s): %s", S.mode.upper(), len(S.sections),
@@ -169,7 +171,8 @@ def config():
                              "enabled": c.enabled} for c in S.controllers.values()],
             "sections": [s.public() for s in S.sections.values()],
             "patterns": P.catalogue(),
-            "categories": P.CATEGORIES}
+            "categories": P.categories(),
+            "theme_prefs": {"favourites": THEMES.favourites, "hidden_groups": THEMES.hidden_groups}}
 
 
 LAST_LAN = {}                     # last status per controller id, for the fast read below
@@ -272,15 +275,36 @@ def _can_stream(sec):
     return bool(sec.caps.get("stream"))
 
 
+def _house_runs(sec):
+    """The runs a whole-house theme is laid along: every enabled run, in order along the house."""
+    runs = [s for s in S.sections.values() if s.enabled or s.id == sec.id]
+    return [(s.id, s.lights, s.reverse) for s in runs]
+
+
+def _lights(sec, pattern, params, t=0.0, seg_width=None):
+    """One colour per light of this run at time t: the run's own frame, or its slice of the
+    whole house for a theme spanning the house."""
+    seg = seg_width or sec.lights_per_segment or 5
+    if P.span_of(pattern, params) == "house":
+        return P.house_frames(pattern, params, t, _house_runs(sec), 5)[sec.id]     # same bands on every run
+    return P.frame(pattern, sec.lights, params, t, sec.reverse, seg)
+
+
+def _render(sec, pattern, params):
+    """What a stream on this run renders at time t (whole-house themes use the shared clock)."""
+    if P.span_of(pattern, params) == "house":
+        return lambda t: _lights(sec, pattern, params, time.monotonic() - HOUSE_T0, 5)
+    return None
+
+
 @app.post("/api/sections/{sid}/preview")
 def preview(sid: str, body: PatternReq, seconds: float = 8.0, fps: int = 12):
     """Static: one frame plus its segment version. Animated: also `frames` for the 3D view."""
     sec = S.sections.get(sid)
     if not sec:
         raise HTTPException(404, f"no section {sid}")
-    pat = _run(lambda: P.get(body.pattern))
-    lights = _run(lambda: P.frame(body.pattern, sec.lights, body.params, 0.0, sec.reverse,
-                                  sec.lights_per_segment or 5))
+    pat = _run(lambda: P.get(body.pattern, body.params))
+    lights = _run(lambda: _lights(sec, body.pattern, body.params))
     segs, mixed, calls = _segments_for(sec, lights)
     one = len(calls) == 1
     out = {"animated": bool(pat.get("animated")) and _can_stream(sec),
@@ -295,8 +319,7 @@ def preview(sid: str, body: PatternReq, seconds: float = 8.0, fps: int = 12):
     if out["animated"]:
         seconds, fps = max(1.0, min(seconds, 20.0)), max(4, min(fps, 20))
         out["fps"] = fps
-        out["frames"] = [[P.rgb_to_hex(c) for c in P.frame(body.pattern, sec.lights, body.params,
-                                                            k / fps, sec.reverse)]
+        out["frames"] = [[P.rgb_to_hex(c) for c in _lights(sec, body.pattern, body.params, k / fps, 5)]
                          for k in range(int(seconds * fps))]
     return out
 
@@ -311,11 +334,10 @@ def apply_pattern(sid: str, body: PatternReq, still: bool = False):
     """Static patterns as segment colours (persist on the controller). Animated ones need
     /play, except as a still picture (still=true) on controllers that can't stream."""
     sec, kit = _section(sid)
-    if _run(lambda: P.is_animated(body.pattern)) and not (still and not _can_stream(sec)):
+    if _run(lambda: P.is_animated(body.pattern, body.params)) and not (still and not _can_stream(sec)):
         raise HTTPException(400, "animated themes play per light: use Play live")
     _stop_stream(sid)
-    lights = _run(lambda: P.frame(body.pattern, sec.lights, body.params, 0.0, sec.reverse,
-                                  sec.lights_per_segment or 5))
+    lights = _run(lambda: _lights(sec, body.pattern, body.params))
     segs, mixed, calls = _segments_for(sec, lights)
     seg_hex = [P.rgb_to_hex(c) for c in segs]
     if len(calls) == 1 and not callable(calls[0]):     # one colour: whole controller
@@ -323,7 +345,7 @@ def apply_pattern(sid: str, body: PatternReq, still: bool = False):
         _remember(sid, segments=seg_hex, pattern=body.pattern, params=body.params,
                   color=seg_hex[0], kelvin=None)
         return {"ok": True, "path": "lan", "mode": S.mode}
-    job = _start_job(sec, kit, P.get(body.pattern)["label"], calls)
+    job = _start_job(sec, kit, P.get(body.pattern, body.params)["label"], calls)
     _remember(sid, segments=seg_hex, pattern=body.pattern, params=body.params, color=None, kelvin=None)
     return {"ok": True, "path": "lan", "job": job, "mode": S.mode}
 
@@ -351,12 +373,13 @@ def set_segments(sid: str, body: Segments):
 def play(sid: str, body: PlayReq):
     """Stream one colour per light (static or animated) until stopped."""
     sec, kit = _section(sid)
-    _run(lambda: P.frame(body.pattern, sec.lights, body.params))          # validate first
+    _run(lambda: _lights(sec, body.pattern, body.params))                 # validate first
     if not _can_stream(sec):                                              # show it as a still picture
         r = apply_pattern(sid, PatternReq(pattern=body.pattern, params=body.params), still=True)
         return {**r, "still": True}
     _run(lambda: kit.power(True))                                         # streaming into a dark kit shows nothing
-    _run(lambda: STREAMS[sid].start(body.pattern, body.params, body.level, sec.reverse))
+    _run(lambda: STREAMS[sid].start(body.pattern, body.params, body.level, sec.reverse,
+                                    _render(sec, body.pattern, body.params)))
     _remember(sid, power=True, streaming={"pattern": body.pattern, "params": body.params, "level": body.level})
     return {"ok": True, "mode": S.mode, "stream": STREAMS[sid].state}
 
@@ -387,9 +410,9 @@ def play_all(body: PlayAllReq):
                 skipped[sid] = e.detail
             continue
         try:
-            P.frame(body.pattern, sec.lights, params)
+            _lights(sec, body.pattern, params)
             KITS[sec.controller.id].power(True)
-            STREAMS[sid].start(body.pattern, params, body.level, sec.reverse)
+            STREAMS[sid].start(body.pattern, params, body.level, sec.reverse, _render(sec, body.pattern, params))
             _remember(sid, power=True, streaming={"pattern": body.pattern, "params": params, "level": body.level})
             started.append(sid)
         except (ValueError, NotAllowed) as e:
@@ -440,7 +463,7 @@ class ApplyAll(BaseModel):
 @app.post("/api/apply-all")
 def apply_all(body: ApplyAll):
     """A static theme as segment colours on several kits (each kit's own job)."""
-    if _run(lambda: P.is_animated(body.pattern)):
+    if _run(lambda: P.is_animated(body.pattern, body.params)):
         raise HTTPException(400, "animated themes play per light: use Play live")
     jobs, skipped = {}, {}
     for sid, sec in S.sections.items():
@@ -496,7 +519,7 @@ class _ScheduleActions:
         _BY_SCHEDULE.on = True
         try:
             pat, level = theme["pattern"], theme["level"]
-            if pat not in ("keep", "warm_white") and P.is_animated(pat):
+            if pat not in ("keep", "warm_white") and P.is_animated(pat, theme["params"]):
                 power(sid, Power(on=True))
                 play(sid, PlayReq(pattern=pat, params=theme["params"], level=level))
                 return
@@ -599,6 +622,70 @@ def schedule_pause(body: SchedPause):
     SCHED.pause_until_tomorrow() if body.pause else SCHED.pause(None)
     log.info("schedules %s", f"paused until {SCHED.paused_until}" if body.pause else "resumed")
     return {"ok": True, **SCHED.overview()}
+
+
+# --- themes you make (Themes tab) ---------------------------------------------------------
+def _themes_out():
+    return {"themes": THEMES.themes, "patterns": P.catalogue(), "categories": P.categories(),
+            "prefs": {"favourites": THEMES.favourites, "hidden_groups": THEMES.hidden_groups},
+            **P.movements()}
+
+
+@app.get("/api/themes")
+def themes_list():
+    """Saved themes (full definitions), the catalogue every picker uses, favourites and
+    hidden groups, and the movements the editor offers."""
+    return _themes_out()
+
+
+class ThemeSave(BaseModel):
+    theme: dict
+    as_new: bool = False
+
+
+@app.post("/api/themes/save")
+def theme_save(body: ThemeSave):
+    th = _run(lambda: THEMES.save(body.theme, body.as_new))
+    log.info("theme saved: %s (%s)", th["name"], th["id"])
+    return {"ok": True, "theme": th, **_themes_out()}
+
+
+class ThemeId(BaseModel):
+    id: str
+
+
+@app.post("/api/themes/delete")
+def theme_delete(body: ThemeId):
+    try:
+        in_seq = THEMES.delete(body.id)
+    except KeyError:
+        raise HTTPException(404, "no such theme of your own (built-in themes can't be deleted)")
+    used = [s["name"] for s in SCHED.schedules if (s.get("theme") or {}).get("pattern") == body.id]
+    log.info("theme deleted: %s", body.id)
+    return {"ok": True, "used_by_schedules": used, "used_by_sequences": in_seq, **_themes_out()}
+
+
+class ThemePrefs(BaseModel):
+    favourites: list[str] | None = None
+    hidden_groups: list[str] | None = None
+
+
+@app.post("/api/themes/prefs")
+def theme_prefs(body: ThemePrefs):
+    _run(lambda: THEMES.set_prefs(body.favourites, body.hidden_groups))
+    return {"ok": True, **_themes_out()}
+
+
+@app.get("/api/themes/export")
+def theme_export():
+    return THEMES.export()
+
+
+@app.post("/api/themes/import")
+def theme_import(body: dict):
+    added, errors = _run(lambda: THEMES.import_(body))
+    log.info("themes imported: %d added, %d skipped", len(added), len(errors))
+    return {"ok": bool(added), "added": added, "errors": errors, **_themes_out()}
 
 
 # --- setup wizard hooks -------------------------------------------------------------------

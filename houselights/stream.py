@@ -24,10 +24,12 @@ class Streamer:
     def playing(self):
         return self._thread is not None and self._thread.is_alive()
 
-    def start(self, pattern, params, level=100, reverse=False):
-        P.frame(pattern, self.lights, params, 0.0, reverse)          # validate before stopping
-        self.start_fn(pattern, lambda t: P.frame(pattern, self.lights, params, t, reverse),
-                      P.is_animated(pattern), level, params=params)
+    def start(self, pattern, params, level=100, reverse=False, render=None):
+        """render(t) -> [rgb] * lights replaces the plain frame, e.g. this run's slice of a
+        whole-house theme (which keeps its own clock so every run shows the same moment)."""
+        render = render or (lambda t: P.frame(pattern, self.lights, params, t, reverse))
+        render(0.0)                                                   # validate before stopping
+        self.start_fn(pattern, render, P.is_animated(pattern, params), level, params=params)
 
     def start_fn(self, name, render, animated=True, level=100, params=None, seconds=None, slow_ok=False):
         """Stream render(t) -> [rgb] * lights. seconds: stop by itself after that long.
