@@ -73,9 +73,9 @@ venv\Scripts\pip install -r requirements.txt
 venv/bin/pip install tinytuya          # Windows: venv\Scripts\pip install tinytuya
 ```
 
-Tested on x86-64 Linux. macOS, Windows and Raspberry Pi (64-bit OS) should work the same way
-but haven't been tested yet. On a Raspberry Pi use the 64-bit OS: on the 32-bit one, pip may
-have to compile a dependency.
+Tested on x86-64 Linux, and on Windows 11 with the simulators (below). macOS and Raspberry Pi
+(64-bit OS) should work the same way but haven't been tested yet. On a Raspberry Pi use the
+64-bit OS: on the 32-bit one, pip may have to compile a dependency.
 
 ## Start the dashboard
 
@@ -86,6 +86,15 @@ venv/bin/python -m houselights          # Windows: venv\Scripts\python -m housel
 Then open **http://localhost:8090/** on this computer, or **http://ADDRESS:8090/** from a
 phone or another computer, where ADDRESS is this computer's address (`hostname -I` on Linux,
 `ipconfig getifaddr en0` on macOS, `ipconfig` on Windows). Stop it with Ctrl+C.
+
+**Windows firewall**: the first time, Windows asks whether Python may communicate on your
+networks. Allow it on **Private networks**. Without that, phones and other computers can't
+open the page, and messages that controllers send back on their own can be blocked: Govee
+answers on UDP port 4002 and Tuya devices announce themselves by broadcast, so their scans and
+Govee's status may come up empty. Your home network should be set to Private in Windows
+(Settings > Network & internet > your Wi-Fi or Ethernet > Network profile type). If you
+dismissed the question, allow `python.exe` under Windows Security > Firewall & network
+protection > Allow an app through firewall.
 
 Options:
 
@@ -133,7 +142,7 @@ can run it again later from the **Settings** tab (**Change setup**).
 **Govee**: in the Govee Home app, open each device's settings and switch on **LAN
 Control**. Discovery uses UDP ports 4001 to 4003; another program listening on port 4002
 (for example a Govee integration in Home Assistant) can take the replies, so stop it while
-scanning.
+scanning. (On Windows the scan then says the port is in use.)
 
 **WLED**: nothing to do beyond having WLED on your network. Animated themes use WLED's UDP
 realtime protocol on port 21324; in WLED's *Sync Interfaces* settings, make sure **Receive
@@ -145,15 +154,16 @@ Set up the zones in the JellyFish app first.
 **Tuya / Smart Life**: local control needs each device's **local key**, which comes from
 Tuya's cloud once. Install tinytuya (above), pair the lights in the Smart Life app, create a
 free developer account at iot.tuya.com with a cloud project linked to your app account, then
-run `venv/bin/python -m tinytuya wizard`. It lists every device with its id and local key.
+run `venv/bin/python -m tinytuya wizard` (Windows: `venv\Scripts\python -m tinytuya wizard`).
+It lists every device with its id and local key.
 The tinytuya README has the step-by-step guide. Tuya devices accept one connection at a time,
 so close the Smart Life app while testing. The key is stored in `data/secrets.json`, readable
 only by you, never in `config.json` and never sent to the web page.
 
 ## Try it without lights
 
-Simulators for Govee, WLED and JellyFish run on this computer (Linux; on macOS add
-`--base 127.0.0.1 --count 1`):
+Simulators for Govee, WLED and JellyFish run on this computer (Linux and Windows; on macOS
+add `--base 127.0.0.1 --count 1`):
 
 ```sh
 export HOUSELIGHTS_GOVEE_PORTS=14001,14002,14003 HOUSELIGHTS_WLED_PORTS=18080,21325 HOUSELIGHTS_JELLYFISH_PORT=19000
@@ -162,6 +172,18 @@ venv/bin/python tools/fake_wled.py --count 1 --lights 150 &
 venv/bin/python tools/fake_jellyfish.py --zones Front:120,Back:45 &
 venv/bin/python -m houselights --home /tmp/hl-demo --port 8094
 ```
+
+Windows (PowerShell; each simulator opens its own window, close it to stop it):
+
+```powershell
+$env:HOUSELIGHTS_GOVEE_PORTS="14001,14002,14003"; $env:HOUSELIGHTS_WLED_PORTS="18080,21325"; $env:HOUSELIGHTS_JELLYFISH_PORT="19000"
+Start-Process venv\Scripts\python "tools\fake_govee.py --count 1 --lights 50"
+Start-Process venv\Scripts\python "tools\fake_wled.py --count 1 --lights 150"
+Start-Process venv\Scripts\python "tools\fake_jellyfish.py --zones Front:120,Back:45"
+venv\Scripts\python -m houselights --home $env:TEMP\hl-demo --port 8094
+```
+
+The `$env:` settings last until you close that PowerShell window.
 
 In the wizard, tick Govee, WLED and JellyFish and scan `127.0.0.11, 127.0.0.21, 127.0.0.31`.
 The extra ports keep the simulators apart from real controllers.
@@ -189,6 +211,9 @@ WantedBy=multi-user.target
 Then `sudo systemctl enable --now houselights`. Animated themes play only while the server
 runs; when it stops, the lights go back to their last static look.
 
+On Windows, leave the PowerShell window open (minimised is fine). When the wizard saves, the
+server restarts inside that same window, and Ctrl+C still stops it.
+
 ## Good to know
 
 - **No login.** Anyone who can open the page can control the lights. Keep it on your home
@@ -196,7 +221,8 @@ runs; when it stops, the lights go back to their last static look.
 - Your files in `data/`: `config.json` (settings), `secrets.json` (Tuya keys, if any),
   `schedules.json`, `state.json` (what was last applied) and `logs/`. Back up this folder to
   keep your setup.
-- To update: `git pull`, then `venv/bin/pip install -r requirements.txt`, then restart.
+- To update: `git pull`, then `venv/bin/pip install -r requirements.txt` (Windows:
+  `venv\Scripts\pip install -r requirements.txt`), then restart.
 
 ## Tests
 
@@ -205,8 +231,10 @@ No lights needed:
 ```sh
 venv/bin/python tests/test_settings.py
 venv/bin/python tests/test_schedule.py
-venv/bin/python tests/test_drivers.py      # Linux: uses 127.0.0.x addresses
+venv/bin/python tests/test_drivers.py      # Linux and Windows: uses 127.0.0.x addresses
 ```
+
+On Windows use `venv\Scripts\python tests\test_settings.py` and so on.
 
 ## Adding another kind of controller
 

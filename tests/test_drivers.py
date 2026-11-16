@@ -3,7 +3,8 @@
     python tests/test_drivers.py
 
 WLED and JellyFish run their simulators (tools/) inside this test on 127.0.0.x and spare
-ports; Tuya uses a stand-in for the tinytuya library. Linux (needs 127.0.0.2+ addresses).
+ports; Tuya uses a stand-in for the tinytuya library. Linux and Windows (needs 127.0.0.2+
+addresses, so not macOS).
 """
 import importlib.util
 import os

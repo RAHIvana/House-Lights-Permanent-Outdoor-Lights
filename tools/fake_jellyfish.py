@@ -2,9 +2,9 @@
 
     python tools/fake_jellyfish.py --count 1 --zones Front:120,Back:80
 
-Controllers at 127.0.0.31, ... (Linux; on macOS use --base 127.0.0.1 --count 1). Each serves
-the documented WebSocket API at ws://<ip>:<port>/ws: "get zones" and "runPattern". Real
-controllers use port 9000; use another port when testing beside one:
+Controllers at 127.0.0.31, ... (Linux and Windows; on macOS use --base 127.0.0.1 --count 1).
+Each serves the documented WebSocket API at ws://<ip>:<port>/ws: "get zones" and "runPattern".
+Real controllers use port 9000; use another port when testing beside one:
 
     HOUSELIGHTS_JELLYFISH_PORT=19000 python tools/fake_jellyfish.py
     HOUSELIGHTS_JELLYFISH_PORT=19000 python -m houselights

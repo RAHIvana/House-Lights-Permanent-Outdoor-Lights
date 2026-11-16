@@ -2,9 +2,9 @@
 
     python tools/fake_govee.py --count 3
 
-Starts devices at 127.0.0.11, 127.0.0.12, ... (Linux: every 127.x address works; on macOS
-use --base 127.0.0.1 --count 1). They answer unicast "scan" and "devStatus", and keep the
-power, brightness and colour they are sent. In the setup wizard, scan "127.0.0.11-13" by
+Starts devices at 127.0.0.11, 127.0.0.12, ... (Linux and Windows: every 127.x address works;
+on macOS use --base 127.0.0.1 --count 1). They answer unicast "scan" and "devStatus", and keep
+the power, brightness and colour they are sent. In the setup wizard, scan "127.0.0.11-13" by
 typing the addresses, e.g. 127.0.0.11, 127.0.0.12, 127.0.0.13 (or 127.0.0.8/29).
 
 Real devices use ports 4001 (scan), 4002 (replies) and 4003 (commands). To run beside real

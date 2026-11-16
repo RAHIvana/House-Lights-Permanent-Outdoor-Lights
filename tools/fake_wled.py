@@ -2,10 +2,10 @@
 
     python tools/fake_wled.py --count 2 --lights 60,150
 
-Devices at 127.0.0.21, 127.0.0.22, ... (Linux; on macOS use --base 127.0.0.1 --count 1). Each
-serves the WLED JSON API (/json/info, /json/state) on HTTP and takes UDP realtime packets
-(DRGB, DNRGB). Real WLED uses port 80 and 21324; port 80 needs admin rights, so the simulator
-uses other ports and House Lights must be told:
+Devices at 127.0.0.21, 127.0.0.22, ... (Linux and Windows; on macOS use --base 127.0.0.1
+--count 1). Each serves the WLED JSON API (/json/info, /json/state) on HTTP and takes UDP
+realtime packets (DRGB, DNRGB). Real WLED uses port 80 and 21324; port 80 needs admin rights,
+so the simulator uses other ports and House Lights must be told:
 
     HOUSELIGHTS_WLED_PORTS=18080,21325 python tools/fake_wled.py
     HOUSELIGHTS_WLED_PORTS=18080,21325 python -m houselights
