@@ -44,13 +44,45 @@ def main():
     server = uvicorn.Server(uvicorn.Config("houselights.app:app", host=host, port=port,
                                            log_level="info", access_log=False))
     runtime.server = server
-    server.run()
+    try:
+        server.run()
+    except KeyboardInterrupt:                     # Ctrl+C: uvicorn has shut down cleanly, then passes
+        logging.getLogger("houselights").info("stopped")    # the Ctrl+C on; no traceback
+        return
 
     if runtime.restart:                           # settings saved: start again with them
         logging.getLogger("houselights").info("restarting with the new settings")
         pkg_parent = os.path.dirname(settings.PKG)
         os.environ["PYTHONPATH"] = os.pathsep.join(filter(None, [pkg_parent, os.environ.get("PYTHONPATH")]))
-        os.execv(sys.executable, [sys.executable, "-m", "houselights", *sys.argv[1:]])
+        cmd = [sys.executable, "-m", "houselights", *sys.argv[1:]]
+        if os.name != "nt":
+            os.execv(sys.executable, cmd)         # same process: the terminal or service sees no change
+        # Windows has no exec: os.execv starts a new process and ends this one, so the terminal
+        # (or service) thinks the server stopped while the new one runs on, out of Ctrl+C's reach.
+        # Instead this process stays as a small supervisor that runs the server as its child.
+        if os.environ.get(SUPERVISED) == "1":
+            sys.exit(RESTART_EXIT)                # the supervisor starts us again
+        os.environ[SUPERVISED] = "1"
+        sys.exit(_supervise(cmd))
+
+
+SUPERVISED = "HOUSELIGHTS_SUPERVISED"
+RESTART_EXIT = 75                                 # a supervised server asking to be started again
+
+
+def _supervise(cmd):
+    """Windows: run the server as a child until it stops for another reason than a restart."""
+    import subprocess
+    while True:
+        child = subprocess.Popen(cmd)
+        while True:
+            try:
+                code = child.wait()
+                break
+            except KeyboardInterrupt:             # Ctrl+C reaches the child too (same console):
+                continue                          # let it shut down cleanly, then stop with it
+        if code != RESTART_EXIT:
+            return code
 
 
 if __name__ == "__main__":
