@@ -1,5 +1,12 @@
 # your settings, schedules and logs (python -m houselights --home elsewhere to keep them out of the folder)
 data/
+# The same files anywhere else in the folder (e.g. --home pointed inside it), simulator state files,
+# and any other JSON: they can hold your controllers' addresses, keys and schedules. The project
+# itself has no JSON files; to add one on purpose, use git add -f.
+*.json
+*.json.tmp
+*.log
+logs/
 venv/
 .venv/
 __pycache__/
