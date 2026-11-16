@@ -308,7 +308,7 @@ TUYA_UDP_PORTS = (6666, 6667)      # Tuya devices announce themselves here every
 TUYA_TCP_PORT = 6668               # and take local commands here
 TUYA_LISTEN = (6.0, 20.0)          # seconds to listen: quick scan, deep scan
 TUYA_FRAMES = (b"\x00\x00\x55\xaa", b"\x00\x00\x66\x99")    # how Tuya messages start (3.1-3.4, 3.5)
-TUYA_NOT_INSTALLED = "Smart Life light. Install tinytuya to use it"
+TUYA_NOT_INSTALLED = "Smart Life / Tuya device. If it's your lights, install tinytuya to use it"
 
 
 def _tuya_announce(data):

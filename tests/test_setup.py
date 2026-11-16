@@ -237,7 +237,7 @@ rows, prob = setup.tuya_scan("", usable=False, same_section=lambda t: True,
                              listen=lambda s, expect=0: {"192.168.2.60": {"gwId": "bf1234567890abcdef12"}},
                              connect=lambda ips: set())
 check(f"tuya scan without tinytuya: found, not usable, says why {rows}", len(rows) == 1 and not rows[0]["supported"]
-      and rows[0]["reason"] == "Smart Life light. Install tinytuya to use it" and "install tinytuya" in rows[0]["install"]
+      and rows[0]["reason"] == setup.TUYA_NOT_INSTALLED and "install tinytuya" in rows[0]["install"]
       and rows[0]["device_id"] == "bf1234567890abcdef12" and not prob)
 listened = []
 rows, prob = setup.tuya_scan("192.168.5.7, 192.168.5.8", usable=False, same_section=lambda t: False,

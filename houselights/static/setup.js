@@ -44,7 +44,9 @@ const HELP = {
   jellyfish: {know: "You use the JellyFish app. Each zone becomes its own run.",
     steps: ["Set up the zones in the JellyFish app first.",
             "The controller must be on and reachable on your network."]},
-  tuya: {know: "You use Smart Life, Tuya Smart, or a brand app that links through Smart Life: ASAHOM, TreatLife, likely Astoria.",
+  tuya: {know: "You use Smart Life, Tuya Smart, or a brand app that links through Smart Life: ASAHOM, TreatLife, likely Astoria. "
+      + "A simple test: if the Smart Life app can find and control your lights, they're Tuya, and House Lights can use them. "
+      + "Plugs, bulbs and other smart-home gadgets use Smart Life too, so the scan may list devices that aren't lights: tick only your lights.",
     steps: ["Install tinytuya: on Windows run INSTALL_WIN, on Linux or a Raspberry Pi INSTALL_NIX, then start House Lights again.",
             "Get each light's local key once: link the Smart Life app to a free iot.tuya.com cloud project, then run python -m tinytuya wizard (see the README).",
             "Close the Smart Life app while testing: these lights take one connection at a time."]},
@@ -137,7 +139,8 @@ function remember(rows) {
     if (d.tier) W.tiers[`${d.type}|${d.model}`] = d.tier;
     const i = W.found.findIndex(f => sameSpot(f, d));
     if (i >= 0) W.found[i] = {...W.found[i], ...d}; else W.found.push(d);
-    if (W.autoTick && usable(d) && !W.untick.has(spotKey(d))) addController(d);
+    // Tuya rows are never ticked by themselves: plugs and bulbs use Smart Life too.
+    if (W.autoTick && usable(d) && d.type !== "tuya" && !W.untick.has(spotKey(d))) addController(d);
   }
 }
 // Every row to show: found ones, plus chosen controllers no scan has found (yet).
@@ -168,7 +171,7 @@ function drawTiles() {
     tile.append(el("span", "tname", KIND_NAME[t]), el("b", "tnum", String(n)));
     const sub = k.state === "asking" ? "Asking…" : k.state === "deep" ? `Deep scan, ${k.left ?? ""} s left`
       : k.state === "error" ? k.msg : t === "tuya" && !drv("tuya").available ? "needs tinytuya to use"
-      : zones && zones !== n ? `${zones} zones` : k.state === "done" ? (n ? (n === 1 ? "controller" : "controllers") : "none found") : "";
+      : zones && zones !== n ? `${zones} zones` : k.state === "done" ? (n ? (t === "tuya" ? (n === 1 ? "device" : "devices") : n === 1 ? "controller" : "controllers") : "none found") : "";
     tile.append(el("small", "tsub", sub));
     if (k.state === "asking" || k.state === "deep") tile.setAttribute("aria-busy", "true");
     box.appendChild(tile);
@@ -198,6 +201,9 @@ function drawFound() {
                   d.saved ? "in your saved setup" : ""].filter(Boolean);
     main.append(el("small", "fsub", bits.join(" · ")));
     if (TIER_NOTE[d.tier]) main.append(el("small", "ftier", TIER_NOTE[d.tier]));
+    if (d.type === "tuya") main.append(el("small", "ftier", "Could be a plug, bulb or other smart-home device, not your lights: "
+      + "tick it only if it's your lights. To check, open each device in the Smart Life app, tap the pencil, then "
+      + `Device Information, and look for the address ${d.ip}.`));
     if (!d.supported) {
       const why = el("small", "freason", (d.reason || "Not supported yet") + (d.install ? ": " : "."));
       if (d.install) why.append(el("code", "", d.install));
@@ -342,7 +348,7 @@ function drawKinds() {
       ol.appendChild(li);
     }
     card.append(ol);
-    if (t === "tuya") card.append(el("p", d.available ? "note ok-line" : "note warn", d.available ? "tinytuya is installed." : "tinytuya is not installed yet: Smart Life lights are found but can't be used."));
+    if (t === "tuya") card.append(el("p", d.available ? "note ok-line" : "note warn", d.available ? "tinytuya is installed." : "tinytuya is not installed yet: Smart Life devices are found but can't be used."));
     // How many, look again, add by address
     const row = el("div", "row krow"), lab = el("label", "kcount");
     const sel = el("select");

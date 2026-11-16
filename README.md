@@ -174,9 +174,14 @@ can run it again later from the **Settings** tab (**Change setup**).
    Each kind shows how many it found, then one list: tick **Use** for the controllers to
    use (found ones are ticked). A JellyFish controller shows one line per zone; each zone
    becomes its own run. Govee models other than the H806A show what they can do ("basic
-   control" or "one colour at a time"). Smart Life lights are found even without tinytuya
+   control" or "one colour at a time"). Smart Life devices are found even without tinytuya
    (they announce themselves on this computer's own network section, and a typed address
    is tried on Tuya's port 6668), but can be used only once tinytuya is installed.
+   Plugs, bulbs and other smart-home gadgets use Smart Life too, so a Smart Life row may not
+   be lights at all: those rows are never ticked by themselves, so tick only your lights.
+   To check a row, open each device in the Smart Life app, tap the pencil, then **Device
+   Information**, and compare its IP address. A simple test for any lights: if the Smart
+   Life app can find and control them, they're Tuya, and House Lights can use them.
    - **Expecting more?** **Deep scan, 30 s** keeps asking for up to half a minute. Govee
      controllers ignore many requests (often three in four), so a quick scan can miss them;
      asking again finds them. **Add by address** asks one address as every kind and adds
