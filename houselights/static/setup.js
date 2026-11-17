@@ -878,7 +878,7 @@ function drawPlace() {
 function showTz() {
   const v = $("#tz").value.trim();
   $("#tz-show").textContent = v || "UTC";
-  $("#tz-src").textContent = v && v === browserTz() ? "(from this device)" : "";
+  $("#tz-src").textContent = v && v === browserTz() ? "From this device ·" : "";
 }
 function readPlace() {
   W.cfg.timezone = $("#tz").value.trim() || "UTC";
@@ -895,7 +895,7 @@ const clock = hm => { const [h, m] = hm.split(":").map(Number); return new Date(
 let sunSeq = 0;
 async function sunLine() {
   const lat = $("#lat").value, lon = $("#lon").value, tz = $("#tz").value.trim() || "UTC", msg = $("#sun-msg"), seq = ++sunSeq;
-  if (lat === "" || lon === "") { msg.textContent = ""; msg.className = "note"; return; }
+  if (lat === "" || lon === "") { msg.textContent = "Type your ZIP code and press Look up to see today's sunrise and sunset. Leave it empty to use clock times only."; msg.className = "note"; return; }
   try {
     const s = await api(`/api/setup/sun?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&tz=${encodeURIComponent(tz)}`);
     if (seq !== sunSeq) return;
@@ -906,8 +906,8 @@ async function sunLine() {
       msg.textContent = `That time zone doesn't look right for ${zip}: ${s.sunset ? `sunset would be at ${clock(s.sunset)}` : `noon would be at ${clock(s.noon)}`}. Pick a different one?`;
       $("#tz-edit").hidden = false;
     } else {
-      msg.className = "note ok-line";
-      msg.textContent = s.sunrise && s.sunset ? `${here} ${clock(s.sunrise)}, sunset ${clock(s.sunset)} today.`
+      msg.className = "sunline";
+      msg.textContent = s.sunrise && s.sunset ? `☀ ${here} ${clock(s.sunrise)} · sunset ${clock(s.sunset)} today`
         : "The sun doesn't rise or set there today.";
     }
   } catch (e) { if (seq === sunSeq) { msg.className = "note warn"; msg.textContent = e.message; } }
@@ -1035,7 +1035,7 @@ async function go(step, keepTests = false) {
     li.className = (s === step ? "on" : s < step ? "done" : "") + (W.jump ? " jump" : "");
   });
   $("#prev").hidden = step === 0;
-  $("#next").textContent = step === STEPS - 1 ? "Save and start" : "Next";
+  $("#next").textContent = step === STEPS - 1 ? "Go live" : "Next";
   if (step === 0) { drawTiles(); drawFound(); drawKinds(); }
   if (step === 1) { startNaming(); drawName(true); }
   if (step === 2) { if (!keepTests || !W.t) startTests(); drawTest(); }

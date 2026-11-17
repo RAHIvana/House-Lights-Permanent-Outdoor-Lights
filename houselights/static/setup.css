@@ -133,3 +133,23 @@ button.swatch::before { content: ""; display: inline-block; width: 12px; height:
 @media (max-width: 700px) { .n-fields { grid-template-columns: minmax(0, 1fr); } }
 /* inputs inside the grey test box: a shade lighter, so they show */
 .testrun input[type=number], .testrun input[type=text], .testrun select { background: var(--panel); border-color: var(--muted); }
+
+/* step 4 (Sun clock): one card each for the time zone, sunrise and sunset, and the mode */
+.pcards { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pcard { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel2); padding: 12px 14px;
+  display: grid; gap: 8px; align-content: start; min-width: 0; }
+.pcard h3 { margin: 0; font-size: 15px; }
+.pcard.wide { grid-column: 1 / -1; }
+.pcard input[type=text], .pcard input[type=number], .pcard select { background: var(--panel); border-color: var(--muted); }
+.pbig { margin: 0; font-size: 18px; font-weight: 600; }
+.sunline { margin: 0; font-size: 16px; font-weight: 600; color: var(--green); }
+.modes { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mcard { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--panel); color: var(--fg); cursor: pointer; font-size: 15px; }
+.mcard span { display: grid; }
+.mcard small { color: var(--muted); font-size: 12px; }
+.mcard input { width: 18px; height: 18px; accent-color: var(--amber); }
+.mcard:has(input:checked) { border: 1.5px solid var(--amber); background: var(--tab-on); color: var(--tab-on-ink); }
+.mcard:has(input:checked) small { color: var(--tab-on-ink); }
+.wiz .navrow button { padding: 8px 18px; font-size: 15px; }
+@media (max-width: 700px) { .pcards, .modes { grid-template-columns: minmax(0, 1fr); } }

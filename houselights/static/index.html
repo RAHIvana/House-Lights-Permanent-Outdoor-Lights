@@ -5,19 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>House Lights</title>
 <script>try { const t = localStorage.getItem("hl-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
-<link rel="stylesheet" href="style.css?v=14">
+<link rel="stylesheet" href="style.css?v=15">
 <link rel="stylesheet" href="themes.css?v=13">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icon-192.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="icon-192.png" sizes="192x192">
 <link rel="apple-touch-icon" href="icon-192.png">
-<meta name="theme-color" content="#2b2e33">
+<meta name="theme-color" content="#1c2541">
 <meta name="mobile-web-app-capable" content="yes">
 </head>
 <body>
 <header class="topbar">
-  <h1><span class="bulb" aria-hidden="true"></span>House Lights</h1>
+  <h1><svg class="bulb" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h1m8 -9v1m8 8h1m-15.4 -6.4l.7 .7m12.1 -.7l-.7 .7"/><path d="M9 16a5 5 0 1 1 6 0a3.5 3.5 0 0 0 -1 3a2 2 0 0 1 -4 0a3.5 3.5 0 0 0 -1 -3"/><path d="M9.7 17l4.6 0"/></svg>House Lights</h1>
   <span class="spacer"></span>
-  <button id="refresh" class="small" title="Re-read the controllers' status"><span aria-hidden="true">⟳</span><span class="wide"> Refresh status</span></button>
+  <button id="refresh" class="small" title="Re-read the controllers' status"><span aria-hidden="true">⟳</span> Refresh</button>
   <div class="daynight" role="group" aria-label="Light or dark page">
     <button id="th-light" title="Light page"><span aria-hidden="true">☀</span><span class="wide"> Light</span></button><button id="th-dark" title="Dark page"><span aria-hidden="true">☾</span><span class="wide"> Dark</span></button>
   </div>

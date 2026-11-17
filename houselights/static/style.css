@@ -38,7 +38,8 @@ h2 { font-size: 18px; margin: 0; }
   margin: 0 calc(-1 * var(--gutter-r)) 14px calc(-1 * var(--gutter)); background: var(--band); color: var(--band-fg); }
 .topbar h1 { font-size: 19px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; }
 .topbar h1 small { font-size: 13px; font-weight: 400; opacity: .8; }
-.bulb { width: 14px; height: 14px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+/* the logo: an amber bulb (icon.svg is the same bulb, for the browser tab and home screen) */
+.topbar .bulb { width: 24px; height: 24px; color: var(--amber); flex: none; }
 .topbar button, .topbar a.button { background: transparent; color: var(--band-fg); border-color: rgba(247, 231, 198, .35); }
 .topbar button:hover:not(:disabled), .topbar a.button:hover { border-color: var(--band-fg); }
 .daynight { display: inline-flex; border: 1px solid var(--amber); border-radius: 8px; overflow: hidden; }
