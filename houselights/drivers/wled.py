@@ -5,9 +5,13 @@ Following the WLED docs (kno.wled.ge, JSON API and UDP realtime):
 - POST /json/state: "on", "bri" (1-255), "seg": [{"id": 0, "col": [[r, g, b]]}] for a solid
   colour, and per-light colours with "i" ([start, "RRGGBB", "RRGGBB", ...], at most 256
   colours per call). Per-light colours stay until the effect changes or the light turns off.
-- Animated themes stream over UDP port 21324 as DNRGB packets (protocol 4: start index, then
-  r, g, b per light, at most 489 per packet). Byte 1 is a timeout: WLED goes back to its
-  normal look that many seconds after the last packet.
+- Animated themes stream over UDP as DNRGB packets (protocol 4: start index, then r, g, b per
+  light, at most 489 per packet) to the port the controller lists as "udpport" in /json/info
+  (21324 unless changed). Byte 1 is a timeout: WLED goes back to its normal look that many
+  seconds after the last packet, and at once when it is 0 (that is how a stream is released).
+  WLED ignores a DNRGB packet that carries exactly one light (its receiver wants more than 7
+  bytes): a lone light goes as DRGB (protocol 2), and a lone light at the end of a long frame is
+  moved into the packet before it. Checked against wled00/udp.cpp (main branch, 2026-11).
 Tested only against tools/fake_wled.py so far, not a real WLED controller.
 """
 import json
@@ -31,6 +35,7 @@ MODELS = {"WLED": {"label": "WLED controller", "lights_per_segment": 1, "max_lig
 HTTP_PORT, UDP_PORT = (int(p) for p in os.environ.get("HOUSELIGHTS_WLED_PORTS", "80,21324").split(","))
 TIMEOUT_S = 2                     # realtime timeout byte: back to normal 2 s after the last frame
 PER_PACKET = 489                  # DNRGB limit
+RELEASE = bytes([4, 0, 0, 0])     # timeout 0: leave realtime mode at once
 PER_CALL = 256                    # "i" colours per JSON call
 
 
@@ -97,12 +102,26 @@ def _hex(c):
     return "%02X%02X%02X" % tuple(c[:3])
 
 
+def _chunks(n):
+    """How many lights go in each DNRGB packet: 489 at most, and never a last packet of one light
+    (WLED ignores that), so a lone light at the end moves into the packet before it (488 + 2)."""
+    full, rest = divmod(n, PER_PACKET)
+    if rest == 1 and full:
+        return [PER_PACKET] * (full - 1) + [PER_PACKET - 1, 2]
+    return [PER_PACKET] * full + ([rest] if rest else [])
+
+
 def dnrgb_packets(colors, timeout=TIMEOUT_S):
-    """UDP realtime frames: [4, timeout, start_hi, start_lo, r, g, b, ...] per 489 lights."""
-    out = []
-    for start in range(0, len(colors), PER_PACKET):
-        chunk = colors[start:start + PER_PACKET]
+    """UDP realtime frames: [4, timeout, start_hi, start_lo, r, g, b, ...] per 489 lights. One light
+    in all goes as DRGB: [2, timeout, r, g, b]."""
+    n = len(colors)
+    if n == 1:
+        return [bytes([2, timeout]) + bytes(colors[0][:3])]
+    out, start = [], 0
+    for size in _chunks(n):
+        chunk = colors[start:start + size]
         out.append(bytes([4, timeout, start >> 8, start & 0xFF]) + b"".join(bytes(c[:3]) for c in chunk))
+        start += size
     return out
 
 
@@ -120,6 +139,25 @@ class Kit(BaseKit):
     def __init__(self, controller, live):
         super().__init__(controller, live)
         self.udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._port = None             # this controller's realtime UDP port, read from /json/info
+        self._owned = False           # a realtime session we started and still have to release
+
+    def udp_port(self):
+        """The controller's own realtime port ("udpport" in /json/info), read once per stream. Falls back
+        to the default (or the simulator's port) when it can't be read or isn't a port number."""
+        if self._port is None:
+            port = UDP_PORT
+            if self.live:
+                try:
+                    p = net.http_json(_url(self.c.ip, "/json/info"), timeout=1.5).get("udpport")
+                    if isinstance(p, int) and not isinstance(p, bool) and 1 <= p <= 65535:
+                        port = p
+                    elif p is not None:
+                        log.warning("%s WLED reports UDP port %r: using %d", self.tag, p, UDP_PORT)
+                except Exception as e:                        # noqa: BLE001
+                    log.warning("%s WLED: couldn't read its UDP port (%s): using %d", self.tag, e, UDP_PORT)
+            self._port = port
+        return self._port
 
     def _post(self, body, what=None):
         self.guard()
@@ -160,11 +198,24 @@ class Kit(BaseKit):
 
     def stream_begin(self):
         self.guard()
+        self._port = None             # read the port again for every stream
+        self.udp_port()
 
     def stream_frame(self, colors):
+        self.guard()
         if self.live:
+            port = self.udp_port()
+            self._owned = True
             for pkt in dnrgb_packets(colors):
-                self.udp.sendto(pkt, (self.c.ip, UDP_PORT))
+                self.udp.sendto(pkt, (self.c.ip, port))
 
     def stream_end(self):
-        pass                      # WLED returns to its normal look TIMEOUT_S after the last frame
+        """Leave realtime mode at once (a packet with timeout 0) rather than 2 seconds after the last
+        frame, so a theme or Off that follows isn't shown over the old animation. Only a session this kit
+        started; if the server dies instead, WLED's own timeout still brings the lights back."""
+        if self._owned and self.live:
+            try:
+                self.udp.sendto(RELEASE, (self.c.ip, self.udp_port()))
+            except OSError as e:
+                log.warning("%s WLED: couldn't release realtime mode (%s)", self.tag, e)
+        self._owned = False

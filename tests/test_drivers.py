@@ -8,6 +8,7 @@ addresses, so not macOS).
 """
 import importlib.util
 import json
+import logging
 import os
 import socket
 import subprocess
@@ -119,8 +120,9 @@ s.start("diya_glow", {}, 100)
 time.sleep(0.6)
 check("WLED streaming: realtime mode", fw[0].live and fw[0].packets > 3)
 s.stop()
-time.sleep(2.4)
-check("WLED back to normal 2 s after the last frame", not fw[0].live and fw[0].shown()[10] == [10, 0, 245])
+time.sleep(0.2)
+check("WLED: stopping the stream releases realtime mode at once, back to the normal look",
+      not fw[0].live and fw[0].released >= 1 and fw[0].shown()[10] == [10, 0, 245])
 k2 = drivers.make_kit(Controller("w2", "wled", "WLED", "127.0.0.22", "", True), live=True)
 k2.stream_frame([(7, 7, 7)] * 600)
 time.sleep(0.2)
@@ -129,6 +131,133 @@ kd = drivers.make_kit(Controller("w1", "wled", "WLED", "127.0.0.21", "", True), 
 before = fw[0].posts
 kd.color((1, 2, 3))
 check("WLED dry mode sends nothing", fw[0].posts == before)
+
+
+# WLED packets, checked by a receiver written from WLED's own rules (wled00/udp.cpp), not from our encoder
+def wled_receiver(packets, n):
+    """What WLED shows after these packets: DRGB (2) applies pixels if the packet is longer than 4 bytes,
+    DNRGB (4) if longer than 7; timeout 0 applies nothing; at most 1472 bytes per packet."""
+    shown = [None] * n
+    for p in packets:
+        if len(p) > 1472:
+            return None
+        if len(p) < 2 or p[0] not in (2, 4) or p[1] == 0:
+            continue
+        if p[0] == 2 and len(p) > 4:
+            start, first = 0, 2
+        elif p[0] == 4 and len(p) > 7:
+            start, first = (p[2] << 8) + p[3], 4
+        else:
+            continue
+        for j, i in enumerate(range(first, len(p) - 2, 3)):
+            if start + j < n:
+                shown[start + j] = tuple(p[i:i + 3])
+    return shown
+
+
+def wled_frame(n):
+    return [(i % 256, (i // 256) % 256, 7) for i in range(n)]
+
+
+lost = [n for n in (1, 2, 3, 488, 489, 490, 491, 978, 979, 980, 1468, 1500)
+        if wled_receiver(wled.dnrgb_packets(wled_frame(n)), n) != wled_frame(n)]
+check(f"WLED packets: every light arrives, for 1 to 1500 lights (lost: {lost})", not lost)
+check("WLED packets: a lone light goes as DRGB, and 490 lights are 488 + 2",
+      wled.dnrgb_packets([(9, 8, 7)]) == [bytes([2, 2, 9, 8, 7])]
+      and [(len(p) - 4) // 3 for p in wled.dnrgb_packets(wled_frame(490))] == [488, 2])
+check("WLED receiver model: a one-light DNRGB packet (7 bytes) is ignored, as in the firmware",
+      wled_receiver([bytes([4, 2, 0, 0, 1, 2, 3])], 1) == [None])
+k2.stream_frame(wled_frame(490))
+k.stream_frame([(5, 6, 7)])
+time.sleep(0.3)
+check("WLED simulator: 490 lights including the last two, and a one-light frame, arrive",
+      [tuple(c) for c in fw[1].live_frame[:490]] == wled_frame(490) and fw[0].live_frame[0] == [5, 6, 7])
+time.sleep(2.4)
+check("WLED: a sender that vanishes without releasing: back to normal after the 2 s timeout",
+      not fw[1].live and not fw[0].live)
+
+
+class FakeUdp:
+    def __init__(self):
+        self.sent = []
+
+    def sendto(self, pkt, addr):
+        self.sent.append((bytes(pkt), addr))
+
+
+def wled_kit(info, ip="127.0.0.51", live=True, enabled=True):
+    """A kit whose /json/info is `info` (a dict, or a function of the URL) and whose UDP socket records."""
+    net.http_json = lambda url, body=None, timeout=3.0: info(url) if callable(info) else info
+    kk = drivers.make_kit(Controller("wp", "wled", "WLED", ip, "", enabled), live=live)
+    kk.udp = FakeUdp()
+    return kk
+
+
+def refuse(url):
+    raise OSError("no route")
+
+
+real_http = net.http_json
+logging.disable(logging.CRITICAL)             # the driver logs the odd ports below; the checks look at what it did
+try:
+    kk = wled_kit({"udpport": 12345})
+    kk.stream_begin()
+    kk.stream_frame([(1, 2, 3)] * 3)
+    kk.stream_end()
+    sent = kk.udp.sent
+    check("WLED: frames and the release go to the controller's own port, the release last",
+          len(sent) == 2 and {a for _, a in sent} == {("127.0.0.51", 12345)} and sent[0][0][0] == 4
+          and sent[1][0] == wled.RELEASE)
+    kk.stream_end()
+    check("WLED: releasing twice sends nothing more", len(kk.udp.sent) == 2)
+    check("WLED: no release for a session this kit didn't start", wled_kit({"udpport": 12345}).udp.sent == [])
+
+    two = lambda url: {"udpport": 12345 if "127.0.0.51" in url else 23456}      # noqa: E731
+    ka, kb = wled_kit(two, "127.0.0.51"), wled_kit(two, "127.0.0.52")
+    ka.stream_frame([(1, 1, 1)] * 2)
+    kb.stream_frame([(1, 1, 1)] * 2)
+    check("WLED: two controllers, two ports", ka.udp.sent[0][1] == ("127.0.0.51", 12345)
+          and kb.udp.sent[0][1] == ("127.0.0.52", 23456))
+
+    ports = []
+    for odd in ({"udpport": 0}, {"udpport": 70000}, {"udpport": -1}, {"udpport": "21324"}, {"udpport": None},
+                {"udpport": True}, {"udpport": 21324.5}, {}, refuse):
+        ko = wled_kit(odd)
+        ko.stream_frame([(1, 1, 1)] * 2)
+        ports.append(ko.udp.sent[0][1][1])
+    check("WLED: a missing, invalid or unreadable port falls back to the default", set(ports) == {wled.UDP_PORT})
+
+    box = {"udpport": 12345}
+    kr = wled_kit(lambda url: dict(box))
+    kr.stream_begin()
+    kr.stream_frame([(1, 1, 1)] * 2)
+    kr.stream_end()
+    box["udpport"] = 23456
+    kr.stream_begin()
+    kr.stream_frame([(1, 1, 1)] * 2)
+    kr.stream_end()
+    check("WLED: the port is read again for every stream", [a[1] for _, a in kr.udp.sent] == [12345, 12345, 23456, 23456])
+
+    asked = []
+    net.http_json = lambda url, body=None, timeout=3.0: asked.append(url) or {}
+    kp = drivers.make_kit(Controller("wp", "wled", "WLED", "127.0.0.51", "", True), live=False)
+    kp.udp = FakeUdp()
+    kp.stream_begin()
+    kp.stream_frame([(1, 1, 1)] * 2)
+    kp.stream_end()
+    check("WLED dry mode: no UDP and no HTTP while streaming", kp.udp.sent == [] and asked == [])
+
+    kx = wled_kit({"udpport": 12345}, enabled=False)
+    try:
+        kx.stream_frame([(1, 1, 1)] * 2)
+        blocked = False
+    except drivers.NotAllowed:
+        blocked = True
+    kx.stream_end()
+    check("WLED: a disabled controller gets no frames and no release", blocked and kx.udp.sent == [])
+finally:
+    net.http_json = real_http
+    logging.disable(logging.NOTSET)
 
 # --- JellyFish ------------------------------------------------------------------------------------
 pal, b = jellyfish.blocks([(255, 0, 0)] * 5 + [(255, 255, 255)] * 5 + [(0, 0, 255)] * 5)

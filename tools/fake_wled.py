@@ -4,7 +4,9 @@
 
 Devices at 127.0.0.21, 127.0.0.22, ... (Linux and Windows; on macOS use --base 127.0.0.1
 --count 1). Each serves the WLED JSON API (/json/info, /json/state) on HTTP and takes UDP
-realtime packets (DRGB, DNRGB). Real WLED uses port 80 and 21324; port 80 needs admin rights,
+realtime packets (DRGB, DNRGB) by the same rules as the real receiver (wled00/udp.cpp): a DRGB
+packet needs more than 4 bytes, a DNRGB packet more than 7 (so one light by DNRGB is ignored),
+byte 1 is the timeout in seconds (0 leaves realtime mode at once, 255 never times out). Real WLED uses port 80 and 21324; port 80 needs admin rights,
 so the simulator uses other ports and House Lights must be told:
 
     HOUSELIGHTS_WLED_PORTS=18080,21325 python tools/fake_wled.py
@@ -28,7 +30,7 @@ class Device:
         self.leds = [list(self.col) for _ in range(n)]      # what the lights show outside realtime
         self.live_frame, self.live_until = None, 0.0
         self.mac = f"fa1e0000{k:04x}"
-        self.posts, self.packets = 0, 0
+        self.posts, self.packets, self.released = 0, 0, 0
         self.lock = threading.Lock()
 
     @property
@@ -90,21 +92,31 @@ class Device:
             k += 1
 
     def realtime(self, pkt):
+        """The same rules as WLED's receiver (wled00/udp.cpp, handleNotifications): at most 1472 bytes;
+        byte 1 = 0 cancels realtime mode at once; the timeout is set before the pixels are looked at;
+        DRGB (2) applies pixels only if the packet is longer than 4 bytes, DNRGB (4) only if longer
+        than 7; a pixel needs all of its 3 bytes."""
         with self.lock:
+            if len(pkt) < 2 or len(pkt) > 1472 or pkt[0] not in (2, 4):
+                return
             proto, timeout = pkt[0], pkt[1]
-            if proto == 2:
-                start, data = 0, pkt[2:]
-            elif proto == 4:
-                start, data = (pkt[2] << 8) | pkt[3], pkt[4:]
-            else:
+            if timeout == 0:
+                self.live_until = 0.0
+                self.released += 1
                 return
             if self.live_frame is None or not self.live:
                 self.live_frame = [[0, 0, 0] for _ in range(self.n)]       # realtime starts black
-            for j in range(len(data) // 3):
-                if start + j < self.n:
-                    self.live_frame[start + j] = list(data[3 * j:3 * j + 3])
             self.live_until = time.monotonic() + (10 ** 9 if timeout == 255 else timeout)
             self.packets += 1
+            if proto == 2 and len(pkt) > 4:
+                start, first = 0, 2
+            elif proto == 4 and len(pkt) > 7:
+                start, first = (pkt[2] << 8) | pkt[3], 4
+            else:
+                return
+            for k, i in enumerate(range(first, len(pkt) - 2, 3)):
+                if start + k < self.n:
+                    self.live_frame[start + k] = list(pkt[i:i + 3])
 
     def shown(self):
         """What a person would see now."""
