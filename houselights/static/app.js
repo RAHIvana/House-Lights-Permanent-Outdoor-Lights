@@ -736,7 +736,7 @@ function sync() {
     const id = t.dataset.p, on = all.filter(sid => { const s = showing(sid); return s && s.pattern === id; });
     const anim = id !== "warm" && patternById(id).animated;
     t.classList.toggle("on", on.length > 0);
-    $(".tile-st", t).textContent = on.length ? `${anim ? "● Playing on" : "● Showing on"} ${names(on)}` : anim ? "animated" : "static";
+    $(".tile-st", t).textContent = anim ? "animated" : "static";     // what's on shows as the border and tick only
   }
   // On / Off: lit like a picked run. What the controllers report wins; until they all agree,
   // the last press

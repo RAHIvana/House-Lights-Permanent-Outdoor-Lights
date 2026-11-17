@@ -3,8 +3,8 @@
   --bg: #e6e0d4; --panel: #f3efe7; --panel2: #ebe5da; --line: #d2c9b9; --fg: #2b2720; --muted: #6c6457;
   --amber: #e9992a; --amber-ink: #8a4f00; --amber-fill-ink: #23170a; --red: #b83a32; --red-bg: #f6e2dc;
   --green: #2c7f4f; --focus: #2f6fde;
-  /* light strips (Your house, wizard, run panels): light beige here, night grey on the dark page */
-  --night: #d9d2c5; --night-fg: #4f483c; --night-ink: #2b2720; --night-chip: #c9c0b0; --night-line: #a99f8d; --dot-off: #bdb3a2;
+  /* light strips (Your house, wizard, run panels): almost white here, so colours look natural; night grey on the dark page */
+  --night: #fcfbf8; --night-fg: #5a5347; --night-ink: #2b2720; --night-chip: #ece7dd; --night-line: #cfc7b8; --dot-off: #e4dfd5; --dot-edge: rgba(0, 0, 0, .18);
   --dry: #b7791f; --toast: #2b2720; --toast-fg: #f3efe7; --err-bg: #8f2f28;
   --band: #1c2541; --band-fg: #f7e7c6; --tab-on: #fbe7be; --tab-on-ink: #5a3a06; --tab-done: #e2edd6; --tab-done-ink: #2f5410;
   --pick: #2b2720; --pick-ink: #fff;   /* the lit theme tile: 4 px border and a tick badge, charcoal (dark page: bright yellow) */
@@ -17,14 +17,14 @@
   --amber-ink: #ffbe5c; --red: #ff7b72; --red-bg: #4a2b2b; --green: #6fcf97; --focus: #7aa7ff;
   --toast: #e9e6e0; --toast-fg: #2b2e33; --band: #0e1a3a; --tab-on: #4a3510; --tab-on-ink: #fbe0a6;
   --tab-done: #22331a; --tab-done-ink: #b9dc8f; --pick: #ffd400; --pick-ink: #2b2720;
-  --night: #23262b; --night-fg: #b3b6bb; --night-ink: #eceae5; --night-chip: #3a3e45; --night-line: #50555d; --dot-off: #41454c;
+  --night: #23262b; --night-fg: #b3b6bb; --night-ink: #eceae5; --night-chip: #3a3e45; --night-line: #50555d; --dot-off: #41454c; --dot-edge: transparent;
   color-scheme: dark } }
 :root[data-theme="dark"] {
   --bg: #2b2e33; --panel: #34383e; --panel2: #3d4148; --line: #4b5058; --fg: #e9e6e0; --muted: #a6a9ae;
   --amber-ink: #ffbe5c; --red: #ff7b72; --red-bg: #4a2b2b; --green: #6fcf97; --focus: #7aa7ff;
   --toast: #e9e6e0; --toast-fg: #2b2e33; --band: #0e1a3a; --tab-on: #4a3510; --tab-on-ink: #fbe0a6;
   --tab-done: #22331a; --tab-done-ink: #b9dc8f; --pick: #ffd400; --pick-ink: #2b2720;
-  --night: #23262b; --night-fg: #b3b6bb; --night-ink: #eceae5; --night-chip: #3a3e45; --night-line: #50555d; --dot-off: #41454c;
+  --night: #23262b; --night-fg: #b3b6bb; --night-ink: #eceae5; --night-chip: #3a3e45; --night-line: #50555d; --dot-off: #41454c; --dot-edge: transparent;
   color-scheme: dark }
 
 * { box-sizing: border-box; }
@@ -343,3 +343,6 @@ a.button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; align-items: center; }
 @media (max-width: 640px) { .kv { grid-template-columns: 1fr; } }
 .testrun .count { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px; border: 1px dashed var(--line); border-radius: 8px; }
+
+/* a thin edge on every light bar on the light page, so white lights show on the near-white strip */
+.dots i, .testdots i, .sweep-dots i, .light { outline: 1px solid var(--dot-edge); outline-offset: -1px; }
