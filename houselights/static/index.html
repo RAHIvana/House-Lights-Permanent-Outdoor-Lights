@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>House Lights</title>
 <script>try { const t = localStorage.getItem("hl-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=13">
 <link rel="stylesheet" href="themes.css?v=13">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -15,22 +15,24 @@
 </head>
 <body>
 <header class="topbar">
-  <h1>House Lights</h1>
-  <nav class="tabs" role="tablist" aria-label="Pages">
-    <button role="tab" data-tab="quick">Quick Settings</button><button role="tab" data-tab="ctrl">Controllers</button><button role="tab" data-tab="themes">Themes</button><button role="tab" data-tab="settings">Settings</button>
-  </nav>
+  <h1><span class="bulb" aria-hidden="true"></span>House Lights</h1>
   <span class="spacer"></span>
-  <span id="mode" class="pill">…</span>
-  <button id="refresh" class="small" title="Re-read the controllers' status">Refresh status</button>
-  <span class="lbl" id="theme-lbl">Theme</span>
-  <div class="seg-toggle" role="group" aria-labelledby="theme-lbl">
-    <button class="small" id="th-light">☀ Light</button><button class="small" id="th-dark">☾ Dark</button>
+  <button id="refresh" class="small" title="Re-read the controllers' status"><span aria-hidden="true">⟳</span><span class="wide"> Refresh status</span></button>
+  <div class="daynight" role="group" aria-label="Light or dark page">
+    <button id="th-light" title="Light page"><span aria-hidden="true">☀</span><span class="wide"> Light</span></button><button id="th-dark" title="Dark page"><span aria-hidden="true">☾</span><span class="wide"> Dark</span></button>
   </div>
+  <span id="mode" class="pill">…</span>
 </header>
+<nav class="bigtabs" role="tablist" aria-label="Pages">
+  <button role="tab" data-tab="quick"><b>Quick Settings</b><small>Tonight, schedules</small></button>
+  <button role="tab" data-tab="ctrl"><b>Controllers</b><small>Each run and its status</small></button>
+  <button role="tab" data-tab="themes"><b>Themes</b><small>Create and edit</small></button>
+  <button role="tab" data-tab="settings"><b>Settings</b><small>Setup and wizard</small></button>
+</nav>
 <p id="banner" class="banner" hidden></p>
 
 <div class="wrap">
-<!-- tab 1: Quick Settings | Schedules side by side, Visualization below -->
+<!-- tab 1: Quick Settings | Schedules side by side, Your house below -->
 <div class="tab" id="tab-quick">
 <div class="split">
 <section class="panel" id="quick">
@@ -140,7 +142,7 @@
 
 <!-- 3 -->
 <section class="panel" id="viz">
-  <div class="ph"><h2>Visualization</h2><span class="spacer"></span>
+  <div class="ph"><h2>Your house</h2><span class="spacer"></span>
   </div>
   <p class="muted" id="viz-target"></p>
   <div class="viewer">
@@ -159,7 +161,7 @@
     <span class="muted" id="z-lbl"></span>
   </div>
   <div class="row">
-    <label class="lbl">Theme <select id="viz-theme"></select></label>
+    <label class="lbl">Show <select id="viz-theme"></select></label>
     <label class="lbl">Level <input id="viz-level" type="number" min="5" max="100" value="100" step="5">%</label>
     <button id="viz-preview">Preview</button>
     <button id="viz-play" class="live">Play live</button>
@@ -282,7 +284,7 @@
         <button id="th-delete" class="danger">Delete</button>
         <span class="spacer"></span>
         <button id="th-pause" class="small">Pause</button>
-        <button id="th-house">Show in Visualization</button>
+        <button id="th-house">Show on Your house</button>
         <select id="th-target" aria-label="Lights to play on"></select>
         <button id="th-play" class="live">Play live</button>
         <button id="th-stop" class="danger">Stop</button>
@@ -378,8 +380,8 @@
     </div>
   </section>
 </template>
-<script src="app.js?v=13"></script>
+<script src="app.js?v=14"></script>
 <script src="themes.js?v=12"></script>
-<script src="schedules.js?v=12"></script>
+<script src="schedules.js?v=13"></script>
 </body>
 </html>

@@ -115,6 +115,17 @@ const Schedules = (() => {
       $("[data-edit]", li).onclick = () => open(s);
       list.appendChild(li);
     });
+    fitList(list);
+  }
+
+  // Four schedules show at a time; the rest scroll inside the list.
+  const SHOWN = 4;
+  function fitList(list) {
+    list.style.maxHeight = "";
+    const items = list.children;
+    if (items.length <= SHOWN || !list.offsetParent) return;
+    const last = items[SHOWN - 1];
+    list.style.maxHeight = `${last.offsetTop + last.offsetHeight - items[0].offsetTop + 1}px`;
   }
 
   const fmtDate = d => new Date(d + "T12:00").toLocaleDateString([], {month: "short", day: "numeric"});

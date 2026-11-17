@@ -557,6 +557,7 @@ function themesChanged(d) {
   if (typeof syncVizTheme === "function") syncVizTheme();
   sync();
 }
+const TILES_SHOWN = () => 12;      // visible at once: 4 x 3, phones 3 x 4 (style.css)
 function applyCat() {
   let n = 0;
   for (const b of $("#tiles").children) {
@@ -565,7 +566,7 @@ function applyCat() {
     if (show) n++;
   }
   $("#tiles").scrollTop = 0;
-  $("#tiles-more").textContent = n > 9 ? `Showing 9 of ${n} themes. Scroll the tiles for the rest.` : `${n} theme${n === 1 ? "" : "s"}`;
+  $("#tiles-more").textContent = n > TILES_SHOWN() ? `Showing ${TILES_SHOWN()} of ${n} themes. Scroll the tiles for the rest.` : `${n} theme${n === 1 ? "" : "s"}`;
 }
 
 async function quickTheme(id) {
@@ -638,7 +639,7 @@ function buildViz() {
     const label = k => s.lights_per_segment >= 3 ? k + 1 : k * lps + 1;   // segment numbers, or light numbers
     const ticks = Array.from({length: segs}, (_, k) => `<span style="grid-column:span ${Math.min(lps, s.lights - k * lps)}">${label(k)}</span>`).join("");
     const rev = fromRight(s);
-    return `<div class="vrun${rev ? " rev" : ""}"><div class="vl"><span>${esc(s.name)} · ${s.lights} lights${rev ? " · light 1 at the right" : ""}</span><span data-vs="${s.id}"></span></div>
+    return `<div class="vrun${rev ? " rev" : ""}"><div class="vl"><b>${esc(s.name)}</b><span>${s.lights} lights · light 1 ${rev ? "right" : "left"}</span><span data-vs="${s.id}"></span></div>
       <div class="dots" data-n="${s.lights}" data-v="${s.id}">${"<i></i>".repeat(s.lights)}</div>
       <div class="ticks" data-n="${s.lights}">${ticks}</div></div>`;
   }).join("");
@@ -711,7 +712,7 @@ function setTab(t) {
   repaintAll();
 }
 
-// Called by the Themes tab's "Show in Visualization": back to the first tab, preview there.
+// Called by the Themes tab's "Show on Your house": back to the first tab, preview there.
 // runs: {section id: preview data} (several for a whole-house theme); label: the theme's name.
 function showInViz(runs, label) {
   const t0 = performance.now() / 1000;
@@ -854,7 +855,7 @@ async function init() {
   const saved = store.get("hl-targets");
   TARGETS = new Set(saved !== null ? saved.split(",").filter(id => SEC[id] && SEC[id].enabled) : enabledIds());
   const pill = $("#mode");
-  pill.textContent = CONFIG.mode === "live" ? "LIVE" : "DRY RUN";
+  pill.textContent = CONFIG.mode === "live" ? "Live" : "Practice";
   pill.className = "pill " + CONFIG.mode;
   if (CONFIG.mode === "dry") {
     const b = $("#banner");
