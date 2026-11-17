@@ -13,37 +13,43 @@ Run it on a computer you already have (**Windows**, **Mac** or Linux) or on a
 **Raspberry Pi 3 or newer**, on the same home network as the lights. Leave it running for
 schedules to work; any phone or computer on that network can open the dashboard.
 
-## Make your house the one people stop to look at
+## A theme for every holiday and every night
 
-**106 built-in themes, 82 of them animated light by light.** Every light gets its own color,
-15 times a second: a comet races the whole roofline, snow streaks past the windows, fireworks
-go off over the garage. Pick one in two taps, or schedule it from sunset to bedtime.
+**106 built-in themes** for every occasion: Christmas, Thanksgiving, Halloween, the 4th of July,
+Diwali and the other Hindu festivals, birthdays, school spirit, everyday looks and more.
+**82 are animated light by light**: every light gets its own color, 15 times a second, so a
+comet can race the whole roofline, snow can streak past the windows and fireworks can go off
+over the garage. Pick one in two taps, or schedule it from sunset to bedtime.
 
 > ### [**See all 106 themes, moving →**](docs/themes.md)
 > Every theme drawn as a strip of lights, animated, by holiday. Pictures are made by the same
 > code that plays them on your house.
 
-**New for the holidays:**
+**Make your own.** Nothing is locked. In the dashboard's **Themes** tab, open any built-in
+theme, change its colors, speed and size, and save it as yours, or build one from scratch from
+movements (chase, twinkle, fireworks, drift, flicker and more), up to three layers, a shape
+(direction, mirror, whole house) and sequences of themes that fade into each other. Take
+colors from a palette, from one color or from a photo. Your themes work everywhere a built-in
+one does (Quick Settings, schedules) and can be exported as a file to share. [How it works.](#themes)
 
-- **Animated-fast** (28 themes): fast, showy motion for any night, to stand out on your
-  street. Racing comets, marquee bulbs, color wipes, dance beats, fireworks finales, and
-  red, white and blue ones for the USA.
+**In season now:**
+
+- **Christmas** (19 themes): reindeer dash, blizzard, northern lights, peppermint twist,
+  jingle beat.
 - **Thanksgiving** (12 themes): leaf storms, harvest fireworks, a turkey trot, a cozy
   fireplace.
-- **Christmas** (19 themes): reindeer dash, blizzard, jingle beat, peppermint twist, northern
-  lights.
+- **Animated-fast** (28 themes): for the nights you want to stand out. Racing comets, marquee
+  bulbs, color wipes, dance beats, fireworks finales. Most are also in their holiday's group.
 
 | Theme | On 48 lights |
 |---|---|
-| **Neon racers** (Animated-fast) | <img src="docs/themes/neon_racers.png" alt="Neon racers" width="436"> |
 | **Reindeer dash** (Christmas) | <img src="docs/themes/reindeer_dash.png" alt="Reindeer dash" width="436"> |
-| **Blizzard** (Christmas) | <img src="docs/themes/blizzard.png" alt="Blizzard" width="436"> |
 | **Leaf storm** (Thanksgiving) | <img src="docs/themes/leaf_storm.png" alt="Leaf storm" width="436"> |
-| **Harvest fireworks** (Thanksgiving) | <img src="docs/themes/harvest_fireworks.png" alt="Harvest fireworks" width="436"> |
-| **Christmas marquee** (Animated-fast) | <img src="docs/themes/christmas_marquee.png" alt="Christmas marquee" width="436"> |
+| **Witch's brew** (Halloween) | <img src="docs/themes/witch_brew.png" alt="Witch's brew" width="436"> |
+| **Rangoli chase** (Diwali) | <img src="docs/themes/rangoli_chase.png" alt="Rangoli chase" width="436"> |
+| **Patriot racers** (USA) | <img src="docs/themes/patriot_racers.png" alt="Patriot racers" width="436"> |
+| **Neon racers** (Animated-fast) | <img src="docs/themes/neon_racers.png" alt="Neon racers" width="436"> |
 
-Also Diwali and Hindu festivals, Halloween, July 4th and other US holidays, birthdays, school
-spirit and everyday looks, and you can [make your own themes](#themes) in the dashboard.
 Light-by-light animation works on **Govee H806A** (tested on real lights) and **WLED**; see
 [Supported controllers](#supported-controllers) for what each kind can do.
 [Full theme gallery](docs/themes.md).
@@ -54,7 +60,7 @@ Light-by-light animation works on **Govee H806A** (tested on real lights) and **
   birthdays, other US holidays, Halloween, school spirit, Diwali and Hindu festivals, India,
   everyday looks. [See them all.](docs/themes.md)
 - Quick Settings with theme tiles, **Your house** (one row per run, drawn to scale), a panel
-  per run, a Themes tab to make your own, and Schedules. A light and a dark page; works on a
+  per run, a Themes tab to change a theme or make your own, and Schedules. A light and a dark page; works on a
   phone.
 - A setup wizard on first start: it finds your controllers, blinks each one so you can name
   it, helps you count the lights, and saves your settings.

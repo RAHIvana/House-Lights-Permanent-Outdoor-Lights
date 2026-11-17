@@ -1,17 +1,23 @@
 # House Lights themes
 
-**106 built-in themes**, 82 of them animated light by light, and you can
-[make your own](../README.md#themes). Every picture on this page is drawn by the same code that
-plays the theme on your house: 48 lights, one bar per light.
+**106 built-in themes** for every occasion, 82 of them animated light by light, and
+you can change any of them or make your own. Every picture on this page is drawn by the same
+code that plays the theme on your house: 48 lights, one bar per light.
 
-The apps that come with the lights show a handful of scenes. House Lights plays every light on
-its own, 15 times a second, so a comet can race the whole roofline, snow can drift past the
-windows and fireworks can go off over the garage. Pick a theme on the dashboard's **Quick
-Settings** tab, or put it on a schedule (sunset to 11 pm, say) and it starts by itself.
+House Lights plays every light on its own, 15 times a second, so a comet can race the whole
+roofline, snow can drift past the windows and fireworks can go off over the garage. Pick a theme
+on the dashboard's **Quick Settings** tab, or put it on a schedule (sunset to 11 pm, say) and it
+starts by itself.
 
-**New for the holidays:** the **[Animated-fast](#animated-fast)** group (28 fast, showy themes
-to stand out on your street), 12 themes for **[Thanksgiving](#thanksgiving)** and
-19 for **[Christmas](#christmas)**.
+**Make your own.** In the dashboard's **Themes** tab, open any theme below, change its colors,
+speed and size and save it as yours, or build one from scratch from movements, layers and
+sequences, with colors from a palette, one color or a photo. Yours work everywhere a built-in
+theme does (Quick Settings, schedules) and can be exported as a file to share.
+[How it works.](../README.md#themes)
+
+**In season now:** **[Christmas](#christmas)** (19 themes), **[Thanksgiving](#thanksgiving)**
+(12), and **[Animated-fast](#animated-fast)** (28): fast, showy motion for any
+night. Most fast themes are in their holiday's group too.
 
 Jump to: [Animated-fast](#animated-fast) · [Christmas](#christmas) · [Thanksgiving](#thanksgiving) · [USA](#usa) · [Celebration](#celebration) · [More US holidays](#more-us-holidays) · [Halloween](#halloween) · [School spirit](#school-spirit) · [Diwali](#diwali) · [Hindu festivals](#hindu-festivals) · [India](#india) · [Everyday](#everyday)
 
@@ -24,7 +30,6 @@ Good to know:
 - Animated themes play while the dashboard is running; still themes stay on the lights.
 - Fast means fast movement, not strobing: the beat themes pulse about twice a second, and no theme
   flashes the whole house more than 3 times a second (a test checks it).
-- Any theme can be changed (colors, speed, size) and saved as your own in the **Themes** tab.
 
 ## Animated-fast
 

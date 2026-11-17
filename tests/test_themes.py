@@ -235,7 +235,8 @@ with open(os.path.join(G.ROOT, "README.md"), encoding="utf-8") as f:
     readme = f.read()
 n_anim = sum(1 for v in P.PATTERNS.values() if v.get("animated"))
 check("the README links the themes page and has the right counts",
-      "docs/themes.md" in readme and f"**{len(P.PATTERNS)} built-in themes, {n_anim} of them animated" in readme
+      "docs/themes.md" in readme and f"**{len(P.PATTERNS)} built-in themes**" in readme
+      and f"**{n_anim} are animated light by light**" in readme and "Themes** tab" in readme
       and f"**Animated-fast** ({len(by(P.FAST))} themes)" in readme
       and f"**Thanksgiving** ({len(by('Thanksgiving'))} themes)" in readme
       and f"**Christmas** ({len(by('Christmas'))} themes)" in readme)
