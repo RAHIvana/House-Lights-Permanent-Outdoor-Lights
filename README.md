@@ -7,7 +7,7 @@ open-source **WLED** controllers (see [Supported controllers](#supported-control
 Play animated themes light by light, apply
 static themes, schedule them by clock time or sunrise/sunset, and make your own themes. No
 cloud account and no app login: it talks to the light controllers directly over your home
-network.
+network. Free for personal and other noncommercial use (see [License](#license)).
 
 Run it on a computer you already have (**Windows**, **Mac** or Linux) or on a
 **Raspberry Pi 3 or newer**, on the same home network as the lights. Leave it running for
@@ -453,6 +453,12 @@ light-by-light animation. Today everything works locally, without a cloud accoun
 
 ## License
 
-MIT, see `LICENSE`. The logo is adapted from the Tabler Icons "bulb" (MIT), see
+**PolyForm Noncommercial License 1.0.0**, see [LICENSE](LICENSE). You may use, change and
+share House Lights for any noncommercial purpose: at home for your own house, for hobby and
+study, and by schools, charities and government bodies. Anything else, such as using it in a
+business or for paying customers, needs the author's permission: open an issue to ask. This is
+a source-available license, not an open-source one.
+
+The logo is adapted from the Tabler Icons "bulb" (MIT), see
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). This project is not affiliated with or
 endorsed by Govee, WLED, JellyFish Lighting or Tuya.
