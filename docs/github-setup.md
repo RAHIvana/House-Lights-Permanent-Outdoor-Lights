@@ -44,7 +44,7 @@ and the descriptor are both in the address. (The clone commands put the code in 
   `README_Raspberry.md` (one place), and the local remote. Still to use it: the Website link in the About
   box and the tests badge, both below.
 
-- [ ] Tagline chosen: ______
+- [x] Tagline chosen: tagline 1, "House Lights: themes and schedules for permanent outdoor lights" (it is the start of the About text)
 - [x] Repository renamed to `House-Lights-Permanent-Outdoor-Lights`
 - [x] README clone commands, Raspberry Pi guide and local remote updated
 
@@ -145,8 +145,8 @@ file was pushed with the last commit. What can stop it is the repository's Actio
 
 ### Checking the first run
 
-- [ ] Open the **Actions** tab, then **tests**, then the latest run. Both jobs, `test (3.10)` and
-  `test (3.13)`, should be green.
+- [x] Open the **Actions** tab, then **tests**, then the latest run. Both jobs, `test (3.10)` and
+  `test (3.13)`, should be green. (Run 3, for `fa16576`, 2026-11-17: green on both.)
 - If one is red: open it, expand the red step and read the last lines. Python 3.10 is the likeliest culprit,
   because it was only checked by searching for newer features, never run. Fix, push, or press **Re-run failed
   jobs**. **Do this before going public:** run logs become public with the repository.
@@ -234,7 +234,8 @@ Open the repository in a private or incognito window where you are signed out:
 ## 8. Later, if you want
 
 - GitHub **Releases** from the existing tags (`v2_0`, `v2_1`). The tag style is yours to choose.
-- A `dependabot.yml` that keeps the GitHub Actions versions fresh.
+- A `dependabot.yml` that keeps the GitHub Actions versions fresh. Meanwhile the runs warn that `checkout@v4`
+  and `setup-python@v5` use an old Node.js version; `checkout@v5` and `setup-python@v6` remove the warning.
 - A Developer Certificate of Origin line in `CONTRIBUTING.md` (you have the web sign-off setting on) and,
   if you ever want to offer commercial licenses, contributors' agreement to that.
 - A Code of Conduct and a pull request template (the Community standards page lists both).
