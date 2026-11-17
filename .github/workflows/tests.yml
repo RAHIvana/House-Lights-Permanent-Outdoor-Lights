@@ -28,3 +28,4 @@ jobs:
       - run: python tests/test_schedule.py
       - run: python tests/test_themes.py
       - run: python tests/test_drivers.py
+      - run: python tests/test_security.py

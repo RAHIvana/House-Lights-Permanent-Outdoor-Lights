@@ -218,7 +218,7 @@ can run it again later from the **Settings** tab (**Change setup**).
 1. **Scout** (find your lights): press **Find my lights**. House Lights asks every controller on
    your network what it is (Govee, WLED, JellyFish and Tuya / Smart Life at once); asking
    changes nothing on the lights. If your lights are on another network section than this
-   computer, type it in **Where to look** first (like `192.168.2.0/24`, or one address).
+   computer, type it in **Where to look** first (like `192.168.2.0/24`, or one address; only home addresses are accepted).
    Each kind shows how many it found, then one list: tick **Use** for the controllers to
    use (found ones are ticked). A JellyFish controller shows one line per zone; each zone
    becomes its own run. Govee models other than the H806A show what they can do ("basic
@@ -399,6 +399,12 @@ delete, the schedule reports an error until you pick another theme.
 
 - **No login.** Anyone who can open the page can control the lights. Keep it on your home
   network and don't forward the port to the internet.
+  House Lights also refuses what a web page on another site could try through your browser:
+  it answers only to IP addresses, `localhost` and names on your own network (like
+  `pi.local`), so a made-up name pointed at your computer gets nothing, and changes must come
+  from its own page. To reach it through another name (a reverse proxy, say), start it with
+  `HOUSELIGHTS_ALLOWED_HOSTS=name1,name2` set. Apart from the wizard's ZIP lookup, it only
+  talks to addresses on your own network (192.168.x.x, 10.x.x.x, 172.16 to 172.31.x.x).
 - Your files in `data/`: `config.json` (settings), `secrets.json` (Tuya keys, if any),
   `schedules.json`, `themes.json` (your themes), `state.json` (what was last applied) and
   `logs/`. Back up this folder to keep your setup.
@@ -425,6 +431,7 @@ venv/bin/python tests/test_setup.py         # wizard helpers; the ZIP lookup is 
 venv/bin/python tests/test_schedule.py
 venv/bin/python tests/test_themes.py       # theme engine, storage, whole-house span
 venv/bin/python tests/test_drivers.py      # Linux and Windows: uses 127.0.0.x addresses
+venv/bin/python tests/test_security.py     # Host and Origin checks, headers, home addresses, escaped names
 ```
 
 On Windows use `venv\Scripts\python tests\test_settings.py` and so on.

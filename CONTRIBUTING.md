@@ -26,6 +26,7 @@ venv/bin/python tests/test_setup.py
 venv/bin/python tests/test_schedule.py
 venv/bin/python tests/test_themes.py
 venv/bin/python tests/test_drivers.py
+venv/bin/python tests/test_security.py
 ```
 
 Ground rules:
