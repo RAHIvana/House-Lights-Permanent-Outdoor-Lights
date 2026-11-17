@@ -141,7 +141,7 @@ gv = next(d for d in sw["drivers"] if d["type"] == "govee")
 check("wizard state: per-model limits, tiers and tests (also for a basic model in the config)",
       gv["max_lights"]["H706B"] == 255 and gv["max_lights"]["H7060"] == 3000
       and gv["model_info"]["H7060"]["tier"] == "basic" and gv["model_info"]["H7060"]["tests"] == ["identify"]
-      and "markers" in gv["model_info"]["H706B"]["tests"] and "segments" not in gv["model_info"]["H706B"]["tests"]
+      and "ends" in gv["model_info"]["H706B"]["tests"] and "segments" not in gv["model_info"]["H706B"]["tests"]
       and gv["tiers"]["basic"]["tests"] == ["identify"] and "segments" in gv["tests"])
 os.remove(settings.path("config.json"))
 

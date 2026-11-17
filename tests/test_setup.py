@@ -259,52 +259,89 @@ check("tuya scan with tinytuya: a typed address is usable once the id and key ar
       rows[0]["supported"] and rows[0]["needs_key"] and rows[0]["device_id"] == "")
 
 # --- Blink: 1 s on, 1 s off ---
-check("blink: on in the first second", setup._identify(3, 0.5) == [setup.WHITE] * 3)
-check("blink: off in the second second", setup._identify(3, 1.5) == [setup.OFF] * 3)
-check("blink: on again after 2 s", setup._identify(3, 2.2) == [setup.WHITE] * 3)
+check("blink: on for the first 2 s", setup._identify(3, 0.5) == setup._identify(3, 1.9) == [setup.WHITE] * 3)
+check("blink: off for the next 2 s", setup._identify(3, 2.1) == setup._identify(3, 3.9) == [setup.OFF] * 3)
+check("blink: on again after 4 s", setup._identify(3, 4.2) == [setup.WHITE] * 3)
 
-# --- streams repeat "start streaming" (lost UDP messages) and a test starts once ---
+# --- Govee streams: "start" a few times at the beginning only (a mid-stream "start" flashes
+# the lights), "stop" a few times at the end; a test starts once ---
 import threading as _th  # noqa: E402
-import time as _time  # noqa: E402
+from types import SimpleNamespace as _NS  # noqa: E402
 
 from houselights import stream as _stream  # noqa: E402
+from houselights.drivers import govee as _govee  # noqa: E402
 
 
-class KeepKit:
-    caps, live, tag, prefix, max_stream_lights = {"stream": True}, True, "keep", "LIVE", 255
-    c = FakeC()
+class _Rec:
+    def __init__(self):
+        self.sent = []
+
+    def send(self, ip, cmd, data):
+        self.sent.append(cmd + ":" + data.get("pt", ""))
+
+
+gk = _govee.Kit(_NS(id="g1", ip="192.168.2.20", model="H806A", enabled=True, options={}), True)
+gk.lan = _Rec()
+s = _stream.Streamer(gk, 5, 20)
+s.start_fn("t", lambda t: [(1, 1, 1)] * 5, True, 100, seconds=0.8)
+s._thread.join(5)
+import base64 as _b64  # noqa: E402
+on = "razer:" + _b64.b64encode(_govee.RAZER_ON).decode()
+off = "razer:" + _b64.b64encode(_govee.RAZER_OFF).decode()
+sent = gk.lan.sent
+n_on = sent.count(on)
+check(f"govee stream: start sent {n_on}x, all before the first frame",
+      n_on == 3 and sent[:3] == [on] * 3)
+check("govee stream: stop sent 5x at the end", sent[-5:] == [off] * 5 and sent.count(off) == 5)
+check("govee stream: frames in between", len(sent) - 8 >= 5)
+check("test start is guarded by a lock", isinstance(setup.TEST_LOCK, type(_th.Lock())))
+
+# --- Govee counting: segment colours, the last segment red, then light 1 blue / last red ---
+from houselights import drivers as _drv  # noqa: E402
+
+full = setup.allowed_tests(_drv.model_caps("govee", "H806A"))
+check("Govee H806A counts with segment colours, not markers or orange",
+      {"seg4", "seglast", "ends"} <= set(full) and not {"markers", "tail", "check"} & set(full))
+check("WLED keeps markers / check, no Govee counting",
+      "ends" not in setup.allowed_tests({"stream": True, "count": "manual", "pick": True})
+      and "check" in setup.allowed_tests({"stream": True, "count": "manual", "pick": True}))
+g, w, r_, y = setup.SEG_COLOURS
+s4 = setup._seg4(23, 0, 5)
+check("seg4: green, white, red, yellow per 5 lights, then again",
+      s4[:5] == [g] * 5 and s4[5:10] == [w] * 5 and s4[10:15] == [r_] * 5 and s4[15:20] == [y] * 5 and s4[20:] == [g] * 3)
+sl = setup._seglast(25, 0, 5, 4)
+check("seglast: segments before the last white, the last red, past it blue",
+      sl[:15] == [setup.WHITE] * 15 and sl[15:20] == [setup.RED] * 5 and sl[20:] == [setup.BLUE] * 5)
+en = setup._ends(73, 0)
+check("ends: light 1 blue, the last red, the rest white", en[0] == setup.BLUE and en[-1] == setup.RED
+      and en[1:-1] == [setup.WHITE] * 71 and len(en) == 73)
+check("segment counting: the last colour and its blocks give the segments",
+      all(4 * (blocks - 1) + place == segs for segs, place, blocks in
+          [(24, 4, 6), (10, 2, 3), (15, 3, 4), (1, 1, 1)]))
+
+
+class SegKit:
+    lock = _th.Lock()
 
     def __init__(self):
-        self.calls = []
+        self.sent = []
 
     def guard(self):
         pass
 
-    def stream_begin(self):
-        self.calls.append("begin")
-
-    def stream_frame(self, colors):
-        self.calls.append("frame")
-
-    def stream_keepalive(self):
-        self.calls.append("keep")
-
-    def stream_end(self):
-        self.calls.append("end")
+    def segments(self, segs, rgb, nseg):
+        self.sent.append((tuple(segs), rgb, nseg))
 
 
-old_keep = _stream.KEEPALIVE_S
-_stream.KEEPALIVE_S = 0.1
-try:
-    kk = KeepKit()
-    s = _stream.Streamer(kk, 5, 20)
-    s.start_fn("t", lambda t: [(1, 1, 1)] * 5, True, 100, seconds=0.8)
-    s._thread.join(3)
-    check(f"stream: keepalive repeated ({kk.calls.count('keep')}x)", kk.calls.count("keep") >= 3
-          and kk.calls[0] == "begin" and kk.calls[-1] == "end")
-finally:
-    _stream.KEEPALIVE_S = old_keep
-check("test start is guarded by a lock", isinstance(setup.TEST_LOCK, type(_th.Lock())))
+sk = SegKit()
+setup.SegmentTest(sk, 5, 255, "seg4").show()
+cover = sorted(s for segs, _, _ in sk.sent[::2] for s in segs)
+check(f"seg4 sets every segment the model can have, once per colour, each sent twice ({len(sk.sent)} sends)",
+      cover == list(range(51)) and len(sk.sent) == 8 and sk.sent[0] == sk.sent[1] and sk.sent[0][2] == 51)
+sk = setup.SegmentTest(SegKit(), 5, 255, "seglast", 24)
+grp = dict((rgb, segs) for segs, rgb in sk.groups())
+check("seglast: 23 white, segment 24 red, 25-51 blue", grp[setup.WHITE] == list(range(23))
+      and grp[setup.RED] == [23] and grp[setup.BLUE] == list(range(24, 51)))
 
 print(f"\n{'ALL OK' if not FAILS else f'{len(FAILS)} FAILED'}")
 sys.exit(1 if FAILS else 0)

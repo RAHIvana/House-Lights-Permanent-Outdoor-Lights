@@ -37,10 +37,12 @@ TESTED = True
 
 # What each tier may do (see base.py for the keys). "stream_untested": per-light streaming is
 # allowed but has not been seen working on that model: the page and wizard say "try it".
+# "frame": "stretch": a stream frame of N colours is spread over the whole run in N equal parts
+# (seen on H806A), so a frame has to carry exactly the run's light count to be one per light.
 FULL_CAPS = {"stream": True, "static": "segments", "pick": True, "status": True, "count": "manual",
-             "restore": "auto"}
+             "restore": "auto", "frame": "stretch"}
 TRY_CAPS = {"stream": True, "stream_untested": True, "static": "segments", "pick": False, "status": True,
-            "count": "manual", "restore": "auto"}
+            "count": "manual", "restore": "auto", "frame": "stretch"}
 BASIC_CAPS = dict(ONE_COLOUR_CAPS)        # like a Tuya strip: one colour at a time, put back after a test
 
 # lights_per_segment: how many lights one segment colours, counted from light 1 (0: no
@@ -397,26 +399,26 @@ class Kit(BaseKit):
         if self.live:
             self.lan.send(self.c.ip, "razer", {"pt": base64.b64encode(pkt).decode()})
 
+    def _razer_n(self, pkt, times):
+        for _ in range(times):
+            self._razer(pkt)
+            time.sleep(0.05 if self.live else 0)
+
     def stream_begin(self):
+        """Govee controllers ignore many UDP messages: if "start streaming" is lost, every frame
+        is ignored. So send it a few times, but only here: a "start streaming" in the middle
+        of a stream makes the lights flash (seen on H806A)."""
         self.guard()
         self._need("stream", "play light-by-light themes")
-        self._razer(RAZER_ON)
-        self._razer(RAZER_ON)                 # twice: one is often lost (stream_keepalive repeats it)
+        self._razer_n(RAZER_ON, 3)
 
     def stream_frame(self, colors):
         self._need("stream", "play light-by-light themes")
         self._razer(razer_frame(colors))
 
-    def stream_keepalive(self):
-        """Govee controllers ignore many UDP messages: if the one "start streaming" was lost,
-        every frame is ignored and the lights stay as they were. So repeat it."""
-        self._razer(RAZER_ON)
-
     def stream_end(self):
         self._need("stream", "play light-by-light themes")
-        for _ in range(3):                    # a lost "stop" would leave the last frame showing
-            self._razer(RAZER_OFF)
-            time.sleep(0.05 if self.live else 0)
+        self._razer_n(RAZER_OFF, 5)           # a lost "stop" leaves the last frame showing
 
     # --- tests on models that don't stream: save the state and put it back -----------------
     def snapshot(self):

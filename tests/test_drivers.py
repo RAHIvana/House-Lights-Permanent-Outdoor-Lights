@@ -310,7 +310,7 @@ st.stop()
 check("Govee basic test: shows the colour, then puts the light back",
       shown == {"r": 255, "g": 0, "b": 0} and b["colorTemInKelvin"] == 3000 and b["brightness"] == 70 and b["onOff"] == 1)
 check("Govee tests per model", setup.allowed_tests(drivers.model_caps("govee", "H7060")) == ["identify"]
-      and "markers" in setup.allowed_tests(drivers.model_caps("govee", "H706B"))
+      and "ends" in setup.allowed_tests(drivers.model_caps("govee", "H706B"))
       and "segments" not in setup.allowed_tests(drivers.model_caps("govee", "H706B")))
 
 # --- settings with secrets ------------------------------------------------------------------------
@@ -353,7 +353,8 @@ except ValueError as e:
 check("tests offered per controller", setup.allowed_tests(drivers.caps("tuya")) == ["identify"]
       and setup.allowed_tests(drivers.caps("jellyfish")) == ["identify", "rgb"]
       and "markers" not in setup.allowed_tests(drivers.caps("wled"))
-      and "markers" in setup.allowed_tests(drivers.caps("govee")))
+      and "seg4" in setup.allowed_tests(drivers.caps("govee"))
+      and "markers" not in setup.allowed_tests(drivers.caps("govee")))
 check("kelvin to RGB looks warm", net.kelvin_to_rgb(2200)[0] == 255 and net.kelvin_to_rgb(2200)[2] < 120)
 
 print(f"\n{'ALL OK' if not FAILS else f'{len(FAILS)} FAILED'}")

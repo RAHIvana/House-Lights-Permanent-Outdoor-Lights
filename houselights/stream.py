@@ -11,7 +11,6 @@ import time
 from . import patterns as P
 
 log = logging.getLogger("houselights")
-KEEPALIVE_S = 2.0             # seconds between kit.stream_keepalive() calls while streaming
 
 
 class Streamer:
@@ -66,14 +65,11 @@ class Streamer:
             self.kit.stream_begin()
             time.sleep(0.3)
             t0, period = time.monotonic(), 1 / self.fps
-            next_at, kept = t0, t0
+            next_at = t0
             while not self._stop.is_set():
                 t = time.monotonic() - t0
                 if seconds and t >= seconds:
                     break
-                if time.monotonic() - kept >= KEEPALIVE_S:            # a lost "start streaming" message
-                    self.kit.stream_keepalive()                       # would leave the lights dark
-                    kept = time.monotonic()
                 if animated or static is None:
                     colors = [tuple(round(v * scale) for v in c) for c in render(t)]
                     if not animated:

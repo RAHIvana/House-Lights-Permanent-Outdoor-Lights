@@ -32,7 +32,7 @@ log = logging.getLogger("houselights")
 router = APIRouter(prefix="/api/setup")
 
 TEST_SECONDS = 60
-BLINK_S = 2.0                      # Blink test: one on-off cycle every 2 seconds
+BLINK_S = 4.0                      # Blink test: one on-off cycle every 4 seconds
 DEEP_SECONDS = 30                  # longest deep scan (Govee: keeps asking silent addresses)
 TESTS = {}                    # (ip, zone) -> Streamer playing a test
 TEST_LOCK = threading.Lock()  # one test start at a time (the stop of the old one, then the new)
@@ -49,7 +49,7 @@ ZIP_TIMEOUT = 5
 
 # --- test patterns: fn(n, t) -> [rgb] * n, in the run's own light order ---------------------
 def _identify(n, t):
-    """The whole run blinks white: 1 s on, 1 s off, so it is easy to spot. Which run is this?"""
+    """The whole run blinks white: 2 s on, 2 s off, so it is easy to spot. Which run is this?"""
     return [WHITE if (t % BLINK_S) < BLINK_S / 2 else OFF] * n
 
 
@@ -128,14 +128,44 @@ def _tail(n, t, lps=5, markers=1):
     return [DIM_WHITE if i < edge else RED for i in range(n)]
 
 
-# Counting tests send a full frame whatever the light count; reverse doesn't apply to them.
+# Counting on controllers that stretch a stream frame over the whole run (caps frame "stretch",
+# Govee): the stream can't count, so the count uses the segment command (fixed groups of
+# lights_per_segment from light 1), like the Govee app. Seen working on three H806A.
+SEG_COLOURS = (GREEN, WHITE, RED, (255, 180, 0))       # green, white, red, yellow, again
+SEG_NAMES = ("green", "white", "red", "yellow")
+
+
+def _seg4(n, t, lps=5):
+    """Count step A: segment k shows SEG_COLOURS[k % 4]. The last colour and how many blocks of
+    it give the segments: 4 x (blocks - 1) + place of the colour (green 1 ... yellow 4)."""
+    return [SEG_COLOURS[(i // lps) % 4] for i in range(n)]
+
+
+def _seglast(n, t, lps=5, segments=1):
+    """Count step B: segments before the last white, the last red, any after it blue (then the
+    segment count was too low). Red lights + lps x (segments - 1) = the count."""
+    return [WHITE if i // lps < segments - 1 else RED if i // lps == segments - 1 else BLUE for i in range(n)]
+
+
+def _ends(n, t):
+    """Count step C (one colour per light only when n is the real count): light 1 blue, the
+    last light red, the rest white. Each a single light: the count is right; blue is light 1."""
+    return [BLUE] + [WHITE] * (n - 2) + [RED] if n >= 2 else [BLUE] * n
+
+
+# Counting tests send a frame whatever the light count; reverse doesn't apply to them.
 COUNTING = {"markers", "tail"}
+# Shown with the segment command, not streamed.
+SEGMENT_TESTS = {"seg4", "seglast"}
 # Tests about where light 1 really is: never reversed.
-PHYSICAL = COUNTING | {"check"}
+PHYSICAL = COUNTING | SEGMENT_TESTS | {"check", "ends"}
 
 PATTERNS = {"identify": ("Blink the whole run", _identify, True),
             "markers": ("Count: segment markers", _markers, False),
             "tail": ("Count: last segment", _tail, False),
+            "seg4": ("Count: segment colours", _seg4, False),
+            "seglast": ("Count: last segment red", _seglast, False),
+            "ends": ("Check: light 1 blue, last light red", _ends, False),
             "check": ("Check the count and light 1", _check, False),
             "ruler": ("Check the count", _ruler, False),
             "chase": ("Direction: dot from light 1", _chase, True),
@@ -151,17 +181,24 @@ def allowed_tests(caps):
         names = ["identify", "rgb"]
     else:
         names = ["identify"]
+    stretch = caps.get("frame") == "stretch"
+    if stretch:                                  # markers and orange past the end need one colour per light
+        names = [n for n in names if n not in COUNTING | {"check"}]
+    else:
+        names = [n for n in names if n != "ends"]
+    if not (stretch and caps.get("pick")):       # segment counting: the segment command (Govee "full")
+        names = [n for n in names if n not in SEGMENT_TESTS]
     if caps.get("count") != "manual":
-        names = [n for n in names if n not in COUNTING]
+        names = [n for n in names if n not in COUNTING | SEGMENT_TESTS]
     if not caps.get("pick"):                     # no segments to show (e.g. Govee "try" models)
         names = [n for n in names if n != "segments"]
     return names
 
 
 def _frame(name, lights, max_lights):
-    """How many lights a test sends: counting tests the most the model takes, "check" the
-    count plus EXTRA (orange), others the count."""
-    if name in COUNTING:
+    """How many lights a test shows: counting tests the most the model takes, "check" the count
+    plus EXTRA (orange), others the count."""
+    if name in COUNTING or name in SEGMENT_TESTS:
         return max_lights
     if name == "check":
         return min(lights + EXTRA, max_lights)
@@ -171,6 +208,10 @@ def _frame(name, lights, max_lights):
 def _pattern(name, n, t, lps=5, markers=1, slow_fps=None, lights=None):
     if name == "identify" and slow_fps:
         return _identify_slow(n, t, slow_fps)
+    if name == "seg4":
+        return _seg4(n, t, lps)
+    if name == "seglast":
+        return _seglast(n, t, lps, markers)
     if name == "check":
         return _check(n, t, lights)
     if name == "segments":
@@ -552,20 +593,53 @@ def test(body: dict):
         old = TESTS.pop(where, None)
         if old:
             old.stop()
-        st = Streamer(kit, lights, 15)
+        st = SegmentTest(kit, lps, model["max_lights"], name, markers) if name in SEGMENT_TESTS else Streamer(kit, lights, 15)
         try:
             if not slow:
                 switch_on(drv, kit, where)
-            st.start_fn(f"test:{name}", render, animated, 100, seconds=TEST_SECONDS, slow_ok=True)
+            if name in SEGMENT_TESTS:
+                st.show()
+            else:
+                st.start_fn(f"test:{name}", render, animated, 100, seconds=TEST_SECONDS, slow_ok=True)
         except (ValueError, drivers.NotAllowed) as e:
             raise HTTPException(400, str(e))
         except OSError as e:
             raise HTTPException(502, f"couldn't reach the controller: {e}")
         TESTS[where] = st
     log.info("setup test %s on %s (%d lights%s)", name, kit.tag, lights, ", reversed" if reverse else "")
-    return {"ok": True, "live": kit.live, "label": label, "seconds": TEST_SECONDS, "lights_per_segment": lps,
+    return {"ok": True, "live": kit.live, "label": label, "seconds": 0 if name in SEGMENT_TESTS else TEST_SECONDS, "stays": name in SEGMENT_TESTS, "lights_per_segment": lps,
             "frame_lights": lights, "restore": caps.get("restore"), "slow": slow, "tier": model.get("tier"),
             "stream_untested": bool(caps.get("stream_untested")) and not slow}
+
+
+class SegmentTest:
+    """A counting test shown with the segment command (seg4, seglast): every segment the model
+    can have is set, so no colour from an earlier test is left over. It stays on the lights
+    until the next test or a theme; stop() has nothing to stop."""
+
+    def __init__(self, kit, lps, max_lights, name, segments=1):
+        self.kit, self.name, self.segments = kit, name, max(1, int(segments))
+        self.lps = max(1, int(lps))
+        self.nseg = -(-max_lights // self.lps)
+
+    def groups(self):
+        """[(segments, rgb)]: which segments get which colour."""
+        every = range(self.nseg)
+        if self.name == "seg4":
+            return [([s for s in every if s % 4 == k], rgb) for k, rgb in enumerate(SEG_COLOURS)]
+        last = min(self.segments, self.nseg) - 1
+        return [(list(range(last)), WHITE), ([last], RED), (list(range(last + 1, self.nseg)), BLUE)]
+
+    def show(self):
+        self.kit.guard()
+        with self.kit.lock:
+            for segs, rgb in self.groups():
+                for _ in range(2):                # twice: Govee controllers drop many messages
+                    if segs:
+                        self.kit.segments(segs, rgb, self.nseg)
+
+    def stop(self):
+        pass
 
 
 def switch_on(drv, kit, where):
@@ -644,8 +718,9 @@ def preview(body: dict):
     drv = drivers.get(c.get("type", "govee"))
     model = (drivers.model_info(c.get("type", "govee"), c.get("model")) if drv else None) or {}
     lps = model.get("lights_per_segment") or 5
+    caps = model.get("caps") or (drv.Kit.CAPS if drv else {})
     frame = _frame(name, lights, model.get("max_lights") or 3000) if name == "check" else None
-    slow = drv and not (model.get("caps") or drv.Kit.CAPS).get("stream")
+    slow = drv and not caps.get("stream")
     if slow and name == "identify":
         fps = drv.Kit.slow_fps
         frames = [[f"#{r:02x}{g:02x}{b:02x}" for r, g, b in _identify_slow(lights, k / 2, fps)] for k in range(8)]

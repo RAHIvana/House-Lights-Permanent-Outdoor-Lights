@@ -16,6 +16,8 @@ Capabilities (CAPS) tell the dashboard and the setup wizard what a controller ca
            put back its state), "none" (can't: the wizard says so)
   stream_untested  (optional) streaming is allowed but not yet seen working on this model:
            the page and the wizard say "try it"
+  frame    (optional) "stretch": a stream frame of N colours is spread over the whole run, in N
+           equal parts (Govee). The wizard counts such runs with "blocks" and "alternate".
 
 CAPS can differ per model of one driver (e.g. Govee): ask drivers.model_caps(kind, model) or
 a kit's .caps, not Kit.CAPS, for one controller.
@@ -98,10 +100,6 @@ class Kit:
 
     def stream_frame(self, colors):
         raise NotImplementedError
-
-    def stream_keepalive(self):
-        """Called every few seconds while streaming: repeat whatever stream_begin() sent that a
-        controller might have missed (UDP can be lost). Nothing by default."""
 
     def stream_end(self):
         raise NotImplementedError
