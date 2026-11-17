@@ -1,0 +1,65 @@
+name: My controller works / doesn't
+description: Tell us how your lights behaved, so the model can be marked as tested
+title: "Controller report: "
+labels: [controller-report]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        House Lights is tested on real Govee H806A controllers only. Every other model and brand
+        is marked "to try" or "not tested yet" in the [README](../blob/main/README.md#supported-controllers)
+        until someone reports how it went. A short report helps a lot, **whether it worked or not**.
+
+        **Before you paste anything**, remove IP addresses, device IDs, MAC addresses and Tuya
+        local keys.
+  - type: dropdown
+    id: result
+    attributes:
+      label: How did it go?
+      options:
+        - Everything worked
+        - Some things worked
+        - It didn't work
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of controller
+      options:
+        - Govee
+        - WLED
+        - JellyFish
+        - Tuya / Smart Life
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model number and product name
+      description: For example H706A "Permanent Outdoor Lights Pro". The Govee Home app shows the model.
+    validations:
+      required: true
+  - type: input
+    id: lights
+    attributes:
+      label: Number of lights on the run
+  - type: checkboxes
+    id: worked
+    attributes:
+      label: What worked
+      options:
+        - label: The wizard found it (or "Add by address" did)
+        - label: The counting test showed light 1 red and the last light blue
+        - label: A still theme (bands of color)
+        - label: An animated theme played light by light
+        - label: On, off and brightness
+        - label: A schedule switched it on and off
+  - type: textarea
+    id: details
+    attributes:
+      label: What you saw
+      description: Anything odd (flashing, wrong colors, delays, lights that stay lit), and what the wizard's counting test looked like.
+    validations:
+      required: true

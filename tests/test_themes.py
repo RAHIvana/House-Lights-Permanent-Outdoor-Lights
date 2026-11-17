@@ -221,11 +221,30 @@ check("no theme flashes the whole house more than 3 times a second", not [k for 
 docs = os.path.join(G.ROOT, "docs")
 with open(os.path.join(docs, "themes.md"), encoding="utf-8") as f:
     check("docs/themes.md is up to date (run tools/make_theme_gallery.py)", f.read() == G.page())
+import struct  # noqa: E402
+import zlib  # noqa: E402
+
+
+def picture_rows(data):
+    """The uncompressed rows of every frame in a PNG from the gallery tool. (The compressed bytes can
+    differ between computers with another zlib; the picture can't.)"""
+    pos, rows = 8, []
+    while pos < len(data):
+        n, kind = struct.unpack(">I4s", data[pos:pos + 8])
+        body = data[pos + 8:pos + 8 + n]
+        if kind == b"IDAT":
+            rows.append(zlib.decompress(body))
+        elif kind == b"fdAT":
+            rows.append(zlib.decompress(body[4:]))
+        pos += 12 + n
+    return rows
+
+
 stale = []
 for pid in P.PATTERNS:
     try:
         with open(os.path.join(G.PICS, f"{pid}.png"), "rb") as f:
-            if f.read() != G.png(*G.frames_of(pid)):
+            if picture_rows(f.read()) != [G.scanlines(c) for c in G.frames_of(pid)[0]]:
                 stale.append(pid)
     except FileNotFoundError:
         stale.append(pid)

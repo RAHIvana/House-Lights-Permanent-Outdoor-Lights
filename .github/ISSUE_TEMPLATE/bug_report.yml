@@ -1,0 +1,68 @@
+name: Bug report
+description: Something in House Lights doesn't work the way it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting it. **Before you paste anything**, remove your lights' IP addresses,
+        device IDs, MAC addresses, Tuya local keys and your location. The log file
+        (`data/logs/houselights.log`) contains addresses.
+
+        Security problem? Please don't post it here: see [SECURITY.md](../blob/main/SECURITY.md).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did and what you saw.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to repeat it
+      description: The steps, or the theme and settings you used.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of controller
+      options:
+        - Govee
+        - WLED
+        - JellyFish
+        - Tuya / Smart Life
+        - Other, or none (the page itself)
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Controller model
+      description: For example H806A, or the name on the box.
+  - type: dropdown
+    id: os
+    attributes:
+      label: Runs on
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Raspberry Pi
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Run `git log -1 --format=%h` in the House Lights folder, and `python --version`.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log lines (optional, with addresses and keys removed)
+      render: shell
