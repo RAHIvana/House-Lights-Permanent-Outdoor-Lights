@@ -64,6 +64,7 @@ const lanHex = lan => lan.colorTemInKelvin ? kelvinToHex(num(lan.colorTemInKelvi
 
 // A theme that isn't in the list (an unsaved one from the Themes tab, or one deleted since)
 // still gets a usable entry, so nothing breaks on it.
+const FAST_CAT = "Animated-fast";      // the category (patterns.py FAST) whose tiles say "animated-fast"
 const patternById = id => CONFIG.patterns.find(p => p.id === id)
   || {id, label: id === "_draft" ? "Unsaved theme" : `${id} (deleted)`, animated: true, params: {}, categories: [],
       group: "", face: "", describe: id === "_draft" ? "A theme being edited in the Themes tab." : "This theme no longer exists."};
@@ -741,9 +742,10 @@ function sync() {
   // tiles stay lit while a run plays (animated) or shows (static) that theme
   for (const t of document.querySelectorAll(".tile")) {
     const id = t.dataset.p, on = all.filter(sid => { const s = showing(sid); return s && s.pattern === id; });
-    const anim = id !== "warm" && patternById(id).animated;
+    const p = id === "warm" ? null : patternById(id);
     t.classList.toggle("on", on.length > 0);
-    $(".tile-st", t).textContent = anim ? "animated" : "static";     // what's on shows as the border and tick only
+    // what's on shows as the border and tick only; the fast themes say so
+    $(".tile-st", t).textContent = !p || !p.animated ? "static" : (p.categories || []).includes(FAST_CAT) ? "animated-fast" : "animated";
   }
   // On / Off: lit like a picked run. What the controllers report wins; until they all agree,
   // the last press

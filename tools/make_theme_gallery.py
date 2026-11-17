@@ -165,7 +165,7 @@ def page():
             lines += [SECTION_NOTE[cat], ""]
         lines += [f"{len(rows)} themes.", "", "| Theme | On 48 lights | What you see |", "|---|---|---|"]
         for pid, v in rows:
-            kind = "animated, fast" if P.FAST in v["cats"] else "animated" if v.get("animated") else "still"
+            kind = "animated-fast" if P.FAST in v["cats"] else "animated" if v.get("animated") else "still"
             pick = "" if v.get("tile", True) else "<br>pick your colors"
             lines.append(f'| **{v["label"]}**<br>{kind}{pick} | <img src="themes/{pid}.png" width="{WIDTH}" '
                          f'height="{HEIGHT}" alt="{v["label"]}"> | {blurb(pid, v)} |')
