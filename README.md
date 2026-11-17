@@ -15,10 +15,11 @@ schedules to work; any phone or computer on that network can open the dashboard.
 
 - 79 built-in themes: everyday, Diwali and Hindu festivals, Christmas, Halloween,
   Thanksgiving, US holidays, celebrations and birthdays, school spirit.
-- Quick Settings with theme tiles, a Visualization of every run, a panel per run, a Themes tab
-  to make your own, and Schedules. Light and dark page themes; works on a phone.
-- A setup wizard on first start: it finds your controllers, helps you count the lights,
-  plays test patterns, and saves your settings.
+- Quick Settings with theme tiles, **Your house** (one row per run, drawn to scale), a panel
+  per run, a Themes tab to make your own, and Schedules. A light and a dark page; works on a
+  phone.
+- A setup wizard on first start: it finds your controllers, blinks each one so you can name
+  it, helps you count the lights, and saves your settings.
 
 ## Supported controllers
 
@@ -52,8 +53,8 @@ step by step:
 | H3A51, H3A52, H3A53 | Permanent Outdoor Lights 2 Pro | Basic control (LAN Control not confirmed); light-by-light animation to try |
 | Any other Govee model with LAN Control (floodlights, spotlights, path, string and wall lights) | | One colour at a time |
 
-"To try": the wizard's **Check** test (red first, blue last) shows at once whether your model
-plays light by light. If it does, please report the model so it can be marked as tested.
+"To try": the wizard's last counting test (light 1 blue, the last light red) shows at once
+whether your model plays light by light. If it does, please report the model so it can be marked as tested.
 Model numbers and names come from Govee's site and community lists; check your box or the
 Govee Home app for yours.
 
@@ -167,7 +168,7 @@ python -m houselights [--home DIR] [--host HOST] [--port PORT] [--dry]
 The first time you open the page there are no settings yet, so the setup wizard opens. You
 can run it again later from the **Settings** tab (**Change setup**).
 
-1. **Find your lights**: press **Find my lights**. House Lights asks every controller on
+1. **Scout** (find your lights): press **Find my lights**. House Lights asks every controller on
    your network what it is (Govee, WLED, JellyFish and Tuya / Smart Life at once); asking
    changes nothing on the lights. If your lights are on another network section than this
    computer, type it in **Where to look** first (like `192.168.2.0/24`, or one address).
@@ -191,42 +192,48 @@ can run it again later from the **Settings** tab (**Change setup**).
      if it finds fewer than the number you picked, it runs a deep scan by itself.
    Other brands (Oelo, Trimlight, Gemstone, Eufy and more) have no local control House
    Lights can use; see the brand list above.
-2. **Name and count**: one card per run. Give it a name and a short name, the number of
-   lights if you know it (WLED and JellyFish report theirs; leave it blank if you don't
-   know: the Test step helps you count), and which end light 1 is at, as you face the
-   lights. Runs can be installed left to right or right to left; "Light 1 is at" lets each
-   one still show the right way round. Put the runs in order along the house, left to
-   right, with ▲ and ▼: themes that play across the whole house use this order.
-3. **Test**: one controller at a time ("Controller 2 of 3: Garage"):
-   - **Find it**: the run blinks. Did the run you expected blink? If another one did, pick
-     it and the names swap. If nothing blinked, the wizard lists what to check.
-   - **Count** (Govee): every segment's first light lights up red or green, and you type how
-     many of those markers you see. Then the last segment lights up red, and you type how
-     many red lights you see. The wizard works out the count, like `5 × 14 + 3 = 73`. You
-     can also type the number from the Govee Home app.
-   - **Check** (Govee and WLED): light 1 red, the last light blue, plus 20 orange lights past
-     the end. Say whether red is on the left or the right (can't tell? a dot runs from light
-     1). Orange after the blue means the count is too low: type how many and it checks
-     again. No blue at all means the count is too high.
+2. **Spotlight** (blink and name): one controller at a time. It blinks (white for 2 seconds,
+   dark for 2 seconds) as soon as it comes up, so you can go and see which lights it is.
+   Then name them, with a short name for buttons, and pick their place along the house,
+   left to right as you stand in front of it. The page draws your house in that order, and
+   patterns that play across the whole house travel from one end to the other. **Nothing
+   blinked** lists what to check.
+3. **Tally** (count the lights): one run at a time, by name.
+   - **Govee** counts like the Govee Home app, in groups of 5 lights (segments):
+     - **A**: the groups light up green, white, red, yellow, then again. Say the colour of
+       the last block and how many blocks of that colour you see: the wizard works out the
+       groups, like `4 × (6 − 1) + 4 = 24`.
+     - **B**: every group is white and only the last is red. Type how many red lights you
+       see: `5 × 23 + 5 = 120` lights. Blue after the red means a colour was miscounted.
+     - **C**: light 1 is blue and the last light red. Each should be a single light (if not,
+       count again); say which end is blue, and that end is light 1.
+     A light past the end that never changes isn't driven by the controller: Govee drives as
+     many lights as it is set up for in the Govee Home app. You can also type the number
+     from the app.
+   - **WLED**: light 1 red, the last light blue, plus 20 orange lights past the end. Say
+     whether red is on the left or the right (can't tell? a dot runs from light 1). Orange
+     after the blue means the count is too low; no blue at all means it's too high.
    - **Done**: a summary like "Garage: 50 lights, light 1 at the right end".
 
-   JellyFish, Tuya and basic Govee models only blink. **More tests** has the extra patterns (colours, segment
-   groups). Tests stop by themselves after a minute. Govee and WLED go back to what they
-   showed; Tuya lights are saved before the test and put back afterwards. JellyFish can't
-   report what it showed, so after testing pick a theme or use the JellyFish app.
-4. **Time and place**: the time zone comes from this device (**Change** to pick another).
-   For sunrise/sunset schedules, type your ZIP code and press **Look up** (it asks
+   JellyFish, Tuya and basic Govee models can't show single lights: type the count and pick
+   which end light 1 is at. **More tests** has the extra patterns (colours, segment groups).
+   Streamed tests stop by themselves after a minute; the Govee counting colours stay until
+   the next test or theme. Govee and WLED go back to what they showed; Tuya lights are saved
+   before the test and put back afterwards. JellyFish can't report what it showed, so after
+   testing pick a theme or use the JellyFish app.
+4. **Sun clock** (time and place): the time zone comes from this device (**Change** to pick
+   another). For sunrise/sunset schedules, type your ZIP code and press **Look up** (it asks
    zippopotam.us); the wizard shows today's sunrise and sunset, and warns if the time zone
    doesn't fit the place. You can also use this device's location or type latitude and
    longitude.
-5. **Save**: a table of the runs, with links to change or count each one. Every run needs
-   its number of lights. Settings go to `data/config.json` and the server restarts with
-   them.
+5. **Go live** (save and start): a table of the runs, with links to rename or count each one.
+   Every run needs its number of lights. Settings go to `data/config.json` and the server
+   restarts with them.
 
 With saved settings, every step at the top of the wizard can be clicked. Links:
-`setup.html?step=test&controller=<controller id>` tests just that controller, and
-`setup.html?step=place` opens Time and place (also `find`, `name`, `save`, or the step's
-number, 1 to 5).
+`setup.html?step=count&controller=<controller id>` counts just that controller (`step=test`
+works too), and `setup.html?step=place` opens Sun clock (also `find`, `name`, `save`, or the
+step's number, 1 to 5).
 
 ## Getting each kind of controller ready
 
@@ -313,7 +320,7 @@ an amber button.
 
 - **Make one**: press **New theme**, or open a built-in theme and change it. Built-in themes
   never change: **Save** on one makes a copy in My themes. Your themes appear everywhere a
-  theme is picked: Quick Settings tiles, schedules, the Visualization and the Controllers tab.
+  theme is picked: Quick Settings tiles, schedules, Your house and the Controllers tab.
 - **Movement**: Bands, Gradient, Solid, Random (still), Chase, Twinkle, Drift, Fireworks,
   Swirl, Flow, Steps, Beat, Breathe, Heartbeat, Flicker (candle, failing bulb, lightning or
   fire), Candles and Game day, each with its colors and settings. A built-in theme can be a
@@ -350,7 +357,7 @@ delete, the schedule reports an error until you pick another theme.
   its right end is drawn from the right, so an animation moves across the screen the same way
   it moves on the house. At **Fit**, the longest run fills the width and the others are drawn
   to scale.
-- **Settings tab**: each run's **Test** button opens the wizard's test step for just that
+- **Settings tab**: each run's **Test** button opens the wizard's counting step for just that
   controller, and **Change ZIP / time zone** opens the time-and-place step.
 - **Server clock**: the Schedules panel shows the server's time next to today's sunrise and
   sunset. Schedules run on the server's clock, so if it is more than two minutes off from

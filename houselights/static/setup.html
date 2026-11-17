@@ -5,28 +5,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>House Lights setup</title>
 <script>try { const t = localStorage.getItem("hl-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
-<link rel="stylesheet" href="style.css?v=12">
-<link rel="stylesheet" href="setup.css?v=4">
+<link rel="stylesheet" href="style.css?v=13">
+<link rel="stylesheet" href="setup.css?v=8">
 <link rel="icon" href="icon-192.png">
 <meta name="theme-color" content="#2b2e33">
 </head>
 <body>
 <header class="topbar">
-  <h1>House Lights setup</h1>
+  <h1><span class="bulb" aria-hidden="true"></span>House Lights <small>setup</small></h1>
   <span class="spacer"></span>
-  <span id="mode" class="pill">…</span>
-  <span class="lbl" id="theme-lbl">Theme</span>
-  <div class="seg-toggle" role="group" aria-labelledby="theme-lbl">
-    <button class="small" id="th-light">☀ Light</button><button class="small" id="th-dark">☾ Dark</button>
+  <a class="button small" id="back" href="./" hidden>Dashboard</a>
+  <div class="daynight" role="group" aria-label="Light or dark page">
+    <button id="th-light" title="Light page"><span aria-hidden="true">☀</span><span class="wide"> Light</span></button><button id="th-dark" title="Dark page"><span aria-hidden="true">☾</span><span class="wide"> Dark</span></button>
   </div>
-  <a class="button" id="back" href="./" hidden>Back to the dashboard</a>
+  <span id="mode" class="pill">…</span>
 </header>
 <p id="banner" class="banner" hidden></p>
 
 <div class="wiz">
-  <ol class="steps" id="steps">
-    <li data-step="0">1 Find your lights</li><li data-step="1">2 Name and count</li>
-    <li data-step="2">3 Test</li><li data-step="3">4 Time and place</li><li data-step="4">5 Save</li>
+  <ol class="bigtabs steps" id="steps">
+    <li data-step="0"><b>1 Scout</b><small>Find your lights</small></li>
+    <li data-step="1"><b>2 Spotlight</b><small>Blink and name</small></li>
+    <li data-step="2"><b>3 Tally</b><small>Count the lights</small></li>
+    <li data-step="3"><b>4 Sun clock</b><small>Time and place</small></li>
+    <li data-step="4"><b>5 Go live</b><small>Save and start</small></li>
   </ol>
 
   <!-- 1: find your lights (every kind at once) -->
@@ -55,23 +57,23 @@
     </details>
   </section>
 
-  <!-- 2: runs -->
+  <!-- 2: Spotlight: each controller blinks, then you name it -->
   <section class="panel" data-page="1" hidden>
-    <div class="ph"><h2>Name and count each run</h2></div>
-    <div class="intro">
-      <p class="muted">A run is the string of lights on one controller (or one JellyFish zone).</p>
-      <p class="muted">If you don't know how many lights you have, leave it blank: the Test step helps you count them.</p>
-      <p class="muted">Some runs may be installed left to right and others right to left. "Light 1 is at" lets every
-        run still show the right way round on the dashboard.</p>
-      <p class="muted">Put the runs in order along the house, left to right as you face it, with ▲ and ▼.
-        Themes that play across the whole house use this order.</p>
+    <div class="ph"><h2>Name your lights</h2></div>
+    <p class="muted">Each controller blinks in turn: white for 2 seconds, dark for 2 seconds. Go and see which
+      lights blink, then name them.</p>
+    <div class="testrun" id="n-one">
+      <div class="row"><b id="n-title"></b><span class="muted" id="n-sub"></span></div>
+      <div class="testdots" id="n-dots" hidden></div>
+      <p class="note" id="n-status"></p>
+      <div id="n-body" class="tbody"></div>
+      <div class="row" id="n-nav"></div>
     </div>
-    <div id="runs" class="runcards"></div>
   </section>
 
   <!-- 3: test -->
   <section class="panel" data-page="2" hidden>
-    <div class="ph"><h2>Test each run</h2></div>
+    <div class="ph"><h2>Count each run</h2></div>
     <p class="muted" id="test-intro"></p>
     <div class="testrun" id="t-one">
       <div class="row"><b id="t-title"></b><span class="muted" id="t-sub"></span></div>
@@ -137,6 +139,6 @@
     <button id="next" class="primary">Next</button>
   </div>
 </div>
-<script src="setup.js?v=17"></script>
+<script src="setup.js?v=21"></script>
 </body>
 </html>

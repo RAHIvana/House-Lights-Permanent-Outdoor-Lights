@@ -1,10 +1,11 @@
 "use strict";
-// Setup wizard: find the controllers (every kind at once), name and count the runs, test them
-// one controller at a time, set the time zone and location, then save config.json (the server
+// Setup wizard: 1 Scout (find the controllers, every kind at once), 2 Spotlight (each one
+// blinks, then you name it and place it along the house), 3 Tally (count each run and find
+// light 1), 4 Sun clock (time zone and location), 5 Go live (save config.json; the server
 // restarts with it).
-// Deep links: setup.html?step=test&controller=<id> tests only that controller; ?step=place opens
-// at "Time and place" (find, name, test, place, save, or the step's number 1 to 5). With a saved
-// config, every step at the top can be clicked.
+// Deep links: setup.html?step=count&controller=<id> counts only that controller (step=test
+// too); ?step=place opens at Sun clock (find, name, count, place, save, or the step's number
+// 1 to 5). With a saved config, every step at the top can be clicked.
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
 // A file in the settings folder, written with the server's separator (backslashes on Windows).
@@ -23,7 +24,8 @@ const W = {step: 0, info: null, cfg: null, found: [], counts: {}, testing: {}, a
 const MAX_COUNT = 12;                      // "How many controllers?" choices; 0 = not sure
 const STEPS = 5;
 // Steps by name, for links: setup.html?step=test&controller=<id>, ?step=place
-const STEP_NAMES = ["find", "name", "test", "place", "save"];
+const STEP_NAMES = ["find", "name", "count", "place", "save"];
+const STEP_ALIAS = {test: "count"};          // older links
 const KINDS = ["govee", "wled", "jellyfish", "tuya"];
 const KIND_NAME = {govee: "Govee", wled: "WLED", jellyfish: "JellyFish", tuya: "Tuya / Smart Life"};
 // Govee models differ (tiers): full = everything, nothing to say.
@@ -96,8 +98,9 @@ const sameSpot = (a, b) => a.type === b.type && a.ip === b.ip && (a.zone || "") 
 const spotKey = d => `${d.type}|${d.ip}|${d.zone || ""}`;
 const hasLights = r => Number(r.lights) >= 1;
 const lpsOf = c => modelInfo(c.type, c.model)?.lights_per_segment ?? drv(c.type).lights_per_segment?.[c.model] ?? 0;
-const canCount = c => testsOf(c).includes("markers") && lpsOf(c) > 0;   // Govee with segments: count with markers
-const canCheck = c => testsOf(c).includes("check");         // Govee, WLED: red / blue / orange
+const segCount = c => testsOf(c).includes("seg4");            // Govee: count with segment colours
+const canCount = c => segCount(c) || (testsOf(c).includes("markers") && lpsOf(c) > 0);   // or segment markers
+const canCheck = c => testsOf(c).includes("check") || testsOf(c).includes("ends");   // light 1 can be shown
 const ipNum = ip => ip.split(".").reduce((a, n) => a * 256 + Number(n), 0);
 function ctrlId(row) {
   const base = `${row.type}-${row.ip}${row.zone ? "-" + row.zone : ""}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 32);
@@ -417,80 +420,115 @@ async function lookAgain(t, card) {
   } finally { stop(); busy(false); }
 }
 
-// --- step 2: name and count (one card per run, in order along the house) --------------------------
-function drawRuns() {
-  const box = $("#runs");
-  box.innerHTML = "";
-  W.cfg.runs.forEach((r, i) => {
-    const c = ctrlOf(r.controller);
-    if (!c) return;
-    const caps = capsOf(c), card = el("div", "runcard");
-    card.innerHTML = `<div class="row rc-head"><b class="rc-n"></b><span class="muted rc-c"></span><span class="spacer"></span>
-        <button class="small rc-up" title="Move left (earlier along the house)">▲ Left</button>
-        <button class="small rc-down" title="Move right (later along the house)">▼ Right</button></div>
-      <div class="rc-grid">
-        <label class="fld"><span>Name</span><input type=text data-k=name maxlength=40></label>
-        <label class="fld"><span>Short name</span><input type=text data-k=short maxlength=12></label>
-        <label class="fld"><span># Lights / LEDs</span><input type=number data-k=lights min=1 placeholder="?"><small class="note rc-hl"></small></label>
-        <label class="fld"><span>Light 1 is at</span><select data-k=light1>${Object.entries(LIGHT1).map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select>
-          <small class="note">as you face the lights</small></label>
-      </div>`;
-    $(".rc-n", card).textContent = `${i + 1}.`;
-    $(".rc-c", card).textContent = `${modelLabel(c.type, c.model)} · ${where(c)}`;
-    if (TIER_NOTE[tierOf(c)]) $(".rc-head", card).after(el("small", "note", TIER_NOTE[tierOf(c)]));
-    $(".rc-hl", card).textContent = caps.count === "display" ? "Used for drawing only." : caps.count === "reported" && hasLights(r)
-      ? "Reported by the controller." : "Not sure? We'll help you count it in the Test step.";
-    const up = $(".rc-up", card), down = $(".rc-down", card);
-    up.disabled = i === 0; down.disabled = i === W.cfg.runs.length - 1;
-    const move = d => { const a = W.cfg.runs; [a[i], a[i + d]] = [a[i + d], a[i]]; drawRuns(); };
-    up.onclick = () => move(-1); down.onclick = () => move(1);
-    for (const inp of $$("[data-k]", card)) {
-      const k = inp.dataset.k;
-      inp.value = r[k] ?? "";
-      if (k === "lights") inp.max = maxLights(c);
-      inp.oninput = inp.onchange = () => {
-        if (k === "name" && (!r.short || r.short === String(r.name).slice(0, 12))) { r.short = inp.value.slice(0, 12); $("[data-k=short]", card).value = r.short; }
-        if (k === "lights") r.lights = inp.value === "" ? null : Number(inp.value);
-        else r[k] = inp.value;
-        if (k === "light1") r.reverse = r.light1 === "right";
-        if (k === "name") syncNames();
-      };
-    }
-    box.appendChild(card);
-  });
+// --- step 2: Spotlight. One controller at a time: it blinks, then you name what blinked ---------
+// W.n: {order: [controller ids], i, nothing}
+function startNaming() {
+  W.n = {order: W.cfg.runs.map(r => r.controller).filter(id => ctrlOf(id)), i: 0, nothing: false};
+}
+async function toNamed(i) {
+  const c = ctrlOf(W.n.order[W.n.i]);
+  if (c) await stopTest(c);
+  W.n.i = i; W.n.nothing = false;
+  drawName(true);
+}
+function drawName(blink = false) {
+  const n = W.n.order.length, c = ctrlOf(W.n.order[W.n.i]);
+  const box = $("#n-one");
+  if (!c) { box.replaceChildren(el("p", "muted", "No controllers yet: find them in step 1.")); return; }
+  const r = runOf(c.id);
+  $("#n-title").textContent = `Controller ${W.n.i + 1} of ${n}`;
+  $("#n-sub").textContent = `${modelLabel(c.type, c.model)} · ${where(c)}` + (TIER_NOTE[tierOf(c)] ? ` · ${TIER_NOTE[tierOf(c)]}` : "");
+  if (blink) runTest(c, "identify").then(() => drawName()).catch(e => err(e.message));
+  const body = $("#n-body");
+  body.innerHTML = "";
+  body.append(answers(
+    button("Blink again", () => runTest(c, "identify"), "live small"),
+    button("Nothing blinked", () => { W.n.nothing = !W.n.nothing; drawName(); }, "small" + (W.n.nothing ? " on" : ""))));
+  if (W.n.nothing) {
+    const ul = el("ul", "note help");
+    for (const t of ["Is the controller powered on, and do its lights work in its own app?",
+      ...(c.type === "govee" ? ["In the Govee Home app, open the device's settings and switch on LAN Control.",
+        "Close the Govee app and stop any other program that drives these lights while you test."] : []),
+      "Is this computer on the same network as the lights (not a guest network)?",
+      "A firewall on this computer can block the messages: allow Python on private networks."])
+      ul.appendChild(el("li", "", t));
+    body.append(ul);
+  }
+  // name and short name
+  const fields = el("div", "n-fields");
+  fields.innerHTML = `<label class="fld"><span>What should we call these lights?</span><input type=text data-k=name maxlength=40 placeholder="Garage roofline"></label>
+    <label class="fld"><span>Short name <small class="muted">on buttons, up to 12 letters</small></span><input type=text data-k=short maxlength=12 placeholder="Garage"></label>`;
+  for (const inp of $$("input", fields)) {
+    const k = inp.dataset.k;
+    inp.value = r[k] ?? "";
+    inp.onfocus = () => inp.select();       // a default like "Run 1": typing replaces it
+    inp.oninput = () => {
+      if (k === "name" && (!r.short || r.short === String(r.name || "").slice(0, 12))) { r.short = inp.value.slice(0, 12); $("[data-k=short]", fields).value = r.short; }
+      r[k] = inp.value;
+      if (k === "name") { syncNames(); drawSlots(); }
+    };
+  }
+  body.append(fields);
+  // place along the house
+  body.append(q("Where is it on the house?"), el("p", "note", "Standing in front of the house, pick its place from left to right."));
+  const slots = el("div", "slots");
+  const drawSlots = () => {
+    slots.innerHTML = "";
+    W.cfg.runs.forEach((x, k) => {
+      const mine = x === r;
+      const b = button(mine ? (r.name || "This one") : (x.name || "not named yet"), () => {
+        const a = W.cfg.runs, from = a.indexOf(r);
+        a.splice(from, 1); a.splice(k, 0, r);
+        drawSlots();
+      }, "slot" + (mine ? " on" : x.name ? " named" : ""));
+      b.title = `Place ${k + 1} from the left`;
+      slots.appendChild(b);
+    });
+  };
+  drawSlots();
+  body.append(slots, el("p", "note", "Used to draw your house, and so moving patterns travel from one end of the house to the other."));
+  // navigation between controllers
+  const nav = $("#n-nav");
+  nav.innerHTML = "";
+  if (W.n.i > 0) nav.appendChild(button("◀ Previous controller", () => toNamed(W.n.i - 1), "ghost small"));
+  nav.appendChild(el("span", "spacer"));
+  nav.appendChild(button("Remove it from the setup", () => {
+    if (!confirm(`Leave ${where(c)} out of the setup?`)) return;
+    stopTest(c); removeController(c.id); startNaming(); W.n.i = Math.min(W.n.i, W.n.order.length - 1); drawName(W.n.order.length > 0);
+  }, "ghost small"));
+  if (W.n.i < n - 1) nav.appendChild(button("Next controller ▶", () => {
+    if (!String(r.name || "").trim()) throw new Error("Give these lights a name first.");
+    return toNamed(W.n.i + 1);
+  }, "primary"));
 }
 
-// --- step 3: test, one controller at a time ---------------------------------------------------
-// W.t: {order: [controller ids], i, phase: find | count | check | done, only: id or null, ...answers}
-function startTests(only = null, phase = "find") {
+// --- step 3: Tally. Count each run, one at a time, in order along the house ---------------------
+// W.t: {order: [controller ids], i, phase: count | check | done, only: id or null, ...answers}
+function startTests(only = null, phase = "count") {
   const order = only ? [only] : W.cfg.runs.map(r => r.controller).filter(id => ctrlOf(id));
   W.t = {order, i: 0, only, phase};
   resetAnswers();
 }
-function resetAnswers() { Object.assign(W.t, {blinked: false, other: false, nothing: false, recount: false, cnt: 0, markers: null, q1: null, q2: null, dir: false, typed: false, started: false}); }
+function resetAnswers() { Object.assign(W.t, {recount: false, cnt: 0, markers: null, last: null, blocks: null, segs: null, q1: null, q2: null, dir: false, typed: false, started: false}); }
 const curCtrl = () => ctrlOf(W.t.order[W.t.i]);
 function setPhase(phase) { W.t.phase = phase; resetAnswers(); drawTest(); }
 async function toController(i) {
   const c = curCtrl();
   if (c) await stopTest(c);
-  W.t.i = i; W.t.phase = "find"; resetAnswers();
+  W.t.i = i; W.t.phase = "count"; resetAnswers();
   drawTest();
-}
-function afterFind() {
-  const c = curCtrl(), r = runOf(c.id);
-  setPhase(canCount(c) || (canCheck(c) && !hasLights(r)) ? "count" : canCheck(c) ? "check" : "done");
 }
 function drawTest() {
   const c = curCtrl();
-  if (!c) { $("#t-one").replaceChildren(el("p", "muted", "No controllers to test: add one in step 1.")); return; }
-  const r = runOf(c.id), d = drv(c.type), n = W.t.order.length;
+  if (!c) { $("#t-one").replaceChildren(el("p", "muted", "No controllers to count: add one in step 1.")); return; }
+  const r = runOf(c.id), n = W.t.order.length;
   $("#test-intro").textContent = W.info.live
-    ? "Each test shows on that controller's lights for up to a minute. Look at the lights and answer."
+    ? "Each test shows on that run's lights. Look at the lights and answer."
     : "Practice mode: nothing is sent to the lights. The strip shows what they would do.";
-  $("#t-title").textContent = W.t.only ? `Testing ${r.name}` : `Controller ${W.t.i + 1} of ${n}: ${r.name}`;
-  $("#t-sub").textContent = `${modelLabel(c.type, c.model)} · ${where(c)}` + (TIER_NOTE[tierOf(c)] ? ` · ${TIER_NOTE[tierOf(c)]}` : "");
-  const steps = ["find", ...(canCount(c) || canCheck(c) ? ["count"] : []), ...(canCheck(c) ? ["check"] : []), "done"];
-  const label = {find: "Find it", count: "Count", check: "Check", done: "Done"};
+  $("#t-title").textContent = W.t.only ? `Counting ${r.name}` : `${r.name} · run ${W.t.i + 1} of ${n}`;
+  $("#t-sub").textContent = `${modelLabel(c.type, c.model)} · ${where(c)}`;
+  const steps = ["count", ...(canCheck(c) ? ["check"] : []), "done"];
+  const label = {count: "Count", check: "Check the ends", done: "Done"};
   $("#t-phases").innerHTML = "";
   for (const s of steps) $("#t-phases").appendChild(el("li", s === W.t.phase ? "on" : steps.indexOf(s) < steps.indexOf(W.t.phase) ? "done" : "", label[s]));
   $("#t-restore").textContent = RESTORE_NOTE[capsOf(c).restore] || "";
@@ -500,13 +538,12 @@ function drawTest() {
   } else $("#t-dots").hidden = W.t.phase === "done";
   const body = $("#t-body");
   body.innerHTML = "";
-  ({find: drawFind, count: drawCountPhase, check: drawCheck, done: drawDone})[W.t.phase](c, r, body);
-  // controller navigation
+  ({count: drawCountPhase, check: drawCheck, done: drawDone})[W.t.phase](c, r, body);
   const nav = $("#t-nav");
   nav.innerHTML = "";
-  if (!W.t.only && W.t.i > 0) nav.appendChild(button("◀ Previous controller", () => toController(W.t.i - 1), "ghost small"));
+  if (!W.t.only && W.t.i > 0) nav.appendChild(button("◀ Previous run", () => toController(W.t.i - 1), "ghost small"));
   nav.appendChild(el("span", "spacer"));
-  if (W.t.phase !== "done") nav.appendChild(button(W.t.i < n - 1 ? "Skip this controller" : "Skip", () => nextController(), "ghost small"));
+  if (W.t.phase !== "done") nav.appendChild(button(W.t.i < n - 1 ? "Skip this run" : "Skip", () => nextController(), "ghost small"));
   drawMore(c);
 }
 async function nextController() {
@@ -517,46 +554,12 @@ async function nextController() {
 const q = (text, cls = "tq") => el("p", cls, text);
 const answers = (...btns) => { const row = el("div", "row answers"); row.append(...btns.filter(Boolean)); return row; };
 
-// A. Find it: blink, then which run blinked?
-function drawFind(c, r, body) {
-  body.append(q(`First, make sure this is the right run. Press Blink and look at your lights.`),
-    answers(button(W.t.blinked ? "Blink again" : "Blink", async () => {
-      await runTest(c, "identify"); W.t.blinked = true; W.t.nothing = false; drawTest();
-    }, "live")));
-  if (!W.t.blinked) return;
-  const others = W.cfg.runs.filter(x => x !== r && ctrlOf(x.controller));
-  body.append(q("What blinked?"), answers(
-    button(`Yes, ${r.name} blinked`, () => afterFind(), "primary"),
-    others.length ? button("Another run blinked…", () => { W.t.other = true; W.t.nothing = false; drawTest(); }) : null,
-    button("Nothing blinked", () => { W.t.nothing = true; W.t.other = false; drawTest(); })));
-  if (W.t.other) {
-    const sel = el("select");
-    for (const x of others) sel.appendChild(new Option(x.name, x.controller));
-    body.append(answers(el("span", "lbl", "Which one?"), sel, button("That one blinked", () => {
-      const o = runOf(sel.value);            // this controller drives that run: swap them
-      [r.controller, o.controller] = [o.controller, r.controller];
-      syncNames();
-      afterFind();
-    }, "primary")), el("p", "note", "The names swap: this controller gets that run's name, place along the house and count."));
-  }
-  if (W.t.nothing) {
-    const ul = el("ul", "note help");
-    for (const t of ["Is the controller powered on, and do its lights work in its own app?",
-      ...(c.type === "govee" ? ["In the Govee Home app, open the device's settings and switch on LAN Control."] : []),
-      "Is this computer on the same network as the lights (not a guest network)?",
-      "A firewall on this computer can block the messages: allow Python on private networks."])
-      ul.appendChild(el("li", "", t));
-    body.append(q("Things to check:"), ul,
-      answers(button("Blink again", () => runTest(c, "identify"), "live"), button("Skip this controller", () => nextController())));
-  }
-}
-
-// B. Count (Govee: segment markers, then the red lights of the last segment)
+// A. Count. Govee: segment colours, then the last segment red. Others: markers, or type it.
 function drawCountPhase(c, r, body) {
   const lps = W.lps[c.id] || lpsOf(c) || 5, max = maxLights(c);
   if (hasLights(r) && !W.t.recount) {
     body.append(q(`${r.name} is set to ${r.lights} lights. Is that right?`), answers(
-      button("Yes, check it", () => setPhase(canCheck(c) ? "check" : "done"), "primary"),
+      button(canCheck(c) ? "Yes, check it" : "Yes", () => setPhase(canCheck(c) ? "check" : "done"), "primary"),
       button(canCount(c) ? "No, count them" : "No, change it", () => { W.t.recount = true; drawTest(); })));
     return;
   }
@@ -574,7 +577,8 @@ function drawCountPhase(c, r, body) {
     if (W.t.typed) body.append(answers(button("Count them instead", () => { W.t.typed = false; drawTest(); }, "ghost small")));
     return;
   }
-  // 1: markers
+  if (segCount(c)) return drawCountSegments(c, r, body, lps);
+  // markers, then the red lights of the last segment
   body.append(q("Step 1: count the markers."),
     answers(button(W.t.cnt ? "Show the markers again" : "Show markers", async () => { await runTest(c, "markers"); W.t.cnt = Math.max(W.t.cnt, 1); drawTest(); }, "live")));
   if (W.t.cnt >= 1) {
@@ -588,37 +592,73 @@ function drawCountPhase(c, r, body) {
         await runTest(c, "tail", {markers: v}); W.t.cnt = 2; drawTest();
       }, "primary")));
   }
-  // 2: the red lights of the last segment
-  if (W.t.cnt >= 2) {
-    const red = el("input"); red.type = "number"; red.min = 1; red.max = lps; red.style.width = "4em";
-    const sum = el("p", "tsum");
-    const use = button("Use this count", () => {
-      const n = lps * (W.t.markers - 1) + Number(red.value);
-      if (!(Number(red.value) >= 1 && Number(red.value) <= lps)) throw new Error(`Type a number from 1 to ${lps}.`);
-      if (!(n >= 1 && n <= max)) throw new Error(`That makes ${n}: count the markers again.`);
-      r.lights = n; setPhase("check");
-    }, "primary");
-    use.disabled = true;
-    red.oninput = () => {
-      const v = Number(red.value), ok = v >= 1 && v <= lps;
-      use.disabled = !ok;
-      sum.textContent = ok ? `${lps} × ${W.t.markers - 1} + ${v} = ${lps * (W.t.markers - 1) + v} lights` : "";
-      use.textContent = ok ? `Use ${lps * (W.t.markers - 1) + v} lights` : "Use this count";
-    };
-    body.append(q("Step 2: now the last group is red."),
-      answers(el("span", "lbl", "How many red lights at the end?"), red), sum, answers(use));
+  if (W.t.cnt >= 2) body.append(...lastGroup(c, r, lps, W.t.markers, "Step 2: now the last group is red."));
+  body.append(answers(button("Type the number instead", () => { W.t.typed = true; drawTest(); }, "ghost small")));
+}
+// "How many red lights at the end?" -> lps x (groups - 1) + red
+function lastGroup(c, r, lps, groups, title) {
+  const red = el("input"); red.type = "number"; red.min = 1; red.max = lps; red.style.width = "4em";
+  const sum = el("p", "tsum");
+  const use = button("Use this count", () => {
+    const v = Number(red.value), n = lps * (groups - 1) + v;
+    if (!(v >= 1 && v <= lps)) throw new Error(`Type a number from 1 to ${lps}.`);
+    if (!(n >= 1 && n <= maxLights(c))) throw new Error(`That makes ${n}: count again.`);
+    r.lights = n; setPhase(canCheck(c) ? "check" : "done");
+  }, "primary");
+  red.oninput = () => {
+    const v = Number(red.value), ok = v >= 1 && v <= lps;
+    sum.textContent = ok ? `${lps} × ${groups - 1} + ${v} = ${lps * (groups - 1) + v} lights` : "";
+    use.textContent = ok ? `Use ${lps * (groups - 1) + v} lights` : "Use this count";
+  };
+  return [q(title), answers(el("span", "lbl", "How many red lights at the end?"), red), sum, answers(use)];
+}
+// Govee: A) every group of lps lights a colour in turn: green, white, red, yellow. The last
+// colour and how many blocks of it give the groups. B) all white, the last group red.
+const SEG_COLOURS = [["green", "#3a3"], ["white", "#ddd"], ["red", "#e33"], ["yellow", "#fb0"]];
+function drawCountSegments(c, r, body, lps) {
+  const maxGroups = Math.ceil(maxLights(c) / lps);
+  if (!W.t.started) { W.t.started = true; runTest(c, "seg4").then(drawTest).catch(e => err(e.message)); }
+  body.append(q(`A · Every ${lps} lights change colour: green, white, red, yellow, then again.`),
+    answers(button("Show the colours again", () => runTest(c, "seg4"), "live small")),
+    el("p", "note", "What colour is the last block at the far end? A single light past it that never changes isn't driven by the controller: leave it out."));
+  body.append(answers(...SEG_COLOURS.map(([name, hex], k) => {
+    const b = button(name[0].toUpperCase() + name.slice(1), () => { W.t.last = k; drawTest(); }, "swatch" + (W.t.last === k ? " on" : ""));
+    b.style.setProperty("--sw", hex);
+    return b;
+  })));
+  if (W.t.last != null) {
+    const name = SEG_COLOURS[W.t.last][0];
+    const m = el("input"); m.type = "number"; m.min = 1; m.max = Math.ceil(maxGroups / 4); m.style.width = "5em";
+    if (W.t.blocks) m.value = W.t.blocks;
+    const sum = el("span", "tsum");
+    const groups = () => 4 * (Number(m.value) - 1) + W.t.last + 1;
+    m.oninput = () => { sum.textContent = Number(m.value) >= 1 ? `= ${groups()} groups of ${lps}` : ""; };
+    m.oninput();
+    body.append(answers(el("span", "lbl", `How many ${name} blocks?`), m, sum, button("Next", async () => {
+      const v = Number(m.value), g = groups();
+      if (!(v >= 1 && g <= maxGroups)) throw new Error(`Count the ${name} blocks along the whole run.`);
+      W.t.blocks = v; W.t.segs = g;
+      await runTest(c, "seglast", {markers: g, lights: Math.min(maxLights(c), g * lps)}); W.t.cnt = 2; drawTest();
+      const qs = $$("#t-body .tq");
+      if (qs.length) qs[qs.length - 1].scrollIntoView({block: "center", behavior: "smooth"});
+    }, "primary")));
+  }
+  if (W.t.cnt >= 2 && W.t.segs) {
+    body.append(...lastGroup(c, r, lps, W.t.segs, "B · Now every group is white and only the last one is red."),
+      el("p", "note", "Blue after the red? Then the colours were miscounted."),
+      answers(button("Count the colours again", async () => { W.t.cnt = 1; W.t.segs = null; await runTest(c, "seg4"); drawTest(); }, "ghost small")));
   }
   body.append(answers(button("Type the number from the Govee app", () => { W.t.typed = true; drawTest(); }, "ghost small")));
 }
 
-// C. Check: light 1 red, last light blue, orange past the end. Which end is red? Any orange?
+// B. Check the ends: which end is light 1 (and, on WLED, nothing past the last light)
 function drawCheck(c, r, body) {
   if (!hasLights(r)) { setPhase("count"); return; }
+  if (testsOf(c).includes("ends")) return drawEnds(c, r, body);
   const shown = W.testing[c.id] === "check" || W.testing[c.id] === "chase";
   if (!W.t.started) { W.t.started = true; runTest(c, "check").then(drawTest).catch(e => err(e.message)); }
   body.append(q(`Light 1 should be red, light ${r.lights} (the last one) blue, the ones between dim white.`),
     answers(button(shown ? "Show it again" : "Show it", async () => { await runTest(c, "check"); W.t.dir = false; drawTest(); }, "live")));
-  // Q1: where is red?
   const set1 = v => { r.light1 = v; r.reverse = v === "right"; W.t.q1 = v || "unsure"; W.t.dir = false; drawTest(); };
   body.append(q("Where is the red light?"), answers(
     button("Yes, red is on the left", () => set1("left"), W.t.q1 === "left" ? "on" : ""),
@@ -630,7 +670,6 @@ function drawCheck(c, r, body) {
       button("Still can't tell", () => set1(""))));
   }
   if (!W.t.q1 || W.t.q1 === "dot") return;
-  // Q2: anything after the blue?
   body.append(q("Do you see any other colour, like orange, after the blue?"), answers(
     button("No, blue is the last light", () => setPhase("done"), "primary"),
     button("Yes, orange after the blue", () => { W.t.q2 = "orange"; drawTest(); }, W.t.q2 === "orange" ? "on" : ""),
@@ -643,26 +682,48 @@ function drawCheck(c, r, body) {
       if (r.lights + v > maxLights(c)) throw new Error(`That makes more than ${maxLights(c)} lights, the most this controller takes.`);
       r.lights += v; W.t.q2 = null;
       await runTest(c, "check"); drawTest();
-    }, "primary")), el("p", "note", v20note()));
+    }, "primary")), el("p", "note", "If all 20 are orange, add them: the next check shows 20 more."));
   }
   if (W.t.q2 === "noblue") {
     body.append(el("p", "note", "Then the count is too high: the blue light is past the end of the run."),
       answers(button(canCount(c) ? "Count again" : "Change the number", () => { setPhase("count"); W.t.recount = true; drawTest(); }, "primary")));
   }
 }
-const v20note = () => "If all 20 are orange, add them: the next check shows 20 more.";
+// Govee: a frame of exactly the count, light 1 blue and the last light red. Each is a single
+// light only when the count is right (the controller spreads a frame over the whole run).
+function drawEnds(c, r, body) {
+  if (!W.t.started) { W.t.started = true; runTest(c, "ends").then(drawTest).catch(e => err(e.message)); }
+  body.append(q(`C · Light 1 is blue and light ${r.lights}, the last one, is red. The rest are white.`),
+    answers(button("Show it again", () => runTest(c, "ends"), "live small")),
+    el("p", "note", "Are blue and red each a single light? Which end is blue?"));
+  const set1 = v => { r.light1 = v; r.reverse = v === "right"; setPhase("done"); };
+  body.append(answers(
+    button("Blue is on the left", () => set1("left"), "primary"),
+    button("Blue is on the right", () => set1("right"), "primary"),
+    button("Not single lights", () => { W.t.q1 = "off"; drawTest(); }, W.t.q1 === "off" ? "on" : "")));
+  if (W.t.q1 === "off") {
+    body.append(el("p", "note", `Then ${r.lights} isn't quite right: the colours are spread over more or fewer lights.`),
+      answers(button("Count again", () => { setPhase("count"); W.t.recount = true; drawTest(); }, "primary")));
+  }
+}
 
-// D. Done: summary for this controller, with a sweep in the chosen direction
+// C. Done: summary for this run, with a sweep in the chosen direction
 function drawDone(c, r, body) {
   stopTest(c);
   const lights = hasLights(r) ? `${r.lights} lights` : "light count not set";
-  const checked = canCheck(c) ? light1Text(r) : `${light1Text(r)} (this controller can only blink)`;
-  body.append(el("p", "tsum", `${r.name}: ${lights}, ${checked}.`));
+  body.append(el("p", "tsum", `${r.name}: ${lights}, ${light1Text(r)}.`));
+  if (!canCheck(c)) {                        // can't show light 1: ask
+    const sel = el("select");
+    for (const [v, t] of Object.entries(LIGHT1)) sel.appendChild(new Option(t, v));
+    sel.value = r.light1 || "";
+    sel.onchange = () => { r.light1 = sel.value; r.reverse = sel.value === "right"; drawTest(); };
+    body.append(answers(el("span", "lbl", "Light 1 is at the"), sel, el("span", "note", "as you face the lights")));
+  }
   if (hasLights(r)) body.append(sweep(r));
   const last = W.t.i >= W.t.order.length - 1;
   body.append(answers(
-    button(last ? (W.t.only ? "Done: check and save" : "Done: time and place") : "Next controller ▶", () => nextController(), "primary"),
-    button("Test it again", () => setPhase("find"), "ghost")));
+    button(last ? (W.t.only ? "Done: check and save" : "Done: time and place") : "Next run ▶", () => nextController(), "primary"),
+    button("Count it again", () => { setPhase("count"); W.t.recount = true; drawTest(); }, "ghost")));
 }
 function sweep(r) {
   const n = Math.min(r.lights, 60), wrap = el("div", "sweep"), strip = el("div", "sweep-dots");
@@ -671,7 +732,7 @@ function sweep(r) {
   const ends = el("div", "sweep-ends");
   const fromRight = r.light1 === "right";
   ends.append(el("span", "", fromRight ? "last light" : r.light1 ? "light 1" : "light 1?"), el("span", "", fromRight ? "light 1" : "last light"));
-  wrap.append(strip, ends, el("p", "note", r.light1 ? "The dot runs from light 1, the way this controller counts its lights. The dashboard turns runs round as needed, so themes run the same way along the house." : "Light 1 not checked yet: themes may run the wrong way round on this run."));
+  wrap.append(strip, ends, el("p", "note", r.light1 ? "The dot runs from light 1, the way this controller counts its lights. The dashboard turns runs round as needed, so patterns run the same way along the house." : "Light 1 not checked yet: patterns may run the wrong way round on this run."));
   const dots = [...strip.children];
   let k = 0;
   clearInterval(W.sweepT);
@@ -689,18 +750,20 @@ function sweep(r) {
 }
 
 // More tests: the extra patterns (colours, segment groups, ruler, dot from light 1)
+const COUNT_TESTS = ["markers", "tail", "seg4", "seglast", "ends", "check"];
 function drawMore(c) {
   const box = $("#t-more-btns");
   box.innerHTML = "";
   for (const name of testsOf(c)) {
-    if (["markers", "tail", "check"].includes(name)) continue;
+    if (COUNT_TESTS.includes(name)) continue;
     box.appendChild(button(W.info.tests[name], () => runTest(c, name), "live small" + (W.testing[c.id] === name ? " on" : "")));
   }
   box.appendChild(button("Stop", () => stopTest(c), "danger small"));
 }
 
+const ui = s => $(`#${W.step === 1 ? "n" : "t"}-${s}`);
 function dots(n) {
-  const d = $("#t-dots");
+  const d = ui("dots");
   n = Math.max(1, Math.min(3000, Number(n) || 1));
   if (d.children.length !== n) {
     d.style.gridTemplateColumns = `repeat(${Math.min(n, 60)}, minmax(0, 1fr))`;
@@ -715,14 +778,15 @@ async function runTest(c, name, extra = {}) {
   const res = await api("/api/setup/test", body);
   W.testing[c.id] = name;
   W.lps[c.id] = res.lights_per_segment;
-  $("#t-status").textContent = (res.live ? "On the lights now." : "Practice mode: logged only.")
+  ui("status").textContent = (res.live ? "On the lights now." : "Practice mode: logged only.")
     + (TEST_HELP[name] && !["identify", "chase"].includes(name) ? " " + TEST_HELP[name] : "")
     + (res.slow ? " (This controller changes about once a second.)" : "")
     + (res.stream_untested && name === "check" ? " This model hasn't been seen playing light by light yet: if the lights show red, dim white and blue as on the strip, it can play light-by-light themes; if they don't change, it can't (please report what you see)." : "")
-    + (name === "check" ? ` The strip shows what is sent: the ${res.frame_lights - body.lights} orange lights are past the count, so real lights only show them if the count is too low.` : "");
+    + (name === "check" && res.frame_lights > body.lights ? ` The strip shows what is sent: the ${res.frame_lights - body.lights} orange lights are past the count, so real lights only show them if the count is too low.` : "");
   const pv = await api("/api/setup/preview", body);
-  $("#t-dots").hidden = false;
-  animate(c.id, pv, res.seconds);
+  ui("dots").hidden = false;
+  animate(c.id, pv, res.stays ? Infinity : res.seconds);
+  if (res.stays) ui("status").textContent += " It stays on the lights until the next test.";
   return res;
 }
 async function stopTest(c) {
@@ -732,8 +796,8 @@ async function stopTest(c) {
     delete W.testing[c.id];
     try { await api("/api/setup/test/stop", {ip: c.ip, zone: c.zone || ""}); } catch (e) { err(e.message); }
   }
-  if ($("#t-dots")) for (const i of $("#t-dots").children) { i.style.background = ""; i.style.boxShadow = ""; }
-  if ($("#t-status")) $("#t-status").textContent = "";
+  if (ui("dots")) for (const i of ui("dots").children) { i.style.background = ""; i.style.boxShadow = ""; }
+  if (ui("status")) ui("status").textContent = "";
 }
 function animate(cid, pv, seconds) {
   clearInterval(W.anim);
@@ -745,7 +809,7 @@ function animate(cid, pv, seconds) {
     k++;
     if (performance.now() - t0 > seconds * 1000) {
       clearInterval(W.anim); delete W.testing[cid];
-      $("#t-status").textContent = "The test ended by itself.";
+      ui("status").textContent = "The test ended by itself.";
     }
   };
   paint();
@@ -855,9 +919,7 @@ function drawSummary() {
     const links = tr.insertCell();
     links.className = "links";
     const a = (text, fn) => { const x = el("a", "", text); x.href = "#"; x.onclick = e => { e.preventDefault(); fn(); }; return x; };
-    links.append(a("Change", () => go(1)), " · ", a(canCount(c) || canCheck(c) ? "Count it" : "Test it", () => {
-      startTests(c.id, canCount(c) || canCheck(c) ? "count" : "find"); go(2, true);
-    }));
+    links.append(a("Rename", () => go(1)), " · ", a("Count it", () => { startTests(c.id); go(2, true); }));
   });
   const loc = W.cfg.location;
   const p = el("p", "", `Mode: ${W.cfg.mode === "live" ? "Live" : "Practice"} · Time zone: ${W.cfg.timezone} · Location: ${
@@ -897,25 +959,22 @@ function check(step) {
     if (noKey) return `Type the 16-character local key for the Tuya device at ${noKey.ip}.`;
   }
   if (step === 1) {
-    for (const r of W.cfg.runs) {
-      const c = ctrlOf(r.controller);
-      if (!String(r.name || "").trim()) return "Every run needs a name.";
-      if (r.lights != null && r.lights !== "" && !(r.lights >= 1 && r.lights <= maxLights(c))) return `${r.name}: lights must be 1 to ${maxLights(c)}, or blank.`;
-    }
+    const r = W.cfg.runs.find(r => !String(r.name || "").trim());
+    if (r) return `Give every run a name: the one at ${where(ctrlOf(r.controller))} has none yet.`;
     const names = W.cfg.runs.map(r => String(r.name).trim().toLowerCase());
     if (new Set(names).size !== names.length) return "Give each run a different name.";
   }
   if (step === 4) {
     const r = W.cfg.runs.find(r => !hasLights(r));
-    if (r) return `${r.name}: how many lights? Type it in step 2, or count it in step 3.`;
+    if (r) return `${r.name}: how many lights? Count it in step 3.`;
   }
   return "";
 }
-// keepTests: step 3 (Test) was set up by the caller (a deep link or a "Count it" link).
+// keepTests: step 3 (Tally) was set up by the caller (a deep link or a "Count it" link).
 async function go(step, keepTests = false) {
   if (step > W.step) for (let s = W.step; s < step; s++) { const msg = check(s); if (msg) { if (s !== W.step) await go(s); return err(msg); } }
   err("");
-  if (W.step === 2 && step !== 2) await stopAllTests();
+  if ((W.step === 1 || W.step === 2) && step !== W.step) await stopAllTests();
   if (W.step === 3) readPlace();
   if (W.step === 1) syncNames();
   W.step = step;
@@ -927,7 +986,7 @@ async function go(step, keepTests = false) {
   $("#prev").hidden = step === 0;
   $("#next").textContent = step === STEPS - 1 ? "Save and start" : "Next";
   if (step === 0) { drawTiles(); drawFound(); drawKinds(); }
-  if (step === 1) drawRuns();
+  if (step === 1) { startNaming(); drawName(true); }
   if (step === 2) { if (!keepTests || !W.t) startTests(); drawTest(); }
   if (step === 3) drawPlace();
   if (step === 4) drawSummary();
@@ -966,7 +1025,7 @@ async function init() {
   // Editing a saved setup: newly found controllers aren't ticked by themselves.
   W.autoTick = !W.cfg.controllers.length;
   const pill = $("#mode");
-  pill.textContent = W.info.live ? "LIVE" : "PRACTICE";
+  pill.textContent = W.info.live ? "Live" : "Practice";
   pill.className = "pill " + (W.info.live ? "live" : "dry");
   const b = $("#banner");
   if (W.info.error) { b.hidden = false; b.textContent = `Your settings file has a problem: ${W.info.error}. Go through the steps to fix it.`; }
@@ -997,8 +1056,8 @@ async function init() {
   // With a saved config every step can be opened from the list at the top.
   W.jump = !W.info.error && W.cfg.runs.length > 0 && W.cfg.controllers.length > 0;
   for (const li of $$("#steps li")) li.onclick = () => { if (W.jump && Number(li.dataset.step) !== W.step) go(Number(li.dataset.step)); };
-  // Deep links: ?step=test&controller=<id>, ?step=place (or the step's number, 1 to 5)
-  const qs = new URLSearchParams(location.search), sv = String(qs.get("step") || "").toLowerCase();
+  // Deep links: ?step=count&controller=<id> (or test), ?step=place (or the step's number, 1 to 5)
+  const qs = new URLSearchParams(location.search), sv0 = String(qs.get("step") || "").toLowerCase(), sv = STEP_ALIAS[sv0] || sv0;
   const want = STEP_NAMES.includes(sv) ? STEP_NAMES.indexOf(sv) : /^[1-9]$/.test(sv) ? Number(sv) - 1 : -1;
   if (W.jump && want >= 0 && want < STEPS) {
     const cid = qs.get("controller");
