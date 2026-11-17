@@ -148,7 +148,7 @@ compile.
 
 ```sh
 sudo apt install python3 python3-venv git
-git clone https://github.com/RAHIvana/Permanent-Outdoor-Liight-Controller.git houselights
+git clone https://github.com/RAHIvana/Permanent-Outdoor-Light-Controller.git houselights
 cd houselights
 python3 -m venv venv
 venv/bin/pip install -r requirements.txt
@@ -162,7 +162,7 @@ Homebrew (`brew install python`), then the same `git clone`, `python3 -m venv ve
 and tick "Add python.exe to PATH". Then:
 
 ```powershell
-git clone https://github.com/RAHIvana/Permanent-Outdoor-Liight-Controller.git houselights
+git clone https://github.com/RAHIvana/Permanent-Outdoor-Light-Controller.git houselights
 cd houselights
 py -m venv venv
 venv\Scripts\pip install -r requirements.txt
