@@ -446,5 +446,6 @@ light-by-light animation. Today everything works locally, without a cloud accoun
 
 ## License
 
-MIT, see `LICENSE`. This project is not affiliated with or endorsed by Govee, WLED,
-JellyFish Lighting or Tuya.
+MIT, see `LICENSE`. The logo is adapted from the Tabler Icons "bulb" (MIT), see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). This project is not affiliated with or
+endorsed by Govee, WLED, JellyFish Lighting or Tuya.
