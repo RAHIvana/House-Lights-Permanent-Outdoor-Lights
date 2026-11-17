@@ -14,10 +14,17 @@ log = logging.getLogger("houselights")
 
 
 class Streamer:
+    """One worker thread at a time per Kit. Every run gets a cancel signal of its own, so a worker that
+    is slow to stop can never be revived by the next start; stop() keeps hold of it until it really
+    ends, and a new start is refused until then."""
+
+    STOP_WAIT = 3.0                   # seconds stop() waits for the worker (tests make it short)
+
     def __init__(self, kit, lights, fps=15):
         self.kit, self.lights, self.fps = kit, lights, fps
         self._thread = None
-        self._stop = threading.Event()
+        self._stop = threading.Event()    # the current worker's cancel signal (a new one for every run)
+        self._mutex = threading.RLock()   # start and stop never interleave (two quick requests)
         self.state = None                 # {"pattern", "params", "level", "since"} while playing
 
     @property
@@ -40,23 +47,37 @@ class Streamer:
         if not slow and self.lights > self.kit.max_stream_lights:
             raise ValueError(f"a stream frame carries at most {self.kit.max_stream_lights} lights")
         self.kit.guard()
-        self.stop()
-        self._stop.clear()
-        self.state = {"pattern": name, "params": params or {}, "level": level,
-                      "since": time.strftime("%H:%M:%S")}
-        self._thread = threading.Thread(target=self._run_slow if slow else self._run,
-                                        args=(name, render, animated, level, seconds),
-                                        name=f"stream-{self.kit.c.id}", daemon=True)
-        self._thread.start()
+        with self._mutex:
+            if not self.stop():
+                raise ValueError("the previous animation is still stopping: try again in a moment")
+            stop = self._stop = threading.Event()
+            self.state = {"pattern": name, "params": params or {}, "level": level,
+                          "since": time.strftime("%H:%M:%S")}
+            self._thread = threading.Thread(target=self._run_slow if slow else self._run,
+                                            args=(name, render, animated, level, seconds, stop),
+                                            name=f"stream-{self.kit.c.id}", daemon=True)
+            self._thread.start()
 
     def stop(self):
-        if self.playing:
-            self._stop.set()
-            self._thread.join(timeout=3)
-        self._thread = None
-        self.state = None
+        """Ask the worker to stop and wait for it. True when nothing runs any more. A worker that
+        has not ended after STOP_WAIT seconds is kept (playing stays True, state says "stopping") with
+        its cancel signal set, and False is returned."""
+        with self._mutex:
+            t = self._thread
+            if t is not None:
+                self._stop.set()
+                if t.is_alive():
+                    t.join(timeout=self.STOP_WAIT)
+                if t.is_alive():
+                    log.warning("%s: the animation has not stopped after %s s", self.kit.tag, self.STOP_WAIT)
+                    if self.state:
+                        self.state["stopping"] = True
+                    return False
+            self._thread = None
+            self.state = None
+            return True
 
-    def _run(self, name, render, animated, level, seconds):
+    def _run(self, name, render, animated, level, seconds, stop):
         log.info("%s STREAM %s start %s level %s%% (%d lights, %d fps)",
                  self.kit.prefix, self.kit.tag, name, level, self.lights, self.fps)
         scale = max(0, min(100, int(level))) / 100
@@ -66,7 +87,7 @@ class Streamer:
             time.sleep(0.3)
             t0, period = time.monotonic(), 1 / self.fps
             next_at = t0
-            while not self._stop.is_set():
+            while not stop.is_set():
                 t = time.monotonic() - t0
                 if seconds and t >= seconds:
                     break
@@ -76,7 +97,7 @@ class Streamer:
                         static = colors
                 self.kit.stream_frame(static or colors)
                 next_at += period if animated else 0.4             # static: just keep the mode alive
-                self._stop.wait(max(0.0, next_at - time.monotonic()))
+                stop.wait(max(0.0, next_at - time.monotonic()))
         except Exception as e:                                     # never leave a controller stuck
             log.error("STREAM %s failed: %s", self.kit.tag, e)
         finally:
@@ -86,7 +107,7 @@ class Streamer:
                 pass
             log.info("%s STREAM %s stop", self.kit.prefix, self.kit.tag)
 
-    def _run_slow(self, name, render, animated, level, seconds):
+    def _run_slow(self, name, render, animated, level, seconds, stop):
         """No streaming: show frames with show_lights() (or the main colour) at most
         kit.slow_fps times a second, then put the controller back if it allows."""
         log.info("%s SLOW %s start %s (%d lights)", self.kit.prefix, self.kit.tag, name, self.lights)
@@ -96,7 +117,7 @@ class Streamer:
         last = None
         try:
             t0 = time.monotonic()
-            while not self._stop.is_set():
+            while not stop.is_set():
                 t = time.monotonic() - t0
                 if seconds and t >= seconds:
                     break
@@ -109,9 +130,9 @@ class Streamer:
                         self.kit.color(max(set(colors), key=colors.count))
                     last = colors
                 if not animated:
-                    self._stop.wait(seconds - t if seconds else None)
+                    stop.wait(seconds - t if seconds else None)
                     break
-                self._stop.wait(1 / self.kit.slow_fps)
+                stop.wait(1 / self.kit.slow_fps)
         except Exception as e:
             log.error("SLOW %s failed: %s", self.kit.tag, e)
         finally:

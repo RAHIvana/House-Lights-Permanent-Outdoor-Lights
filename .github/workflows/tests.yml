@@ -30,3 +30,4 @@ jobs:
       - run: python tests/test_themes.py
       - run: python tests/test_drivers.py
       - run: python tests/test_security.py
+      - run: python tests/test_stream.py

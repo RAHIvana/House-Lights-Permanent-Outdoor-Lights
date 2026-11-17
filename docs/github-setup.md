@@ -120,8 +120,8 @@ Settings is the tab in the repository's top bar (under **...** if it is hidden).
 - **When it runs:** on every push to `main`, on every pull request, and by hand (a **Run workflow** button,
   added with this checklist).
 - **What it does:** on two Python versions (**3.10** and **3.13**, the README says "3.10 or newer") it checks
-  out the code, installs `requirements.txt`, and runs the six test files: `test_settings`, `test_setup`,
-  `test_schedule`, `test_themes`, `test_drivers` and `test_security`. They need no lights, no network (the ZIP
+  out the code, installs `requirements.txt`, and runs the seven test files: `test_settings`, `test_setup`,
+  `test_schedule`, `test_themes`, `test_drivers`, `test_security` and `test_stream`. They need no lights, no network (the ZIP
   lookup is faked) and no secrets, and the workflow has read-only permission on the repository.
 - **Where it shows up:** the repository's **Actions** tab, and as a green tick or red cross next to every commit.
   The two checks are named `test (3.10)` and `test (3.13)`.
@@ -176,7 +176,7 @@ every commit already tells you.
 - Adding a test file? Add a `- run:` line for it in `tests.yml`, or it never runs on GitHub.
 - The gallery test fails when a theme was added or changed and `docs/themes.md` and its pictures weren't
   redrawn: run `python tools/make_theme_gallery.py` and commit the result.
-- To run exactly what GitHub runs: the six commands listed in `CONTRIBUTING.md`.
+- To run exactly what GitHub runs: the seven commands listed in `CONTRIBUTING.md`.
 
 ## 5. Switching to public
 

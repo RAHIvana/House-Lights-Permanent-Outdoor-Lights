@@ -434,6 +434,7 @@ venv/bin/python tests/test_schedule.py
 venv/bin/python tests/test_themes.py       # theme engine, storage, whole-house span
 venv/bin/python tests/test_drivers.py      # Linux and Windows: uses 127.0.0.x addresses
 venv/bin/python tests/test_security.py     # Host and Origin checks, headers, home addresses, escaped names
+venv/bin/python tests/test_stream.py       # the animation worker: one at a time, stops and restarts cleanly
 ```
 
 On Windows use `venv\Scripts\python tests\test_settings.py` and so on.
