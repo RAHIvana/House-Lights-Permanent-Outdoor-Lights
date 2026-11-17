@@ -5,6 +5,7 @@
   --green: #2c7f4f; --night: #23262b; --night-fg: #b3b6bb; --dot-off: #41454c; --focus: #2f6fde;
   --dry: #b7791f; --toast: #2b2720; --toast-fg: #f3efe7; --err-bg: #8f2f28;
   --band: #1c2541; --band-fg: #f7e7c6; --tab-on: #fbe7be; --tab-on-ink: #5a3a06; --tab-done: #e2edd6; --tab-done-ink: #2f5410;
+  --pick-1: #000; --pick-2: #fff; --pick-3: #000;   /* the lit theme tile: outer 2 px, 1 px, inner 1 px */
   --gutter: max(20px, env(safe-area-inset-left, 0px)); --gutter-r: max(20px, env(safe-area-inset-right, 0px));
   --radius: 12px;
   color-scheme: light;
@@ -13,12 +14,12 @@
   --bg: #2b2e33; --panel: #34383e; --panel2: #3d4148; --line: #4b5058; --fg: #e9e6e0; --muted: #a6a9ae;
   --amber-ink: #ffbe5c; --red: #ff7b72; --red-bg: #4a2b2b; --green: #6fcf97; --focus: #7aa7ff;
   --toast: #e9e6e0; --toast-fg: #2b2e33; --band: #0e1a3a; --tab-on: #4a3510; --tab-on-ink: #fbe0a6;
-  --tab-done: #22331a; --tab-done-ink: #b9dc8f; color-scheme: dark } }
+  --tab-done: #22331a; --tab-done-ink: #b9dc8f; --pick-1: #ffd400; --pick-2: #fff; --pick-3: #e3262b; color-scheme: dark } }
 :root[data-theme="dark"] {
   --bg: #2b2e33; --panel: #34383e; --panel2: #3d4148; --line: #4b5058; --fg: #e9e6e0; --muted: #a6a9ae;
   --amber-ink: #ffbe5c; --red: #ff7b72; --red-bg: #4a2b2b; --green: #6fcf97; --focus: #7aa7ff;
   --toast: #e9e6e0; --toast-fg: #2b2e33; --band: #0e1a3a; --tab-on: #4a3510; --tab-on-ink: #fbe0a6;
-  --tab-done: #22331a; --tab-done-ink: #b9dc8f; color-scheme: dark }
+  --tab-done: #22331a; --tab-done-ink: #b9dc8f; --pick-1: #ffd400; --pick-2: #fff; --pick-3: #e3262b; color-scheme: dark }
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -122,9 +123,9 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .tile-st { font-size: 11px; color: var(--muted); padding: 0 9px 7px; }
 /* Quick Settings: a tile or button that's on keeps its look and gets a thick amber border */
 .tile.on { position: relative; background: var(--panel2); color: var(--fg); border-color: var(--line); }
-/* the theme that's on: 2 px black, 1 px white, 1 px black, on top of its colours so it shows on any theme */
+/* the theme that's on: light page 2 px black, 1 px white, 1 px black; dark page yellow, white, red; on top of its colours so it shows on any theme */
 .tile.on::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-  box-shadow: inset 0 0 0 2px #000, inset 0 0 0 3px #fff, inset 0 0 0 4px #000; }
+  box-shadow: inset 0 0 0 2px var(--pick-1), inset 0 0 0 3px var(--pick-2), inset 0 0 0 4px var(--pick-3); }
 .tile:active { transform: scale(.97); }
 #now-playing b { color: var(--amber-ink); }
 
