@@ -204,6 +204,7 @@ function drawFound() {
                   d.saved ? "in your saved setup" : ""].filter(Boolean);
     main.append(el("small", "fsub", bits.join(" · ")));
     if (TIER_NOTE[d.tier]) main.append(el("small", "ftier", TIER_NOTE[d.tier]));
+    if (d.warning) main.append(el("small", "fwarning", "\u26A0 " + d.warning));      // e.g. WLED's segment layout
     if (d.type === "tuya") main.append(el("small", "ftier", "Could be a plug, bulb or other smart-home device, not your lights: "
       + "tick it only if it's your lights. To check, open each device in the Smart Life app, tap the pencil, then "
       + `Device Information, and look for the address ${d.ip}.`));

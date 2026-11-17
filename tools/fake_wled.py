@@ -31,6 +31,7 @@ class Device:
         self.live_frame, self.live_until = None, 0.0
         self.mac = f"fa1e0000{k:04x}"
         self.posts, self.packets, self.released = 0, 0, 0
+        self.layout = None                # a list of segment dicts to report instead of the one whole-strip segment
         self.lock = threading.Lock()
 
     @property
@@ -43,9 +44,9 @@ class Device:
                 "leds": {"count": self.n, "rgbw": False, "lc": 1, "pwr": 0, "maxseg": 16}}
 
     def state(self):
-        return {"on": self.on, "bri": self.bri, "transition": 7, "ps": -1,
-                "seg": [{"id": 0, "start": 0, "stop": self.n, "len": self.n, "on": True, "bri": 255,
-                         "col": [list(self.col), [0, 0, 0], [0, 0, 0]], "fx": 0}]}
+        whole = [{"id": 0, "start": 0, "stop": self.n, "len": self.n, "grp": 1, "spc": 0, "of": 0, "on": True,
+                  "bri": 255, "col": [list(self.col), [0, 0, 0], [0, 0, 0]], "fx": 0, "rev": False, "mi": False}]
+        return {"on": self.on, "bri": self.bri, "transition": 7, "ps": -1, "seg": self.layout or whole}
 
     @staticmethod
     def _rgb(c):

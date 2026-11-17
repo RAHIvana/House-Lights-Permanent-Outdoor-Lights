@@ -66,6 +66,60 @@ def _row(ip, info):
             "rgbw": bool((leds.get("lc", 1) & 2) if isinstance(leds.get("lc"), int) else leds.get("rgbw"))}
 
 
+def _num(v, default=0):
+    return v if isinstance(v, int) and not isinstance(v, bool) else default
+
+
+def layout_warning(state, count=None):
+    """A sentence when this controller's segments would make static colours and themes differ from animations,
+    or "" when segment 0 is the plain whole strip. Static commands go to segment 0 and count from its own first
+    LED (grouping, spacing, mirror, reverse and offset apply to them), while live data from an animation lights
+    every LED whatever the segments are (kno.wled.ge JSON API and segments pages). Read-only: it only looks at
+    what /json/state says, and changes nothing in WLED."""
+    segs = state.get("seg") if isinstance(state, dict) else None
+    live = []
+    for i, s in enumerate(segs if isinstance(segs, list) else []):
+        if not isinstance(s, dict):
+            continue
+        start, stop = _num(s.get("start")), _num(s.get("stop"))
+        if stop > start:                                      # a slot with stop 0 is an unused one
+            live.append((_num(s.get("id"), i), start, stop, s))
+    first = next((x for x in live if x[0] == 0), None)
+    if first is None:
+        return ""
+    _, start, stop, s = first
+    why = []
+    if start != 0 or (count and stop != count):
+        why.append(f"segment 0 covers LEDs {start} to {stop - 1}" + (f" of {count}" if count else ""))
+    more = len(live) - 1
+    if more:
+        why.append(f"there {'is' if more == 1 else 'are'} {more} more segment{'' if more == 1 else 's'}")
+    odd = [name for name, on in (("grouping", _num(s.get("grp"), 1) > 1), ("spacing", _num(s.get("spc")) > 0),
+                                 ("mirror", bool(s.get("mi"))), ("reverse", bool(s.get("rev"))),
+                                 ("offset", _num(s.get("of")) != 0)) if on]
+    if odd:
+        why.append("segment 0 uses " + ", ".join(odd))
+    if s.get("on") is False:
+        why.append("segment 0 is switched off")
+    if not why:
+        return ""
+    return ("Static colours and themes go to segment 0 only, but animations light every LED, so they won't match "
+            "here: " + "; ".join(why) + ". To make them match, set segment 0 to cover the whole strip in WLED (no "
+            "grouping, spacing, mirror, reverse or offset). House Lights changes nothing in WLED.")
+
+
+def _with_layout(row, ip, timeout=1.5):
+    """Add a \"warning\" to a scan row when the segment layout needs one. A controller that won't say adds nothing."""
+    try:
+        state = net.http_json(_url(ip, "/json/state"), timeout=timeout)
+        text = layout_warning(state, row.get("lights"))
+    except Exception:                                         # noqa: BLE001
+        text = ""
+    if text:
+        row["warning"] = text
+    return row
+
+
 def discover(targets="", deep=False, expect=0, known=()):
     """Ask every address (typed, or this computer's /24 network) for /json/info. A deep scan
     waits longer for slow controllers."""
@@ -73,13 +127,14 @@ def discover(targets="", deep=False, expect=0, known=()):
     ips = expand_targets(targets) if str(targets or "").strip() else expand_targets(",".join(net.local_networks()))
     ips = [ip for ip in ips if ip not in set(known)]
     found = net.probe_many(lambda ip: _info(ip, timeout=4.0 if deep else 1.0), ips)
-    return [_row(ip, info) for ip, info in sorted(found.items(), key=lambda kv: socket.inet_aton(kv[0]))]
+    return [_with_layout(_row(ip, info), ip, 4.0 if deep else 1.5)
+            for ip, info in sorted(found.items(), key=lambda kv: socket.inet_aton(kv[0]))]
 
 
 def probe(info):
     ip = str(info.get("ip", "")).strip()
     try:
-        return [_row(ip, _info(ip))]
+        return [_with_layout(_row(ip, _info(ip)), ip)]
     except Exception as e:
         raise ValueError(f"no WLED device answered at {ip} ({type(e).__name__})") from None
 

@@ -179,6 +179,14 @@ frame is deliberately longer than the count). The questions, in order:
    - **I don't see blue at all:** the count is too high (the blue light is past the end).
      Count again or change the number.
 
+**A note about segments.** Under a WLED controller in the Scout list you may see a ⚠ note. House Lights sets static
+colours, themes and picked lights on **segment 0**, counted from its own first LED, while an animation lights **every LED**
+whatever the segments are (WLED's own documentation says live data ignores segments). They agree when segment 0 is the plain
+whole strip, which is WLED's default, and then there is no note. If segment 0 covers only part of the strip, there are more
+segments, or segment 0 uses grouping, spacing, mirror, reverse or offset, the note says so and how to fix it in WLED. It only
+reads the controller's layout: nothing is sent to WLED and nothing in it is changed. The Check pattern above can't show this
+mismatch, because it is drawn the way animations are.
+
 ### Controllers that cannot show single lights
 
 JellyFish, Tuya and basic Govee models change one colour (or a limited palette) at a time, so there

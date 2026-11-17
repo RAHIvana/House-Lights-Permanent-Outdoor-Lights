@@ -78,6 +78,7 @@ answered at ...") when nothing of your kind is there. Other fields the user type
 | `device_tail` | The last five characters of an id or MAC, so people can tell identical boxes apart |
 | `zone` | When one address has several lights (JellyFish zones): one row per zone |
 | `tier` | For kinds with tiers, the model's tier |
+| `warning` | Optional: a sentence the wizard shows under the row (WLED: its segment layout would make static colours and animations differ). Read-only: it must come from reading, never from changing anything |
 | *driver specific* | `device_id`, `version`, `needs_key` for Tuya, and so on |
 
 ### Status
@@ -342,7 +343,8 @@ class Kit(BaseKit):
   sends a packet with timeout 0 so it ends at once (the 2 seconds stay as the fallback if the server dies).
   It receives on the port it lists as `udpport` in `/json/info`, and it **ignores a DNRGB packet of exactly
   one light** (a lone light goes as DRGB; a lone light at the end of a long frame moves into the packet
-  before it).
+  before it). Static commands go to segment 0 and count from its own first LED, while live data lights every
+  LED whatever the segments are, so a scan row carries a `warning` when segment 0 isn't the plain whole strip.
 - **Tuya devices take one connection at a time**, so close the Smart Life app while testing.
 - **Tuya brightness** is that of the mode the light is in: the white level in white mode, the colour's value
   (V) in colour mode, both on TinyTuya's own scale (type A 25 to 255, type B 10 to 1000), so what is set is what

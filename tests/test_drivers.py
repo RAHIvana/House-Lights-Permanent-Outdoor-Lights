@@ -259,6 +259,45 @@ finally:
     net.http_json = real_http
     logging.disable(logging.NOTSET)
 
+
+# WLED segment layout: a read-only warning when static colours (segment 0) and animations (every LED) wouldn't match
+seg0 = {"id": 0, "start": 0, "stop": 60, "len": 60, "grp": 1, "spc": 0, "of": 0, "on": True, "rev": False, "mi": False}
+check("WLED layout: the plain whole strip gives no warning", wled.layout_warning({"seg": [seg0]}, 60) == "")
+check("WLED layout: unused slots are ignored",
+      wled.layout_warning({"seg": [seg0, {"stop": 0}, {"id": 5, "start": 3, "stop": 3}]}, 60) == "")
+w = wled.layout_warning({"seg": [dict(seg0, stop=20, len=20)]}, 60)
+check("WLED layout: segment 0 covering only part of the strip is explained, and nothing is changed",
+      "LEDs 0 to 19 of 60" in w and "segment 0 only" in w and "changes nothing in WLED" in w)
+check("WLED layout: a segment 0 that starts later is explained",
+      "LEDs 10 to 59 of 60" in wled.layout_warning({"seg": [dict(seg0, start=10, len=50)]}, 60))
+w = wled.layout_warning({"seg": [dict(seg0, stop=30, len=30), dict(seg0, id=1, start=30, stop=60, len=30)]}, 60)
+check("WLED layout: more segments are counted", "LEDs 0 to 29 of 60" in w and "there is 1 more segment" in w)
+w = wled.layout_warning({"seg": [dict(seg0, grp=2, spc=1, mi=True, rev=True, of=3)]}, 60)
+check("WLED layout: grouping, spacing, mirror, reverse and offset are named",
+      all(word in w for word in ("grouping", "spacing", "mirror", "reverse", "offset")))
+check("WLED layout: a switched-off segment 0 is named",
+      "segment 0 is switched off" in wled.layout_warning({"seg": [dict(seg0, on=False)]}, 60))
+check("WLED layout: without a LED count only the shape is judged",
+      wled.layout_warning({"seg": [seg0]}) == ""
+      and "LEDs 5 to 19" in wled.layout_warning({"seg": [dict(seg0, start=5, stop=20, len=15)]}))
+odd = [wled.layout_warning(x, 60) for x in ({}, None, {"seg": "x"}, {"seg": [None, 5, "a"]},
+                                             {"seg": [{"id": 0, "start": "a", "stop": None}]})]
+check("WLED layout: missing or odd data gives no warning and no crash", odd == [""] * 5)
+
+posts_before = (fw[0].posts, fw[1].posts)
+check("WLED scan: plain layouts add no warning", all("warning" not in r for r in wled.discover("127.0.0.21, 127.0.0.22")))
+fw[1].layout = [dict(seg0, stop=300, len=300), dict(seg0, id=1, start=300, stop=600, len=300)]
+try:
+    scanned = {r["ip"]: r for r in wled.discover("127.0.0.21, 127.0.0.22")}
+    probed = wled.probe({"ip": "127.0.0.22"})
+    via_wizard = setup.discover({"types": ["wled"], "targets": "127.0.0.22"})["devices"]
+finally:
+    fw[1].layout = None
+check("WLED scan: the controller with split segments carries the warning, the plain one doesn't",
+      "warning" not in scanned["127.0.0.21"] and "LEDs 0 to 299 of 600" in scanned["127.0.0.22"]["warning"])
+check("WLED add by address and the wizard's scan carry it too", "warning" in probed[0] and "warning" in via_wizard[0])
+check("WLED layout check is read-only: nothing was posted to the controllers", (fw[0].posts, fw[1].posts) == posts_before)
+
 # --- JellyFish ------------------------------------------------------------------------------------
 pal, b = jellyfish.blocks([(255, 0, 0)] * 5 + [(255, 255, 255)] * 5 + [(0, 0, 255)] * 5)
 check("JellyFish blocks: bands are exact", pal == [(255, 0, 0), (255, 255, 255), (0, 0, 255)] and b == 5)
