@@ -5,7 +5,7 @@
   --green: #2c7f4f; --night: #23262b; --night-fg: #b3b6bb; --dot-off: #41454c; --focus: #2f6fde;
   --dry: #b7791f; --toast: #2b2720; --toast-fg: #f3efe7; --err-bg: #8f2f28;
   --band: #1c2541; --band-fg: #f7e7c6; --tab-on: #fbe7be; --tab-on-ink: #5a3a06; --tab-done: #e2edd6; --tab-done-ink: #2f5410;
-  --pick: #c0c0c0;   /* the lit theme tile's 4 px border: silver (bright yellow on the dark page) */
+  --pick: #a0a0a0;   /* the lit theme tile's 4 px border: dark silver (bright yellow on the dark page) */
   --gutter: max(20px, env(safe-area-inset-left, 0px)); --gutter-r: max(20px, env(safe-area-inset-right, 0px));
   --radius: 12px;
   color-scheme: light;
