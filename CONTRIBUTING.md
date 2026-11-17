@@ -7,7 +7,9 @@ Thanks for helping. The most useful things, in order:
 2. **Bug reports.** Use the bug report form, and remove addresses, device IDs and keys first.
 3. **Themes.** Made one you love? Export it from the Themes tab and attach the `.json` file to an
    issue (or open a pull request that adds it as a built-in theme).
-4. **Code.** Small, focused pull requests are easiest to review.
+4. **Code.** Small, focused pull requests are easiest to review. Adding support for another
+   controller? Start with the [drivers guide](houselights/drivers/README.md); how the setup wizard
+   uses a driver is in [docs/light-discovery.md](docs/light-discovery.md).
 
 Security problems go through [SECURITY.md](SECURITY.md), not a public issue.
 

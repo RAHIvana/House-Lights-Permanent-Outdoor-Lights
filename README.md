@@ -213,7 +213,9 @@ python -m houselights [--home DIR] [--host HOST] [--port PORT] [--dry]
 ## The setup wizard
 
 The first time you open the page there are no settings yet, so the setup wizard opens. You
-can run it again later from the **Settings** tab (**Change setup**).
+can run it again later from the **Settings** tab (**Change setup**). How it finds your lights,
+which patterns it plays on them, and what it does with your answers is explained in
+[docs/light-discovery.md](docs/light-discovery.md).
 
 1. **Scout** (find your lights): press **Find my lights**. House Lights asks every controller on
    your network what it is (Govee, WLED, JellyFish and Tuya / Smart Life at once); asking
@@ -440,7 +442,9 @@ On Windows use `venv\Scripts\python tests\test_settings.py` and so on.
 
 Each kind is a driver in `houselights/drivers/`. `base.py` describes what a driver provides
 and its capabilities (per-light streaming, static frames or segments, status, how the light
-count is found); the setup wizard and the dashboard adapt to them.
+count is found); the setup wizard and the dashboard adapt to them. The
+[drivers guide](houselights/drivers/README.md) lists the functions and commands a driver needs,
+with a small example and a checklist for adding one.
 
 ## Coming later
 
