@@ -505,6 +505,10 @@ function buildCard(sec) {
 // Tiles: every theme marked as a tile, in category order, plus plain warm white first.
 const WARM_TILE = {id: "warm", label: "Warm white", animated: false, categories: ["Everyday"],
   face: "#ffd8a8,#ffb36b", describe: "Plain warm white, 2200 K."};
+// The category the pull-down starts on until someone picks another one (it then remembers that).
+// Seasonal: change DEFAULT_CAT with the season, and CAT_KEY to a new name so that the new default
+// shows once for people who had already picked a category.
+const DEFAULT_CAT = "Christmas", CAT_KEY = "hl-cat-2";
 let CAT = "All";
 // Favourites first (starred in the Themes tab), then your own themes, then the built-ins in
 // category order. Built-in groups hidden in the Themes tab are left out (unless starred).
@@ -540,10 +544,11 @@ function buildTiles() {
   cat.appendChild(new Option(`All (${tiles.length})`, "All"));
   for (const c of ["Favourites", ...(CONFIG.categories || [])]) if (used.has(c))
     cat.appendChild(new Option(`${c} (${tiles.filter(t => t.categories.includes(c)).length})`, c));
-  const saved = store.get("hl-cat");
-  CAT = [...cat.options].some(o => o.value === saved) ? saved : "All";
+  const has = v => [...cat.options].some(o => o.value === v);
+  const saved = store.get(CAT_KEY);
+  CAT = has(saved) ? saved : has(DEFAULT_CAT) ? DEFAULT_CAT : "All";
   cat.value = CAT;
-  cat.onchange = () => { CAT = cat.value; store.set("hl-cat", CAT); applyCat(); };
+  cat.onchange = () => { CAT = cat.value; store.set(CAT_KEY, CAT); applyCat(); };
   applyCat();
 }
 
