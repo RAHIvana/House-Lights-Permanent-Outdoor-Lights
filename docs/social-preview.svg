@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <!-- House Lights social preview (GitHub "Social preview", 1280x640): the approved amber bulb on night blue,
+       with a roofline of lit bulbs in four of the theme families (Christmas, USA, Halloween, Diwali).
+       Static shapes only: no script, so it shows the same everywhere. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b1330"/>
+      <stop offset="1" stop-color="#1c2541"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#f2b544" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#f2b544" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-200%" y="-200%" width="500%" height="500%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#sky)"/>
+
+  <g fill="#f7e7c6" opacity="0.55">
+    <circle cx="96" cy="84" r="1.8"/><circle cx="214" cy="150" r="1.4"/><circle cx="330" cy="62" r="1.6"/>
+    <circle cx="452" cy="132" r="1.2"/><circle cx="868" cy="70" r="1.5"/><circle cx="978" cy="148" r="1.8"/>
+    <circle cx="1090" cy="88" r="1.3"/><circle cx="1196" cy="156" r="1.6"/><circle cx="760" cy="40" r="1.2"/>
+    <circle cx="540" cy="44" r="1.2"/><circle cx="150" cy="236" r="1.3"/><circle cx="1140" cy="244" r="1.3"/>
+  </g>
+
+  <!-- the bulb: the same paths as houselights/static/icon.svg, drawn 5x -->
+  <circle cx="640" cy="118" r="150" fill="url(#halo)"/>
+  <g transform="translate(580 58) scale(5)" fill="none" stroke="#f2b544" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 12h1m8 -9v1m8 8h1m-15.4 -6.4l.7 .7m12.1 -.7l-.7 .7"/>
+    <path d="M9 16a5 5 0 1 1 6 0a3.5 3.5 0 0 0 -1 3a2 2 0 0 1 -4 0a3.5 3.5 0 0 0 -1 -3"/>
+    <path d="M9.7 17l4.6 0"/>
+  </g>
+
+  <g font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" text-anchor="middle">
+    <text x="640" y="300" font-size="100" font-weight="700" fill="#f7e7c6">House Lights</text>
+    <text x="640" y="358" font-size="34" fill="#d3dbef">Themes and schedules for permanent outdoor lights</text>
+    <text x="640" y="406" font-size="25" fill="#8f9cc0">100+ holiday and everyday themes  ·  schedules  ·  make your own</text>
+  </g>
+
+  <!-- the house: a dark roof, and the lights along the eave -->
+  <polygon points="0,640 0,586 640,502 1280,586 1280,640" fill="#060b1d"/>
+  <polyline points="0,586 640,502 1280,586" fill="none" stroke="#2a3558" stroke-width="3"/>
+  <g filter="url(#glow)" opacity="0.85">
+    <circle cx="8.0" cy="601.0" r="11" fill="#ff3b3b"/>
+    <circle cx="44.1" cy="596.2" r="11" fill="#2fd36b"/>
+    <circle cx="80.2" cy="591.5" r="11" fill="#fff2d6"/>
+    <circle cx="116.3" cy="586.7" r="11" fill="#ff3b3b"/>
+    <circle cx="152.5" cy="582.0" r="11" fill="#2fd36b"/>
+    <circle cx="188.6" cy="577.2" r="11" fill="#fff2d6"/>
+    <circle cx="224.7" cy="572.5" r="11" fill="#ff3b3b"/>
+    <circle cx="260.8" cy="567.8" r="11" fill="#2fd36b"/>
+    <circle cx="296.9" cy="563.0" r="11" fill="#fff2d6"/>
+    <circle cx="333.0" cy="558.3" r="11" fill="#ff3b3b"/>
+    <circle cx="369.1" cy="553.5" r="11" fill="#fff6ea"/>
+    <circle cx="405.3" cy="548.8" r="11" fill="#3b7bff"/>
+    <circle cx="441.4" cy="544.1" r="11" fill="#ff3b3b"/>
+    <circle cx="477.5" cy="539.3" r="11" fill="#fff6ea"/>
+    <circle cx="513.6" cy="534.6" r="11" fill="#3b7bff"/>
+    <circle cx="549.7" cy="529.9" r="11" fill="#ff3b3b"/>
+    <circle cx="585.8" cy="525.1" r="11" fill="#fff6ea"/>
+    <circle cx="621.9" cy="520.4" r="11" fill="#3b7bff"/>
+    <circle cx="658.1" cy="520.4" r="11" fill="#ff8a1f"/>
+    <circle cx="694.2" cy="525.1" r="11" fill="#7dff4a"/>
+    <circle cx="730.3" cy="529.9" r="11" fill="#ff8a1f"/>
+    <circle cx="766.4" cy="534.6" r="11" fill="#a255ff"/>
+    <circle cx="802.5" cy="539.3" r="11" fill="#ff8a1f"/>
+    <circle cx="838.6" cy="544.1" r="11" fill="#7dff4a"/>
+    <circle cx="874.7" cy="548.8" r="11" fill="#ff8a1f"/>
+    <circle cx="910.9" cy="553.5" r="11" fill="#a255ff"/>
+    <circle cx="947.0" cy="558.3" r="11" fill="#ff8a1f"/>
+    <circle cx="983.1" cy="563.0" r="11" fill="#ffe08a"/>
+    <circle cx="1019.2" cy="567.8" r="11" fill="#ffc233"/>
+    <circle cx="1055.3" cy="572.5" r="11" fill="#ff3d9a"/>
+    <circle cx="1091.4" cy="577.2" r="11" fill="#ff7a1a"/>
+    <circle cx="1127.5" cy="582.0" r="11" fill="#ffe08a"/>
+    <circle cx="1163.7" cy="586.7" r="11" fill="#ffc233"/>
+    <circle cx="1199.8" cy="591.5" r="11" fill="#ff3d9a"/>
+    <circle cx="1235.9" cy="596.2" r="11" fill="#ff7a1a"/>
+    <circle cx="1272.0" cy="601.0" r="11" fill="#ffe08a"/>
+  </g>
+  <g>
+    <circle cx="8.0" cy="601.0" r="6.5" fill="#ff3b3b"/>
+    <circle cx="6.2" cy="599.0" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="44.1" cy="596.2" r="6.5" fill="#2fd36b"/>
+    <circle cx="42.3" cy="594.2" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="80.2" cy="591.5" r="6.5" fill="#fff2d6"/>
+    <circle cx="78.4" cy="589.5" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="116.3" cy="586.7" r="6.5" fill="#ff3b3b"/>
+    <circle cx="114.5" cy="584.7" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="152.5" cy="582.0" r="6.5" fill="#2fd36b"/>
+    <circle cx="150.7" cy="580.0" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="188.6" cy="577.2" r="6.5" fill="#fff2d6"/>
+    <circle cx="186.8" cy="575.2" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="224.7" cy="572.5" r="6.5" fill="#ff3b3b"/>
+    <circle cx="222.9" cy="570.5" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="260.8" cy="567.8" r="6.5" fill="#2fd36b"/>
+    <circle cx="259.0" cy="565.8" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="296.9" cy="563.0" r="6.5" fill="#fff2d6"/>
+    <circle cx="295.1" cy="561.0" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="333.0" cy="558.3" r="6.5" fill="#ff3b3b"/>
+    <circle cx="331.2" cy="556.3" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="369.1" cy="553.5" r="6.5" fill="#fff6ea"/>
+    <circle cx="367.3" cy="551.5" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="405.3" cy="548.8" r="6.5" fill="#3b7bff"/>
+    <circle cx="403.5" cy="546.8" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="441.4" cy="544.1" r="6.5" fill="#ff3b3b"/>
+    <circle cx="439.6" cy="542.1" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="477.5" cy="539.3" r="6.5" fill="#fff6ea"/>
+    <circle cx="475.7" cy="537.3" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="513.6" cy="534.6" r="6.5" fill="#3b7bff"/>
+    <circle cx="511.8" cy="532.6" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="549.7" cy="529.9" r="6.5" fill="#ff3b3b"/>
+    <circle cx="547.9" cy="527.9" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="585.8" cy="525.1" r="6.5" fill="#fff6ea"/>
+    <circle cx="584.0" cy="523.1" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="621.9" cy="520.4" r="6.5" fill="#3b7bff"/>
+    <circle cx="620.1" cy="518.4" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="658.1" cy="520.4" r="6.5" fill="#ff8a1f"/>
+    <circle cx="656.3" cy="518.4" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="694.2" cy="525.1" r="6.5" fill="#7dff4a"/>
+    <circle cx="692.4" cy="523.1" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="730.3" cy="529.9" r="6.5" fill="#ff8a1f"/>
+    <circle cx="728.5" cy="527.9" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="766.4" cy="534.6" r="6.5" fill="#a255ff"/>
+    <circle cx="764.6" cy="532.6" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="802.5" cy="539.3" r="6.5" fill="#ff8a1f"/>
+    <circle cx="800.7" cy="537.3" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="838.6" cy="544.1" r="6.5" fill="#7dff4a"/>
+    <circle cx="836.8" cy="542.1" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="874.7" cy="548.8" r="6.5" fill="#ff8a1f"/>
+    <circle cx="872.9" cy="546.8" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="910.9" cy="553.5" r="6.5" fill="#a255ff"/>
+    <circle cx="909.1" cy="551.5" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="947.0" cy="558.3" r="6.5" fill="#ff8a1f"/>
+    <circle cx="945.2" cy="556.3" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="983.1" cy="563.0" r="6.5" fill="#ffe08a"/>
+    <circle cx="981.3" cy="561.0" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="1019.2" cy="567.8" r="6.5" fill="#ffc233"/>
+    <circle cx="1017.4" cy="565.8" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="1055.3" cy="572.5" r="6.5" fill="#ff3d9a"/>
+    <circle cx="1053.5" cy="570.5" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="1091.4" cy="577.2" r="6.5" fill="#ff7a1a"/>
+    <circle cx="1089.6" cy="575.2" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="1127.5" cy="582.0" r="6.5" fill="#ffe08a"/>
+    <circle cx="1125.7" cy="580.0" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="1163.7" cy="586.7" r="6.5" fill="#ffc233"/>
+    <circle cx="1161.9" cy="584.7" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="1199.8" cy="591.5" r="6.5" fill="#ff3d9a"/>
+    <circle cx="1198.0" cy="589.5" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="1235.9" cy="596.2" r="6.5" fill="#ff7a1a"/>
+    <circle cx="1234.1" cy="594.2" r="2.1" fill="#ffffff" opacity="0.65"/>
+    <circle cx="1272.0" cy="601.0" r="6.5" fill="#ffe08a"/>
+    <circle cx="1270.2" cy="599.0" r="2.1" fill="#ffffff" opacity="0.65"/>
+  </g>
+</svg>
