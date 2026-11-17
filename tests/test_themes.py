@@ -163,4 +163,78 @@ with tempfile.TemporaryDirectory() as tmp:
     check("import: not a themes file", raises(lambda: st3.import_({"x": 1}), "themes"))
     P.set_custom([])
 
+# --- the built-in themes: every one renders, the holiday and Animated-fast groups, flash limit ----
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools"))
+import make_theme_gallery as G  # noqa: E402
+
+bad = [(k, n, t) for k in P.PATTERNS for n in (1, 7, 50, 120) for t in (0.0, 0.37, 12.3, 3601.5)
+       if len(P.frame(k, n, {}, t)) != n
+       or not all(len(c) == 3 and all(isinstance(v, int) and 0 <= v <= 255 for v in c) for c in P.frame(k, n, {}, t))]
+check(f"all {len(P.PATTERNS)} built-in themes render at any size and time", not bad)
+check("every theme is in a listed category", all(c in P.CATEGORIES for v in P.PATTERNS.values() for c in v["cats"]))
+check("every theme has a face", all(v.get("face") for v in P.PATTERNS.values()))
+by = lambda cat: [k for k, v in P.PATTERNS.items() if cat in v["cats"]]       # noqa: E731
+check("Animated-fast group: 20 or more, all animated", len(by(P.FAST)) >= 20 and all(P.PATTERNS[k].get("animated") for k in by(P.FAST)))
+check("Animated-fast is the second category", P.categories()[:3] == [P.MY_GROUP, "Everyday", P.FAST])
+check("Christmas: 8 or more animated", sum(1 for k in by("Christmas") if P.PATTERNS[k].get("animated")) >= 8)
+check("Thanksgiving: 8 or more animated", sum(1 for k in by("Thanksgiving") if P.PATTERNS[k].get("animated")) >= 8)
+check("fast holiday themes are in Animated-fast too", {"reindeer_dash", "turkey_trot"} <= set(by(P.FAST)))
+check("the red-and-green static Christmas theme is gone", "christmas" not in P.PATTERNS)
+check("asking for it explains", raises(lambda: P.frame("christmas", 10, {}), "no longer part"))
+
+
+def moves(pid, lights=120, fps=15, seconds=4):
+    """Lights changing colour per second, as a share of all lights (how lively a theme is)."""
+    fr = [P.frame(pid, lights, {}, k / fps) for k in range(int(seconds * fps))]
+    return sum(a != b for x, y in zip(fr, fr[1:]) for a, b in zip(x, y)) / (len(fr) - 1) / lights
+
+
+slow = [k for k in by(P.FAST) if moves(k) < 0.05]
+check("every Animated-fast theme is lively (5% of lights change each frame)", not slow)
+
+
+def flashes_per_second(pid, lights=120, fps=15, seconds=20, step=0.10):
+    """Whole-house brightness swings of 0.10 up and back, the most in any one second."""
+    def lum(frame):
+        lin = lambda v: v / 255 / 12.92 if v <= 10.3 else ((v / 255 + 0.055) / 1.055) ** 2.4      # noqa: E731
+        return sum(0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b) for r, g, b in frame) / len(frame)
+    series = [lum(P.frame(pid, lights, {}, k / fps)) for k in range(int(seconds * fps))]
+    swings, hi, lo, d = [], series[0], series[0], 0
+    for k, v in enumerate(series):
+        hi, lo = (max(hi, v) if d >= 0 else hi), (min(lo, v) if d <= 0 else lo)
+        if d >= 0 and hi - v >= step:
+            swings.append(k)
+            d, lo = -1, v
+        elif d <= 0 and v - lo >= step:
+            swings.append(k)
+            d, hi = 1, v
+    return max((sum(1 for j in swings[i:] if j - k < fps) for i, k in enumerate(swings)), default=0) / 2
+
+
+over = {k: flashes_per_second(k) for k, v in P.PATTERNS.items() if v.get("animated")}
+check("no theme flashes the whole house more than 3 times a second", not [k for k, f in over.items() if f > 3])
+
+# --- docs/themes.md and its pictures are what tools/make_theme_gallery.py makes now ----------------
+docs = os.path.join(G.ROOT, "docs")
+with open(os.path.join(docs, "themes.md"), encoding="utf-8") as f:
+    check("docs/themes.md is up to date (run tools/make_theme_gallery.py)", f.read() == G.page())
+stale = []
+for pid in P.PATTERNS:
+    try:
+        with open(os.path.join(G.PICS, f"{pid}.png"), "rb") as f:
+            if f.read() != G.png(*G.frames_of(pid)):
+                stale.append(pid)
+    except FileNotFoundError:
+        stale.append(pid)
+check("every theme's picture in docs/themes is up to date", not stale)
+check("no picture of a removed theme", {n for n in os.listdir(G.PICS) if n.endswith(".png")} == {f"{k}.png" for k in P.PATTERNS})
+with open(os.path.join(G.ROOT, "README.md"), encoding="utf-8") as f:
+    readme = f.read()
+n_anim = sum(1 for v in P.PATTERNS.values() if v.get("animated"))
+check("the README links the themes page and has the right counts",
+      "docs/themes.md" in readme and f"**{len(P.PATTERNS)} built-in themes, {n_anim} of them animated" in readme
+      and f"**Animated-fast** ({len(by(P.FAST))} themes)" in readme
+      and f"**Thanksgiving** ({len(by('Thanksgiving'))} themes)" in readme
+      and f"**Christmas** ({len(by('Christmas'))} themes)" in readme)
+
 sys.exit(1 if check.failed else 0)

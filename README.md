@@ -13,8 +13,45 @@ Run it on a computer you already have (**Windows**, **Mac** or Linux) or on a
 **Raspberry Pi 3 or newer**, on the same home network as the lights. Leave it running for
 schedules to work; any phone or computer on that network can open the dashboard.
 
-- 79 built-in themes: everyday, Diwali and Hindu festivals, Christmas, Halloween,
-  Thanksgiving, US holidays, celebrations and birthdays, school spirit.
+## Make your house the one people stop to look at
+
+**103 built-in themes, 79 of them animated light by light.** Every light gets its own color,
+15 times a second: a comet races the whole roofline, snow streaks past the windows, fireworks
+go off over the garage. Pick one in two taps, or schedule it from sunset to bedtime.
+
+> ### [**See all 103 themes, moving →**](docs/themes.md)
+> Every theme drawn as a strip of lights, animated, by holiday. Pictures are made by the same
+> code that plays them on your house.
+
+**New for the holidays:**
+
+- **Animated-fast** (25 themes): fast, showy motion for any night, to stand out on your
+  street. Racing comets, marquee bulbs, color wipes, dance beats, fireworks finales.
+- **Thanksgiving** (12 themes): leaf storms, harvest fireworks, a turkey trot, a cozy
+  fireplace.
+- **Christmas** (19 themes): reindeer dash, blizzard, jingle beat, peppermint twist, northern
+  lights.
+
+| Theme | On 48 lights |
+|---|---|
+| **Neon racers** (Animated-fast) | <img src="docs/themes/neon_racers.png" alt="Neon racers" width="436"> |
+| **Reindeer dash** (Christmas) | <img src="docs/themes/reindeer_dash.png" alt="Reindeer dash" width="436"> |
+| **Blizzard** (Christmas) | <img src="docs/themes/blizzard.png" alt="Blizzard" width="436"> |
+| **Leaf storm** (Thanksgiving) | <img src="docs/themes/leaf_storm.png" alt="Leaf storm" width="436"> |
+| **Harvest fireworks** (Thanksgiving) | <img src="docs/themes/harvest_fireworks.png" alt="Harvest fireworks" width="436"> |
+| **Christmas marquee** (Animated-fast) | <img src="docs/themes/christmas_marquee.png" alt="Christmas marquee" width="436"> |
+
+Also Diwali and Hindu festivals, Halloween, July 4th and other US holidays, birthdays, school
+spirit and everyday looks, and you can [make your own themes](#themes) in the dashboard.
+Light-by-light animation works on **Govee H806A** (tested on real lights) and **WLED**; see
+[Supported controllers](#supported-controllers) for what each kind can do.
+[Full theme gallery](docs/themes.md).
+
+## What's in it
+
+- 103 built-in themes: everyday, **Animated-fast**, Diwali and Hindu festivals, Christmas,
+  Halloween, Thanksgiving, US holidays, celebrations and birthdays, school spirit.
+  [See them all.](docs/themes.md)
 - Quick Settings with theme tiles, **Your house** (one row per run, drawn to scale), a panel
   per run, a Themes tab to make your own, and Schedules. A light and a dark page; works on a
   phone.
@@ -318,7 +355,9 @@ server restarts inside that same window, and Ctrl+C still stops it.
 
 The **Themes** tab lists your own themes first (**My themes**), then the built-in ones by
 group. Pick any theme to open it in the editor; nothing is sent to the lights until you press
-an amber button.
+an amber button. The [theme gallery](docs/themes.md) shows every built-in theme moving.
+After adding or changing a built-in theme, run `python tools/make_theme_gallery.py` to
+redraw the gallery.
 
 - **Make one**: press **New theme**, or open a built-in theme and change it. Built-in themes
   never change: **Save** on one makes a copy in My themes. Your themes appear everywhere a
