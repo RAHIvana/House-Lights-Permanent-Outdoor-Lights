@@ -540,8 +540,8 @@ FIREWORK = "#ffc850,#ff3030,#30ff60,#ff40ff,#40a0ff,#ffffff"
 # Quick Settings' category pull-down, in this order. A theme can be in several; its first
 # category groups it in the theme lists.
 FAST = "Animated-fast"        # the show-off group: fast movement, any occasion
-CATEGORIES = ["Everyday", FAST, "Diwali", "Hindu festivals", "India", "Christmas", "Halloween", "Thanksgiving",
-              "USA", "More US holidays", "Celebration", "School spirit"]
+CATEGORIES = [FAST, "Christmas", "Thanksgiving", "USA", "Celebration", "More US holidays", "Halloween",
+              "School spirit", "Diwali", "Hindu festivals", "India", "Everyday"]
 
 
 def _hx(*cols):

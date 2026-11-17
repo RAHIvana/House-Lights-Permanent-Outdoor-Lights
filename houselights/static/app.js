@@ -502,8 +502,8 @@ function buildCard(sec) {
 }
 
 // --- Quick Settings ---------------------------------------------------------------------------
-// Tiles: every theme marked as a tile, in category order, plus plain warm white first.
-const WARM_TILE = {id: "warm", label: "Warm white", animated: false, categories: ["Everyday"],
+// Tiles: every theme marked as a tile, in category order; plain warm white is the first Everyday tile.
+const WARM_TILE = {id: "warm", label: "Warm white", animated: false, categories: ["Everyday"], group: "Everyday",
   face: "#ffd8a8,#ffb36b", describe: "Plain warm white, 2200 K."};
 // The category the pull-down starts on until someone picks another one (it then remembers that).
 // Seasonal: change DEFAULT_CAT with the season, and CAT_KEY to a new name so that the new default
@@ -518,8 +518,8 @@ function tileList() {
   const fav = id => { const k = favourites.indexOf(id); return k < 0 ? 1e6 : k; };
   const list = CONFIG.patterns.filter(p => p.tile && (favourites.includes(p.id) || p.custom
     || !p.categories.some(c => hidden_groups.includes(c))));
-  return [WARM_TILE, ...list.map(p => favourites.includes(p.id) ? {...p, categories: ["Favourites", ...p.categories]} : p)
-    .sort((a, b) => fav(a.id) - fav(b.id) || order.indexOf(a.group) - order.indexOf(b.group))];
+  return [WARM_TILE, ...list.map(p => favourites.includes(p.id) ? {...p, categories: ["Favourites", ...p.categories]} : p)]
+    .sort((a, b) => fav(a.id) - fav(b.id) || order.indexOf(a.group) - order.indexOf(b.group));
 }
 // Two stops at least: a one-color face would be an invalid gradient.
 const faceGradient = face => { const c = (face || "#888888").split(","); return `linear-gradient(90deg, ${(c.length > 1 ? c : [c[0], c[0]]).join(",")})`; };

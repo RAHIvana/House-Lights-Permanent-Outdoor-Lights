@@ -49,9 +49,9 @@ Light-by-light animation works on **Govee H806A** (tested on real lights) and **
 
 ## What's in it
 
-- 103 built-in themes: everyday, **Animated-fast**, Diwali and Hindu festivals, Christmas,
-  Halloween, Thanksgiving, US holidays, celebrations and birthdays, school spirit.
-  [See them all.](docs/themes.md)
+- 103 built-in themes: **Animated-fast**, Christmas, Thanksgiving, USA, celebrations and
+  birthdays, other US holidays, Halloween, school spirit, Diwali and Hindu festivals, India,
+  everyday looks. [See them all.](docs/themes.md)
 - Quick Settings with theme tiles, **Your house** (one row per run, drawn to scale), a panel
   per run, a Themes tab to make your own, and Schedules. A light and a dark page; works on a
   phone.

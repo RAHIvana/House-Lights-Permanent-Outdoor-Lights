@@ -175,7 +175,9 @@ check("every theme is in a listed category", all(c in P.CATEGORIES for v in P.PA
 check("every theme has a face", all(v.get("face") for v in P.PATTERNS.values()))
 by = lambda cat: [k for k, v in P.PATTERNS.items() if cat in v["cats"]]       # noqa: E731
 check("Animated-fast group: 20 or more, all animated", len(by(P.FAST)) >= 20 and all(P.PATTERNS[k].get("animated") for k in by(P.FAST)))
-check("Animated-fast is the second category", P.categories()[:3] == [P.MY_GROUP, "Everyday", P.FAST])
+check("category order: My themes, Animated-fast, Christmas, Thanksgiving, USA, ... Everyday last",
+      P.categories() == [P.MY_GROUP, P.FAST, "Christmas", "Thanksgiving", "USA", "Celebration", "More US holidays",
+                         "Halloween", "School spirit", "Diwali", "Hindu festivals", "India", "Everyday"])
 check("Christmas: 8 or more animated", sum(1 for k in by("Christmas") if P.PATTERNS[k].get("animated")) >= 8)
 check("Thanksgiving: 8 or more animated", sum(1 for k in by("Thanksgiving") if P.PATTERNS[k].get("animated")) >= 8)
 check("fast holiday themes are in Animated-fast too", {"reindeer_dash", "turkey_trot"} <= set(by(P.FAST)))
