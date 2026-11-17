@@ -15,18 +15,19 @@ schedules to work; any phone or computer on that network can open the dashboard.
 
 ## Make your house the one people stop to look at
 
-**103 built-in themes, 79 of them animated light by light.** Every light gets its own color,
+**106 built-in themes, 82 of them animated light by light.** Every light gets its own color,
 15 times a second: a comet races the whole roofline, snow streaks past the windows, fireworks
 go off over the garage. Pick one in two taps, or schedule it from sunset to bedtime.
 
-> ### [**See all 103 themes, moving →**](docs/themes.md)
+> ### [**See all 106 themes, moving →**](docs/themes.md)
 > Every theme drawn as a strip of lights, animated, by holiday. Pictures are made by the same
 > code that plays them on your house.
 
 **New for the holidays:**
 
-- **Animated-fast** (25 themes): fast, showy motion for any night, to stand out on your
-  street. Racing comets, marquee bulbs, color wipes, dance beats, fireworks finales.
+- **Animated-fast** (28 themes): fast, showy motion for any night, to stand out on your
+  street. Racing comets, marquee bulbs, color wipes, dance beats, fireworks finales, and
+  red, white and blue ones for the USA.
 - **Thanksgiving** (12 themes): leaf storms, harvest fireworks, a turkey trot, a cozy
   fireplace.
 - **Christmas** (19 themes): reindeer dash, blizzard, jingle beat, peppermint twist, northern
@@ -49,7 +50,7 @@ Light-by-light animation works on **Govee H806A** (tested on real lights) and **
 
 ## What's in it
 
-- 103 built-in themes: **Animated-fast**, Christmas, Thanksgiving, USA, celebrations and
+- 106 built-in themes: **Animated-fast**, Christmas, Thanksgiving, USA, celebrations and
   birthdays, other US holidays, Halloween, school spirit, Diwali and Hindu festivals, India,
   everyday looks. [See them all.](docs/themes.md)
 - Quick Settings with theme tiles, **Your house** (one row per run, drawn to scale), a panel

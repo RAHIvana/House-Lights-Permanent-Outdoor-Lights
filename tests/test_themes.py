@@ -181,6 +181,7 @@ check("category order: My themes, Animated-fast, Christmas, Thanksgiving, USA, .
 check("Christmas: 8 or more animated", sum(1 for k in by("Christmas") if P.PATTERNS[k].get("animated")) >= 8)
 check("Thanksgiving: 8 or more animated", sum(1 for k in by("Thanksgiving") if P.PATTERNS[k].get("animated")) >= 8)
 check("fast holiday themes are in Animated-fast too", {"reindeer_dash", "turkey_trot"} <= set(by(P.FAST)))
+check("USA: 3 or more of its themes are Animated-fast", len(set(by("USA")) & set(by(P.FAST))) >= 3)
 check("the red-and-green static Christmas theme is gone", "christmas" not in P.PATTERNS)
 check("asking for it explains", raises(lambda: P.frame("christmas", 10, {}), "no longer part"))
 

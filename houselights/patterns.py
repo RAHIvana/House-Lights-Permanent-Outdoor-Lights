@@ -609,6 +609,7 @@ def BEAT(colors, bpm, width=4):
 
 
 XMAS_RED, XMAS_GREEN = (255, 0, 0), (0, 170, 30)
+USA3 = _hx(US_RED, US_WHITE, US_BLUE)
 XMAS = _hx(XMAS_RED, XMAS_GREEN, WHITE)
 XMAS_GOLD = _hx(XMAS_RED, XMAS_GREEN, GOLD, WHITE)
 MAPLE, PUMPKIN, CORN, RUST = (220, 30, 0), (255, 120, 0), (255, 190, 40), (200, 80, 0)
@@ -854,6 +855,15 @@ PATTERNS = {
                           face="#1428c8,#ffffff,#dc0014,#ffffff"),
     "usa_fireworks": A("Red, white & blue fireworks", ["USA", FAST], _bursts, BU(_hx(US_RED, US_WHITE, US_BLUE), "#00000f", 1.3),
                        "#dc0014,#ffffff,#1428c8", "Dynamic. Red, white and blue firework bursts over a dark sky."),
+    "patriot_racers": A("Patriot racers", ["USA", FAST], _racers, RC(USA3, "#00000f", 5, 24.0, 8),
+                        "#00000f,#dc0014,#ffffff,#1428c8", "Dynamic. Fast. Red, white and blue comets racing past each "
+                        "other in both directions over a dark night sky, each with a fading tail."),
+    "liberty_marquee": A("Liberty marquee", ["USA", FAST], _marquee, MQ(USA3, 3, 8.0), "#dc0014,#ffffff,#1428c8",
+                         "Dynamic. Fast. Red, white and blue marquee bulbs, every third one lit, running along the "
+                         "roofline."),
+    "star_spangled_wipe": A("Star-spangled wipe", ["USA", FAST], _wipe, WP(USA3, 1.0), "#dc0014,#ffffff,#1428c8",
+                            "Dynamic. Fast. Red, white and blue take turns sweeping across the house behind a bright "
+                            "edge, back and forth, once a second."),
     "patriotic_wave": A("Patriotic wave", ["USA"], _stars_stripes, {"width": ("int", 4), "speed": ("float", 1.0)},
                         "#1428c8,#dc0014,#ffffff", "Dynamic. A blue field of twinkling stars, then red and white stripes, "
                         "all rippling like a flag in the wind."),

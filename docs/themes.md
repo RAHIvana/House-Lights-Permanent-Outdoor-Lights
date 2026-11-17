@@ -1,6 +1,6 @@
 # House Lights themes
 
-**103 built-in themes**, 79 of them animated light by light, and you can
+**106 built-in themes**, 82 of them animated light by light, and you can
 [make your own](../README.md#themes). Every picture on this page is drawn by the same code that
 plays the theme on your house: 48 lights, one bar per light.
 
@@ -9,7 +9,7 @@ its own, 15 times a second, so a comet can race the whole roofline, snow can dri
 windows and fireworks can go off over the garage. Pick a theme on the dashboard's **Quick
 Settings** tab, or put it on a schedule (sunset to 11 pm, say) and it starts by itself.
 
-**New for the holidays:** the **[Animated-fast](#animated-fast)** group (25 fast, showy themes
+**New for the holidays:** the **[Animated-fast](#animated-fast)** group (28 fast, showy themes
 to stand out on your street), 12 themes for **[Thanksgiving](#thanksgiving)** and
 19 for **[Christmas](#christmas)**.
 
@@ -30,7 +30,7 @@ Good to know:
 
 Fast movement for any night: racing comets, marquee bulbs, color wipes, dance beats and fireworks. The fast holiday themes are here too.
 
-25 themes.
+28 themes.
 
 | Theme | On 48 lights | What you see |
 |---|---|---|
@@ -58,6 +58,9 @@ Fast movement for any night: racing comets, marquee bulbs, color wipes, dance be
 | **Harvest fireworks**<br>animated, fast | <img src="themes/harvest_fireworks.png" width="436" height="28" alt="Harvest fireworks"> | Orange, gold and red firework bursts all over the house. |
 | **Autumn wipe**<br>animated, fast | <img src="themes/autumn_wipe.png" width="436" height="28" alt="Autumn wipe"> | Red, orange, gold and rust take turns sweeping across the house behind a bright edge, back and forth. |
 | **Red, white & blue fireworks**<br>animated, fast | <img src="themes/usa_fireworks.png" width="436" height="28" alt="Red, white & blue fireworks"> | Red, white and blue firework bursts over a dark sky. |
+| **Patriot racers**<br>animated, fast | <img src="themes/patriot_racers.png" width="436" height="28" alt="Patriot racers"> | Red, white and blue comets racing past each other in both directions over a dark night sky, each with a fading tail. |
+| **Liberty marquee**<br>animated, fast | <img src="themes/liberty_marquee.png" width="436" height="28" alt="Liberty marquee"> | Red, white and blue marquee bulbs, every third one lit, running along the roofline. |
+| **Star-spangled wipe**<br>animated, fast | <img src="themes/star_spangled_wipe.png" width="436" height="28" alt="Star-spangled wipe"> | Red, white and blue take turns sweeping across the house behind a bright edge, back and forth, once a second. |
 | **New Year's sparkle**<br>animated, fast | <img src="themes/new_year.png" width="436" height="28" alt="New Year's sparkle"> | Gold, white and silver firework sparkles bursting all over the house. |
 
 ## Christmas
@@ -107,12 +110,15 @@ Fast movement for any night: racing comets, marquee bulbs, color wipes, dance be
 
 ## USA
 
-4 themes.
+7 themes.
 
 | Theme | On 48 lights | What you see |
 |---|---|---|
 | **Stars & stripes**<br>still | <img src="themes/stars_stripes.png" width="436" height="28" alt="Stars & stripes"> | The US flag: a blue field with white stars, then red and white stripes. |
 | **Red, white & blue fireworks**<br>animated, fast | <img src="themes/usa_fireworks.png" width="436" height="28" alt="Red, white & blue fireworks"> | Red, white and blue firework bursts over a dark sky. |
+| **Patriot racers**<br>animated, fast | <img src="themes/patriot_racers.png" width="436" height="28" alt="Patriot racers"> | Red, white and blue comets racing past each other in both directions over a dark night sky, each with a fading tail. |
+| **Liberty marquee**<br>animated, fast | <img src="themes/liberty_marquee.png" width="436" height="28" alt="Liberty marquee"> | Red, white and blue marquee bulbs, every third one lit, running along the roofline. |
+| **Star-spangled wipe**<br>animated, fast | <img src="themes/star_spangled_wipe.png" width="436" height="28" alt="Star-spangled wipe"> | Red, white and blue take turns sweeping across the house behind a bright edge, back and forth, once a second. |
 | **Patriotic wave**<br>animated | <img src="themes/patriotic_wave.png" width="436" height="28" alt="Patriotic wave"> | A blue field of twinkling stars, then red and white stripes, all rippling like a flag in the wind. |
 | **Remembrance**<br>still | <img src="themes/remembrance.png" width="436" height="28" alt="Remembrance"> | Soft, steady red, white and blue for Memorial Day and Veterans Day. |
 
