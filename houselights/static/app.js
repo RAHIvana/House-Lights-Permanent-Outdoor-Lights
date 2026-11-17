@@ -610,6 +610,7 @@ function buildQuick() {
     if (!ids.length) return toast("Pick some lights first", true);
     try {
       const r = await api("/api/power-all", {on, sections: ids});
+      POWER_PICK = on;                         // On / Off stay lit from the press, until the controllers say otherwise
       toast((r.mode === "dry" ? "Dry run: " : "") + (on ? "On: " : "Off: ") + names(r.done));
     } catch (e) { toast(e.message, true); }
     afterAction();
@@ -723,6 +724,7 @@ function showInViz(runs, label) {
 }
 
 // --- keep every panel in step -----------------------------------------------------------------
+let POWER_PICK = null;                           // the last On / Off pressed in Quick Settings
 function sync() {
   if (!CONFIG) return;
   const ids = targetIds(), all = enabledIds();
@@ -736,10 +738,12 @@ function sync() {
     t.classList.toggle("on", on.length > 0);
     $(".tile-st", t).textContent = on.length ? `${anim ? "● Playing on" : "● Showing on"} ${names(on)}` : anim ? "animated" : "static";
   }
-  // On / Off stay lit while every picked run is on (or off)
+  // On / Off: lit like a picked run. What the controllers report wins; until they all agree,
+  // the last press
   const power = ids.map(sid => { const st = STATUS[sid]; return st && st.lan ? st.lan.onOff === 1 : st && st.assumed ? st.assumed.power !== false : null; });
-  $("#all-on").classList.toggle("on", power.length > 0 && power.every(p => p === true));
-  $("#all-off").classList.toggle("on", power.length > 0 && power.every(p => p === false));
+  const known = power.length > 0 && power.every(p => p !== null) && power.every(p => p === power[0]) ? power[0] : POWER_PICK;
+  $("#all-on").classList.toggle("on", known === true);
+  $("#all-off").classList.toggle("on", known === false);
   const live = all.filter(sid => STATUS[sid] && STATUS[sid].stream);
   $("#now-playing").innerHTML = live.length
     ? "Playing live: " + live.map(sid => `<b>${shortName(sid)} · ${labelOf(STATUS[sid].stream.pattern)}</b>`).join(", ")

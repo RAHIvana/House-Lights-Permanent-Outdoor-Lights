@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>House Lights</title>
 <script>try { const t = localStorage.getItem("hl-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
-<link rel="stylesheet" href="style.css?v=20">
+<link rel="stylesheet" href="style.css?v=21">
 <link rel="stylesheet" href="themes.css?v=13">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -43,8 +43,7 @@
     <span class="lbl" id="lights-lbl">Lights</span>
     <div class="seg-toggle" role="group" aria-labelledby="lights-lbl" id="targets"></div>
     <span class="spacer"></span>
-    <button class="live" id="all-on">On</button>
-    <button class="live" id="all-off">Off</button>
+    <div class="seg-toggle" role="group" aria-label="Power"><button id="all-on">On</button><button id="all-off">Off</button></div>
   </div>
   <div id="tiles" class="tiles" role="group" aria-label="Themes"></div>
   <p id="tiles-more" class="note"></p>
@@ -381,7 +380,7 @@
     </div>
   </section>
 </template>
-<script src="app.js?v=15"></script>
+<script src="app.js?v=16"></script>
 <script src="themes.js?v=12"></script>
 <script src="schedules.js?v=13"></script>
 </body>
