@@ -338,6 +338,82 @@ st.stop()
 check("Tuya test shows a colour, then puts the light back",
       CALLS[0] == ("set_colour", (255, 0, 0)) and CALLS[-1][0] == "set_multiple_values" and DPS == before)
 
+
+# Tuya: one thing at a time on the device object (the dashboard asks for status every 15 s while commands run)
+class SlowBulb(FakeBulb):
+    made = active = most = 0
+    fail = False
+    gate = threading.Lock()
+
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        SlowBulb.made += 1
+
+    def _busy(self, result):
+        with SlowBulb.gate:
+            SlowBulb.active += 1
+            SlowBulb.most = max(SlowBulb.most, SlowBulb.active)
+        time.sleep(0.05)
+        with SlowBulb.gate:
+            SlowBulb.active -= 1
+        return result
+
+    def status(self):
+        if SlowBulb.fail:
+            raise OSError("boom")
+        return self._busy({"dps": dict(DPS)})
+
+    def set_colour(self, *args):
+        CALLS.append(("set_colour", args))
+        return self._busy({"dps": {}})
+
+
+tt = sys.modules["tinytuya"]
+real_bulb = tt.BulbDevice
+tt.BulbDevice = SlowBulb
+try:
+    ks = drivers.make_kit(ct, live=True)
+    jobs = [lambda: ks.color((1, 2, 3)), ks.status, ks.snapshot, lambda: ks.color((4, 5, 6)), ks.status]
+    start = threading.Barrier(len(jobs))
+    errors = []
+
+    def go(fn):
+        try:
+            start.wait(5)
+            fn()
+        except Exception as e:                    # noqa: BLE001
+            errors.append(e)
+
+    threads = [threading.Thread(target=go, args=(fn,)) for fn in jobs]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join(15)
+    check("Tuya: commands, status and snapshot never use the device at the same time, and one device is made",
+          not errors and SlowBulb.most == 1 and SlowBulb.made == 1)
+    SlowBulb.fail = True
+    try:
+        ks.status()
+    except OSError:
+        pass
+    SlowBulb.fail = False
+    freed = ks.lock.acquire(timeout=1)
+    if freed:
+        ks.lock.release()
+    check("Tuya: a failing status call doesn't leave the lock held", freed and ks.status()["onOff"] == 1)
+finally:
+    tt.BulbDevice = real_bulb
+kdis = drivers.make_kit(Controller("t2", "tuya", "Tuya light", "127.0.0.41", "", False,
+                                   {"device_id": "abcdef0123456789abcd", "version": "3.3"},
+                                   {"local_key": "0123456789abcdef"}), live=True)
+CALLS.clear()
+try:
+    kdis.restore({"20": True})
+    refused = False
+except drivers.NotAllowed:
+    refused = True
+check("Tuya: a disabled controller gets no restore", refused and CALLS == [])
+
 # --- Govee scan: retries the addresses that didn't answer ----------------------------------------
 ASKED = {}
 

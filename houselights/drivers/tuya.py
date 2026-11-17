@@ -148,6 +148,8 @@ class Kit(BaseKit):
         self._bri = 100
 
     def _dev(self):
+        """The library's device object. Every use of it (making it included) happens with self.lock held:
+        it keeps one connection's state, so two threads must never use it at once."""
         if self._d is None:
             self._d = _device(self.dev_id, self.c.ip, self.key, self.version)
         return self._d
@@ -184,14 +186,16 @@ class Kit(BaseKit):
         self._colour(rgb)
 
     def status(self):
-        r = _check(self._dev().status())
+        with self.lock:                           # the dashboard asks every 15 s, whatever else is going on
+            r = _check(self._dev().status())
         return parse_dps(r.get("dps"))
 
     def snapshot(self):
         if not self.live:
             return None
         try:
-            dps = _check(self._dev().status()).get("dps") or {}
+            with self.lock:
+                dps = _check(self._dev().status()).get("dps") or {}
         except OSError:
             return None
         keep = [k for k in ("20", "21", "22", "23", "24", "1", "2", "3", "4", "5") if k in {str(x) for x in dps}]
@@ -200,5 +204,6 @@ class Kit(BaseKit):
     def restore(self, snap):
         if snap and self.live:
             with self.lock:
+                self.guard()
                 log.info("%s %s Tuya restore %s", self.prefix, self.tag, snap)
                 _check(self._dev().set_multiple_values(snap))
