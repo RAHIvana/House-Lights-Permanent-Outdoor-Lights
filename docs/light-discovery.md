@@ -57,7 +57,7 @@ all at once:
 | **Govee** | UDP: a `scan` message to the multicast address `239.255.255.250` port 4001, and the same message straight to each address you typed. Devices answer on UDP port 4002; commands later go to port 4003. | The model number (SKU) and the end of the device id | up to 3 s, 10 rounds | up to 30 s, 100 rounds |
 | **WLED** | HTTP: `GET /json/info` on each address | Firmware version, name, MAC address and the **light count** (`leds.count`) | 1 s per address | 4 s per address |
 | **JellyFish** | WebSocket (port 9000, path `/ws`): ask for the `zones` | One row per zone, with its pixel count (`numPixels`) | 1 s per address | 4 s per address |
-| **Tuya / Smart Life** | Listen only (sends nothing): the broadcasts Tuya devices make on UDP 6666 and 6667 every few seconds. Typed addresses are tried on TCP 6668 instead. | The device id and protocol version (6666 is readable; 6667 is encrypted) | listens 6 s | listens 20 s |
+| **Tuya / Smart Life** | With the `tinytuya` package: its own scanner, which listens for the broadcasts Tuya devices make every few seconds and, where it can, also asks the devices it finds for their status (read-only; its `poll` option is on). Without `tinytuya` the wizard only listens on UDP 6666 and 6667 and sends nothing. Typed addresses are tried on TCP 6668 (a connection, nothing sent) either way. | The device id and protocol version (on 6666 readable; 6667 is encrypted) | about 6 s | about 20 s |
 
 Things worth knowing:
 

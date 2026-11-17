@@ -52,7 +52,8 @@ nothing to add return `({}, {})`.
   accepts **home addresses only**, at most 1024. WLED and JellyFish use it, so should you.
 - `deep` means "try harder" (longer waits, more rounds).
 - `known` is a list of addresses already found: skip them. `expect` is how many controllers of this
-  kind the user said they have: stop early once you have that many (counting `known`).
+  kind the user said they have: stop early once you have that many (counting `known`; Tuya's library scan
+  ignores both).
 - Return a list of scan rows (below), sorted by address. Raise `ValueError` for a problem the user can
   fix (shown on this kind's card) and let an `OSError` through for "could not scan the network".
 - Never send anything that changes a light. Scanning is only "who are you?".
@@ -115,7 +116,9 @@ Rules that every driver follows (they are what make practice mode and disabled c
 - **Call `self.guard()` before anything that sends.** It raises `NotAllowed` for a disabled controller.
 - **When `self.live` is false, log and send nothing.** Reading (status) is still allowed. Log lines
   start with `self.prefix` and `self.tag` (`LIVE sim_front(127.0.0.11) ...` or `DRY ...`).
-- **One command at a time per controller:** take `self.lock` in the commands that you implement yourself.
+- **One thing at a time per controller:** take `self.lock` in the commands that you implement yourself, and
+  in everything else that uses the controller's connection or library object (status, snapshot, restore):
+  the dashboard asks for status every 15 seconds while commands are running.
 - Never put a secret in a log line.
 - Raise `ValueError` for a request the controller cannot do, and `OSError` for a network problem.
 
@@ -179,7 +182,9 @@ wizard shows them.
 - **Playing an animated theme** (`stream: True`). Power on, then a thread: `stream_begin()`, a 0.3
   second pause, then `stream_frame(colors)` at `stream_fps` frames a second (15 by default), then
   `stream_end()` when it stops or fails. `colors` is a list of `(r, g, b)` integers, 0 to 255, already
-  scaled by the brightness level. Asking for more lights than `max_stream_lights` is refused. Any direct
+  scaled by the brightness level. Asking for more lights than `max_stream_lights` is refused. There is one worker per controller: stopping
+  waits up to 3 seconds for it, and a new start is refused ("still stopping") until the old worker has really
+  ended, so `stream_frame()` and `stream_end()` must not block for long. Any direct
   command (colour, power) takes the controller out of streaming first, so `stream_end()` must leave it
   in a normal state.
 - **Status.** `read_status` every 15 seconds while the page is open.
@@ -332,8 +337,11 @@ class Kit(BaseKit):
   flash, so send it only at the start. A stream frame of N colours is stretched over the whole run, so
   count with segment commands, not frames ([govee-lan-notes.md](../../docs/govee-lan-notes.md)).
 - **WLED ignores per-light colours that arrive together with `"on"`**: turn it on first, then send
-  the colours. Its realtime mode ends by itself about 2 seconds after the last frame, so `stream_end()`
-  has nothing to do.
+  the colours. Its realtime mode ends by itself about 2 seconds after the last frame; `stream_end()`
+  sends a packet with timeout 0 so it ends at once (the 2 seconds stay as the fallback if the server dies).
+  It receives on the port it lists as `udpport` in `/json/info`, and it **ignores a DNRGB packet of exactly
+  one light** (a lone light goes as DRGB; a lone light at the end of a long frame moves into the packet
+  before it).
 - **Tuya devices take one connection at a time**, so close the Smart Life app while testing.
 - **JellyFish cannot report what a zone shows** (`status: False`, `restore: "none"`) and holds at most 30
   colour blocks in a pattern, so its static themes are approximations: implement `preview_static`.
