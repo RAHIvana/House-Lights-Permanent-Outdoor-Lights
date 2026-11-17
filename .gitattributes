@@ -1,0 +1,4 @@
+# A shell script with Windows (CRLF) line endings fails on a Raspberry Pi or a Mac ("bad interpreter"),
+# even when it was written on Windows. These keep the right endings whatever the machine's Git settings.
+*.sh  text eol=lf
+*.bat text eol=crlf

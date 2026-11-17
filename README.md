@@ -211,7 +211,42 @@ python -m houselights [--home DIR] [--host HOST] [--port PORT] [--dry]
 
 - `--home DIR`: where settings, schedules and logs are kept (default: `data/` in this folder).
 - `--port PORT`: another port if 8090 is taken.
-- `--dry`: practice mode. Commands are logged and nothing is sent to the lights.
+- `--dry`: practice mode. Commands are logged and nothing is sent to the lights. The page still
+  reads each controller's status (reading changes nothing) and shows a **Practice** badge, so
+  you can look around, and click anything, safely. Without it the dashboard is live.
+
+### Start and stop with a script
+
+The `scripts/` folder has one script per system. Each checks for Python 3.10 or newer, makes
+`venv/` and installs `requirements.txt` the first time (and again whenever `requirements.txt`
+changes, or the settings start using Tuya), and then starts the dashboard. After `git clone`
+you don't need the install commands above.
+
+| System | Script | Starts by itself? |
+|---|---|---|
+| Raspberry Pi, or Linux with systemd | `scripts/pi-dashboard.sh` | At every boot (`start` sets it up, `boot-off` turns it off) |
+| macOS | `scripts/mac-dashboard.sh` | No |
+| Windows 10 or 11 | `scripts\windows-dashboard.bat` | No |
+
+```sh
+scripts/pi-dashboard.sh start      # set up if needed, start now and at every boot
+scripts/pi-dashboard.sh stop       # stop now (it still starts at the next boot)
+scripts/pi-dashboard.sh restart    # after git pull or a settings change
+scripts/pi-dashboard.sh status     # running? starts at boot? which address to open?
+scripts/pi-dashboard.sh boot-off   # stop now, and don't start at the next boot
+scripts/pi-dashboard.sh logs       # follow the log (Ctrl+C to leave)
+scripts/pi-dashboard.sh run --dry  # try it in this terminal in practice mode; Ctrl+C stops it
+```
+
+The Mac and Windows scripts take the same commands except `boot-on` and `boot-off` (they run it
+in the background until you `stop` it). Words after `start` or `run` go to the program, so
+`start --port 8091` or `start --dry` work too. On Windows, use `scripts\windows-dashboard.bat start`
+from a Command Prompt or PowerShell; it runs PowerShell for that one command only and changes no
+PowerShell setting. Double-clicking the `.bat` shows its help.
+
+Tested: the Windows script on Windows 11, and the Pi and Mac scripts on Linux (Red Hat Enterprise
+Linux 9 under WSL), including the systemd unit file. Not yet tried on a Raspberry Pi or a Mac, and
+the systemd start, stop and boot commands have not run on a real Pi. Please report what you find.
 
 ## The setup wizard
 
@@ -360,11 +395,13 @@ Restart=on-failure
 WantedBy=multi-user.target
 ```
 
-Then `sudo systemctl enable --now houselights`. Animated themes play only while the server
+Then `sudo systemctl enable --now houselights`. On a Raspberry Pi, `scripts/pi-dashboard.sh start`
+does all of this for you (see "Start and stop with a script"). Animated themes play only while the server
 runs; when it stops, the lights go back to their last static look.
 
 On Windows, leave the PowerShell window open (minimised is fine). When the wizard saves, the
-server restarts inside that same window, and Ctrl+C still stops it.
+server restarts inside that same window, and Ctrl+C still stops it. Or run it in the background with
+`scripts\windows-dashboard.bat start` and stop it with `scripts\windows-dashboard.bat stop`.
 
 ## Themes
 
@@ -447,6 +484,7 @@ venv/bin/python tests/test_drivers.py      # Linux and Windows: uses 127.0.0.x a
 venv/bin/python tests/test_security.py     # Host and Origin checks, headers, home addresses, escaped names
 venv/bin/python tests/test_stream.py       # the animation worker: one at a time, stops and restarts cleanly
 venv/bin/python tests/test_auth.py         # the optional dashboard password: login, lockout, change, remove
+venv/bin/python tests/test_scripts.py      # the start/stop scripts in scripts/: syntax, line endings, help, docs
 ```
 
 On Windows use `venv\Scripts\python tests\test_settings.py` and so on.

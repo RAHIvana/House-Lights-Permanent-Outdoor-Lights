@@ -111,19 +111,28 @@ venv/bin/pip install -r requirements.txt
 
 For **Tuya / Smart Life** lights, also run `venv/bin/pip install tinytuya`.
 
+**Shortcut:** after the `git clone` and `cd houselights` lines you can skip the `python3 -m venv`
+and `pip install` lines. `scripts/pi-dashboard.sh` checks for Python 3.10 or newer, makes `venv/`
+and installs `requirements.txt` (and `tinytuya` when your settings use a Tuya light) the first
+time you use it, and again whenever they change. The next sections use it.
+
 The `full-upgrade` can take a while the first time, longest on a Pi 3 or Zero 2 W.
 
 ## 4. Try it
 
 ```sh
-venv/bin/python -m houselights --dry
+scripts/pi-dashboard.sh run --dry
 ```
+
+(That is the same as `venv/bin/python -m houselights --dry`, plus the setup check above. If it says
+`Permission denied`, run it as `bash scripts/pi-dashboard.sh run --dry`.)
 
 On your phone or computer, open **http://houselights.local:8090/** (or
 `http://ADDRESS:8090/` with the Pi's address). The setup wizard opens; the main
 [README](README.md#the-setup-wizard) explains each step.
 
-- `--dry` is practice mode: commands are logged and nothing is sent to the lights. Use it
+- `--dry` is practice mode: commands are logged and nothing is sent to the lights. The page still
+  reads each controller's status (that changes nothing) and shows a **Practice** badge. Use it
   for a first look, especially if another program or computer already controls your
   lights. When everything looks right, stop it with Ctrl+C and start it without `--dry`
   (or choose *Live* in the wizard's *Time and place* step).
@@ -133,7 +142,28 @@ On your phone or computer, open **http://houselights.local:8090/** (or
 
 ## 5. Start it automatically at boot
 
-Once it works, make it a service. On the Pi, from the `houselights` folder:
+Once it works, make it a service. On the Pi, from the `houselights` folder, the script does it all:
+it checks the setup, writes the service file (asking for your password once), starts House Lights now
+and sets it to start at every boot:
+
+```sh
+scripts/pi-dashboard.sh start
+```
+
+Then:
+
+```sh
+scripts/pi-dashboard.sh status      # running? starts at boot? which address to open?
+scripts/pi-dashboard.sh stop        # stop now (it still starts at the next boot)
+scripts/pi-dashboard.sh restart     # stop and start again, after git pull or a settings change
+scripts/pi-dashboard.sh boot-off    # stop now, and don't start at the next boot
+scripts/pi-dashboard.sh boot-on     # start at every boot again (without starting now)
+scripts/pi-dashboard.sh logs        # follow the log (Ctrl+C to leave)
+```
+
+Stop any copy you started with `run` first (Ctrl+C), or the port is taken.
+
+**Or by hand**, without the script:
 
 ```sh
 sudo tee /etc/systemd/system/houselights.service >/dev/null <<EOF
@@ -159,7 +189,7 @@ sudo systemctl enable --now houselights
 `$USER` and `$PWD` fill in your username and folder. Stop any copy you started by hand
 first (Ctrl+C), or the port is taken.
 
-Useful commands:
+Useful commands when you set it up by hand:
 
 ```sh
 systemctl status houselights          # running?
@@ -174,9 +204,11 @@ sudo systemctl disable houselights    # don't start at boot any more
 ```sh
 cd ~/houselights
 git pull
-venv/bin/pip install -r requirements.txt
-sudo systemctl restart houselights
+scripts/pi-dashboard.sh restart
 ```
+
+(`restart` installs anything new from `requirements.txt` first. By hand it is `git pull`,
+`venv/bin/pip install -r requirements.txt`, then `sudo systemctl restart houselights`.)
 
 Your settings in `data/` are kept. Back up that folder to keep your setup, for example
 `scp -r yourname@houselights.local:houselights/data houselights-backup` from your computer.

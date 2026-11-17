@@ -31,6 +31,7 @@ venv/bin/python tests/test_drivers.py
 venv/bin/python tests/test_security.py
 venv/bin/python tests/test_stream.py
 venv/bin/python tests/test_auth.py
+venv/bin/python tests/test_scripts.py
 ```
 
 Ground rules:
