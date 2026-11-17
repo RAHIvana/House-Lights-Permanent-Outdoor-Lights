@@ -80,14 +80,6 @@ SAFFRON, INDIA_WHITE, INDIA_GREEN = (255, 106, 0), (255, 255, 255), (0, 160, 0)
 
 
 # --- static patterns: fn(n, seg_width, params) -> [rgb] ---------------------------------
-def _christmas(n, width, white_ends):
-    out = _bands(n, [hex_to_rgb("#ff0000"), hex_to_rgb("#00a000")], width)
-    if white_ends:
-        for i in list(range(min(width, n))) + list(range(max(0, n - width), n)):
-            out[i] = WHITE
-    return out
-
-
 def _gradient(n, a, b):
     return [tuple(round(a[k] + (b[k] - a[k]) * (i / max(1, n - 1))) for k in range(3)) for i in range(n)]
 
@@ -357,6 +349,76 @@ def _glide(n, t, p):
     return out
 
 
+# --- fast effects (the Animated-fast group). Fast here means fast movement. Beat themes pulse
+# the whole house on every beat, so they stay at 124 beats a minute or less; tests/test_themes.py
+# checks that no theme flashes the whole house more than 3 times a second.
+def _marquee(n, t, p):
+    """Theatre marquee: every `gap`-th light is lit and the lit lights run along the house at
+    `speed` lights a second, each keeping its colour; the lights in between glow dimly."""
+    pal, gap, shift = _colors(p["colors"]), max(2, int(p["gap"])), t * p["speed"]
+    out = []
+    for i in range(n):
+        x = i - shift
+        k = math.floor(x / gap + 0.5)                     # the nearest lit spot
+        out.append(_scale(pal[k % len(pal)], 0.1 + 0.9 * max(0.0, 1 - abs(x - k * gap))))
+    return out
+
+
+def _racers(n, t, p):
+    """Comets racing along the house, each at its own speed, with a white-hot head and a
+    fading tail. With `both`, every second one runs the other way."""
+    pal, bg, trail = _colors(p["colors"]), hex_to_rgb(p["bg"]), max(1, int(p["trail"]))
+    out = [bg] * n
+    span = n + trail + 2
+    for m in range(max(1, round(p["count"] * n / 50))):
+        head = (_h(m, 0, 111) * span + t * p["speed"] * (0.6 + 0.8 * _h(m, 0, 110))) % span - 1
+        back, col = p["both"] and m % 2 == 1, pal[m % len(pal)]
+        for i in range(max(0, int(head - trail - 1)), min(n, int(head) + 2)):
+            d = head - i                                  # how far behind the head
+            if d <= -1:
+                continue
+            glow = _scale(_mix(col, WHITE, 0.7 * (1 - abs(d))), 1 + d if d < 0 else max(0.0, 1 - d / (trail + 1)) ** 1.5)
+            j = n - 1 - i if back else i
+            out[j] = _add(out[j], glow)
+    return out
+
+
+def _wipe(n, t, p):
+    """Colour wipes: every `hold` seconds the next colour sweeps over the last one from end to
+    end behind a bright edge. With `bounce`, every second sweep comes back the other way."""
+    pal, hold = _colors(p["colors"]), max(0.3, p["hold"])
+    k = math.floor(t / hold)
+    f = min(1.0, (t / hold - k) / 0.8)                    # sweep, then hold for a moment
+    new, old, back = pal[k % len(pal)], pal[(k - 1) % len(pal)], p["bounce"] and k % 2 == 1
+    front = f * (n + 3) - 2
+    out = []
+    for i in range(n):
+        d = front - (n - 1 - i if back else i)            # > 0: already painted
+        c = new if d >= 0 else old
+        out.append(_mix(c, WHITE, 0.8 * (1 - abs(d) / 2)) if f < 1 and abs(d) < 2 else c)
+    return out
+
+
+def _bounce(n, t, p):
+    """A bright bar bouncing from end to end with a fading tail, a new colour at each end."""
+    pal, bg = _colors(p["colors"]), hex_to_rgb(p["bg"])
+    size, trail, speed = max(1.0, p["size"]), max(0, int(p["trail"])), max(1.0, abs(p["speed"]))
+    length = max(1.0, n - size)
+    x = t * speed / length
+    k = math.floor(x)
+    fwd, f = k % 2 == 0, x - k
+    pos, col = (f if fwd else 1 - f) * length, pal[k % len(pal)]       # pos: the bar's first light
+    out = []
+    for i in range(n):
+        if pos - 1 < i < pos + size:
+            out.append(_mix(bg, col, min(1.0, i - pos + 1, pos + size - i)))
+            continue
+        d = pos - i if fwd else i - (pos + size - 1)      # how far behind the bar
+        tail = 0 < d <= min(trail, f * length)            # no tail left over from the last pass
+        out.append(_mix(bg, col, 0.6 * (1 - d / (trail + 1)) ** 1.5) if tail else bg)
+    return out
+
+
 def _rhythm(n, t, p):
     """Dance beat: on every beat the colours step one group along and flash, then ease off."""
     pal, width, bpm = _colors(p["colors"]), max(1, p["width"]), max(30.0, p["bpm"])
@@ -477,7 +539,8 @@ FIREWORK = "#ffc850,#ff3030,#30ff60,#ff40ff,#40a0ff,#ffffff"
 
 # Quick Settings' category pull-down, in this order. A theme can be in several; its first
 # category groups it in the theme lists.
-CATEGORIES = ["Everyday", "Diwali", "Hindu festivals", "India", "Christmas", "Halloween", "Thanksgiving",
+FAST = "Animated-fast"        # the show-off group: fast movement, any occasion
+CATEGORIES = ["Everyday", FAST, "Diwali", "Hindu festivals", "India", "Christmas", "Halloween", "Thanksgiving",
               "USA", "More US holidays", "Celebration", "School spirit"]
 
 
@@ -528,6 +591,31 @@ def CAND(age, colors):
     return {"age": ("int", age), "colors": ("colors", colors)}
 
 
+def MQ(colors, gap=3, speed=8.0):
+    return {"colors": ("colors", colors), "gap": ("int", gap), "speed": ("float", speed)}
+
+
+def RC(colors, bg, count=5.0, speed=24.0, trail=8, both=True):
+    return {"colors": ("colors", colors), "bg": ("color", bg), "count": ("float", count), "speed": ("float", speed),
+            "trail": ("int", trail), "both": ("bool", both)}
+
+
+def WP(colors, hold=1.0, bounce=True):
+    return {"colors": ("colors", colors), "hold": ("float", hold), "bounce": ("bool", bounce)}
+
+
+def BEAT(colors, bpm, width=4):
+    return {"colors": ("colors", colors), "width": ("int", width), "bpm": ("float", bpm)}
+
+
+XMAS_RED, XMAS_GREEN = (255, 0, 0), (0, 170, 30)
+XMAS = _hx(XMAS_RED, XMAS_GREEN, WHITE)
+XMAS_GOLD = _hx(XMAS_RED, XMAS_GREEN, GOLD, WHITE)
+MAPLE, PUMPKIN, CORN, RUST = (220, 30, 0), (255, 120, 0), (255, 190, 40), (200, 80, 0)
+HARVEST = _hx(MAPLE, PUMPKIN, CORN, RUST)
+NEON = _hx((255, 0, 200), (0, 230, 255), (120, 255, 0), (255, 230, 0), (150, 60, 255))
+
+
 # LED-friendly school colours: very dark shades (maroon) are lifted so they read as colour.
 UT_ORANGE, AGGIE_MAROON, UTD_ORANGE, UTD_GREEN = (204, 85, 0), (150, 0, 25), (232, 117, 0), (0, 120, 55)
 ASU_MAROON, ASU_GOLD = (150, 20, 65), (255, 198, 39)
@@ -557,6 +645,31 @@ PATTERNS = {
                    fn=lambda n, w, p: _random(n, _colors(p["colors"]), p["width"] or w, p["seed"]),
                    face="#ff0000,#00a000,#ffffff,#ffb000", tile=False),
 
+    # --- Animated-fast: for any night. The fast holiday themes (below) are in this group too. ---
+    "rainbow_rush": A("Rainbow rush", [FAST, "Celebration"], _deepavali_rainbow, {"spread": ("float", 2.0), "speed": ("float", 8.0)},
+                      "#ff0000,#ffd000,#00c000,#0060ff,#a000ff", "Dynamic. Fast. A double rainbow racing along the "
+                      "house with a shimmer."),
+    "neon_racers": A("Neon racers", [FAST], _racers, RC(NEON, "#05000f", 5, 26.0, 9), "#ff00c8,#00e6ff,#78ff00,#ffe600",
+                     "Dynamic. Fast. Neon pink, cyan, lime and yellow comets racing each other in both directions, "
+                     "each with a white-hot head and a long fading tail."),
+    "showtime_marquee": A("Showtime marquee", [FAST], _marquee, MQ(_hx((255, 180, 70)), 3, 8.0), "#ffb446,#3c2408,#ffb446",
+                          "Dynamic. Fast. Warm white theatre-marquee bulbs, every third one lit, running along the "
+                          "roofline."),
+    "color_wipe": A("Color wipe", [FAST], _wipe,
+                    WP(_hx((255, 0, 60), (255, 150, 0), (255, 230, 0), (0, 220, 80), (0, 140, 255), (160, 0, 255)), 1.0),
+                    "#ff003c,#ff9600,#00dc50,#008cff,#a000ff", "Dynamic. Fast. One bright color after another sweeps "
+                    "across the house behind a white edge, back and forth, once a second."),
+    "party_beat": A("Party beat", [FAST, "Celebration"], _rhythm, BEAT(NEON, 124.0), "#ff00c8,#00e6ff,#78ff00,#9638ff",
+                    "Dynamic. Fast. Neon colors jumping along the house on a 124-beats-a-minute dance beat."),
+    "bouncing_comet": A("Bouncing comet", [FAST], _bounce,
+                        {"colors": ("colors", NEON), "bg": ("color", "#05000f"), "size": ("float", 4.0),
+                         "speed": ("float", 30.0), "trail": ("int", 12)},
+                        "#05000f,#00e6ff,#ff00c8,#05000f", "Dynamic. Fast. A bright bar shooting from one end of the "
+                        "house to the other and back, with a long tail and a new color at every bounce."),
+    "fireworks_finale": A("Fireworks finale", [FAST, "Celebration"], _bursts, BU(FIREWORK, "#05050f", 3.0, 22.0, 1.4),
+                          "#ffc850,#ff3030,#30ff60,#40a0ff,#ff40ff", "Dynamic. Fast. The finale: firework bursts in every "
+                          "color going off all over the house, three a second."),
+
     # --- Diwali ---
     "diya_glow": A("Diya glow", ["Diwali"], _diya_glow, {"color": ("color", "#ff8a1c"), "speed": ("float", 1.0)},
                    "#ff8a1c,#ffc850,#ff6a00", "Dynamic. Warm amber diya flames: every light flickers independently like a "
@@ -565,7 +678,7 @@ PATTERNS = {
                        {"colors": ("colors", RANGOLI), "width": ("int", 5), "speed": ("float", 6.0)},
                        "#e0007a,#ff7a00,#ffd000,#00b050,#0060ff", "Dynamic. Bands of magenta, orange, yellow, green, blue "
                        "and purple, 5 lights each, chasing smoothly along the strip with soft blended edges."),
-    "anar_fireworks": A("Anar fireworks", ["Diwali"], _anar_fireworks, {"colors": ("colors", FIREWORK), "rate": ("float", 1.2)},
+    "anar_fireworks": A("Anar fireworks", ["Diwali", FAST], _anar_fireworks, {"colors": ("colors", FIREWORK), "rate": ("float", 1.2)},
                         "#ffc850,#ff3030,#30ff60,#ff40ff", "Dynamic. Firework bursts at random points: a white flash, then "
                         "a gold, red, green, pink or blue ring racing outwards and fading, over a dim warm glow."),
     "phuljhadi": A("Phuljhadi sparklers", ["Diwali"], _phuljhadi, {"color": ("color", "#ffa020"), "density": ("float", 0.08)},
@@ -598,7 +711,7 @@ PATTERNS = {
                                             (150, 150, 175), (140, 0, 220), (0, 160, 140))), "hold": ("float", 4.0)},
                   "#ff6400,#e60014,#1e3cff,#ffd200,#00be28,#8c00dc", "Dynamic. The whole house steps through the nine "
                   "Navratri colors, holding each for a few seconds with a soft cross-fade."),
-    "garba": A("Garba nights", ["Hindu festivals"], _rhythm,
+    "garba": A("Garba nights", ["Hindu festivals", FAST], _rhythm,
                {"colors": ("colors", _hx((230, 0, 30), (255, 200, 0), (0, 180, 60), (220, 0, 150), (255, 110, 0), (0, 90, 255))),
                 "width": ("int", 3), "bpm": ("float", 116.0)},
                "#e6001e,#ffc800,#00b43c,#dc0096", "Dynamic. Festive colors stepping along the house on a dandiya beat, "
@@ -641,8 +754,33 @@ PATTERNS = {
                 "Dynamic. Saffron, white and green thirds, with a navy-blue chakra pulse moving through the white."),
 
     # --- Christmas ---
-    "christmas": dict(label="Christmas", cats=["Christmas"], params={"width": ("int", 0), "white_ends": ("bool", True)},
-                      fn=lambda n, w, p: _christmas(n, p["width"] or w, p["white_ends"]), face="#ff0000,#00a000,#ffffff"),
+    "christmas_marquee": A("Christmas marquee", ["Christmas", FAST], _marquee, MQ(XMAS, 3, 8.0), "#ff0000,#00aa1e,#ffffff",
+                           "Dynamic. Fast. Red, green and white marquee bulbs, every third one lit, running along "
+                           "the roofline."),
+    "reindeer_dash": A("Reindeer dash", ["Christmas", FAST], _racers, RC(XMAS_GOLD, "#000a1e", 5, 24.0, 8),
+                       "#000a1e,#ff0000,#00aa1e,#ffc850", "Dynamic. Fast. Red, green, gold and white comets dashing "
+                       "past each other in both directions over a dark night sky, each with a fading tail."),
+    "jingle_beat": A("Jingle beat", ["Christmas", FAST], _rhythm, BEAT(XMAS_GOLD, 124.0), "#ff0000,#00aa1e,#ffc850,#ffffff",
+                     "Dynamic. Fast. Red, green, gold and white jumping along the house on a lively beat."),
+    "peppermint_twist": A("Peppermint twist", ["Christmas", FAST], _candy_cane, {"width": ("int", 4), "speed": ("float", 16.0)},
+                          "#ff0000,#ffffff,#ff0000,#ffffff", "Dynamic. Fast. Red and white stripes, 4 lights each, "
+                          "spinning along the roofline like a barber pole."),
+    "wrapping_paper": A("Wrapping paper wipe", ["Christmas", FAST], _wipe, WP(XMAS_GOLD, 1.0), "#ff0000,#ffffff,#00aa1e,#ffc850",
+                        "Dynamic. Fast. Red, green, gold and white take turns sweeping across the house behind a "
+                        "bright edge, back and forth, once a second."),
+    "blizzard": A("Blizzard", ["Christmas", FAST], _drift, DR(_hx(WHITE, (200, 230, 255)), "#001432", 14, 16.0, 0.6, 2, 0.5),
+                  "#001432,#ffffff,#c8e6ff,#001432", "Dynamic. Fast. A snowstorm: white flakes streaking along the "
+                  "roofline over deep icy blue."),
+    "christmas_crackers": A("Christmas crackers", ["Christmas", FAST], _bursts, BU(XMAS_GOLD, "#0a0005", 2.4, 20.0, 1.5),
+                            "#ff0000,#ffc850,#00aa1e,#ffffff", "Dynamic. Fast. Red, green, gold and white bursts "
+                            "popping all over the house."),
+    "northern_lights": A("Northern lights", ["Christmas"], _swirl,
+                         SWP(_hx((0, 220, 110), (0, 150, 200), (110, 0, 200), (0, 200, 150), (30, 60, 220)), 0.7),
+                         "#00dc6e,#0096c8,#6e00c8,#00c896", "Dynamic. Aurora greens, teals and purples slowly rippling "
+                         "along the house."),
+    "golden_bells": A("Golden bells", ["Christmas"], _twinkle,
+                      TW(_hx((255, 160, 20), (220, 120, 0)), _hx(WHITE, (255, 230, 150)), 0.3, 1.2, 0.65),
+                      "#ffa014,#ffffff,#dc7800", "Dynamic. Rich gold with white glints twinkling across it."),
     "retro_c9": S("Retro C9 bulbs", ["Christmas"], _hx((230, 0, 0), (0, 170, 30), (20, 60, 255), (255, 110, 0), (255, 200, 0)),
                   "Old-style big Christmas bulbs: red, green, blue, orange and yellow."),
     "gingerbread": S("Gingerbread house", ["Christmas"], _hx((170, 70, 10), (170, 70, 10), WHITE),
@@ -656,7 +794,7 @@ PATTERNS = {
                       "Dynamic. Soft warm white with a slow, gentle twinkle."),
     "snowfall": A("Snowfall", ["Christmas"], _drift, DR(_hx(WHITE, (200, 230, 255)), "#001e46", 8, 2.0, 0.6, 0, 1.5),
                   "#001e46,#ffffff,#c8e6ff", "Dynamic. White snowflakes drifting slowly along the roofline over icy blue."),
-    "santa_sleigh": A("Santa's sleigh", ["Christmas"], _drift, DR(_hx((255, 220, 140)), "#000a1e", 0.4, 12.0, 1.0, 10, 0),
+    "santa_sleigh": A("Santa's sleigh", ["Christmas", FAST], _drift, DR(_hx((255, 220, 140)), "#000a1e", 0.4, 12.0, 1.0, 10, 0),
                       "#000a1e,#ffdc8c,#ffffff", "Dynamic. A bright golden streak racing across the house with a long "
                       "sparkling trail, over a dark night sky."),
     "red_green_chase": A("Red & green chase", ["Christmas"], _rangoli_chase,
@@ -676,6 +814,33 @@ PATTERNS = {
                    "#3c0064,#ffffff,#5a0096", "Dynamic. Dim stormy purple with sudden white lightning flashes."),
 
     # --- Thanksgiving ---
+    "turkey_trot": A("Turkey trot", ["Thanksgiving", FAST], _racers, RC(HARVEST, "#140600", 5, 22.0, 7, False),
+                     "#140600,#dc1e00,#ff7800,#ffbe28", "Dynamic. Fast. Red, orange and gold comets racing along the "
+                     "house one after another, each with a fading tail."),
+    "harvest_marquee": A("Harvest marquee", ["Thanksgiving", FAST], _marquee, MQ(_hx(PUMPKIN, CORN, MAPLE), 3, 8.0),
+                         "#ff7800,#ffbe28,#dc1e00", "Dynamic. Fast. Orange, gold and red marquee bulbs, every third "
+                         "one lit, running along the roofline."),
+    "leaf_storm": A("Leaf storm", ["Thanksgiving", FAST], _drift, DR(HARVEST, "#1e0a00", 12, 15.0, 0.9, 2, 1.0),
+                    "#1e0a00,#dc1e00,#ff7800,#ffbe28", "Dynamic. Fast. A gust of red, orange and gold leaves blowing "
+                    "along the house."),
+    "harvest_hoedown": A("Harvest hoedown", ["Thanksgiving", FAST], _rhythm, BEAT(HARVEST, 120.0), "#dc1e00,#ff7800,#ffbe28,#c85000",
+                         "Dynamic. Fast. Autumn red, orange and gold jumping along the house on a barn-dance beat."),
+    "harvest_fireworks": A("Harvest fireworks", ["Thanksgiving", FAST], _bursts,
+                           BU(_hx(PUMPKIN, CORN, MAPLE, (255, 230, 170)), "#0f0500", 2.2, 18.0, 1.6),
+                           "#ff7800,#ffbe28,#dc1e00,#ffe6aa", "Dynamic. Fast. Orange, gold and red firework bursts all "
+                           "over the house."),
+    "autumn_wipe": A("Autumn wipe", ["Thanksgiving", FAST], _wipe, WP(HARVEST, 1.2), "#dc1e00,#ff7800,#ffbe28,#c85000",
+                     "Dynamic. Fast. Red, orange, gold and rust take turns sweeping across the house behind a "
+                     "bright edge, back and forth."),
+    "cozy_fireplace": A("Cozy fireplace", ["Thanksgiving", "Christmas"], _fire, {"speed": ("float", 0.7)},
+                        "#aa1400,#ff5000,#ffa014,#ffdc78", "Dynamic. A slow fireplace glow: flames flickering from "
+                        "deep red to orange and yellow."),
+    "pumpkin_spice": A("Pumpkin spice", ["Thanksgiving"], _twinkle,
+                       TW(_hx(PUMPKIN, RUST), _hx((255, 225, 170), CORN), 0.25, 0.8, 0.6), "#ff7800,#ffe1aa,#c85000",
+                       "Dynamic. Pumpkin orange and rust with cream and gold twinkles."),
+    "maple_wave": A("Maple wave", ["Thanksgiving"], _glide, GL(HARVEST, 12, 4.0, 0.8, 0.2), "#dc1e00,#ff7800,#ffbe28,#c85000",
+                    "Dynamic. Wide waves of maple red, orange, gold and rust rolling slowly along the house, "
+                    "blending into each other."),
     "harvest_glow": A("Harvest glow", ["Thanksgiving"], _swirl, SWP(_hx((255, 140, 0), (255, 190, 40), (170, 20, 0), (220, 80, 0)), 0.4),
                       "#ff8c00,#ffbe28,#aa1400", "Dynamic. Amber, gold, deep red and burnt orange slowly shimmering."),
     "autumn_leaves": A("Autumn leaves", ["Thanksgiving"], _drift,
@@ -687,7 +852,7 @@ PATTERNS = {
     "stars_stripes": dict(label="Stars & stripes", cats=["USA"], params={"width": ("int", 0), "speed": ("float", 1.0)},
                           fn=lambda n, w, p: _stars_stripes(n, 0, {**p, "width": p["width"] or w}),
                           face="#1428c8,#ffffff,#dc0014,#ffffff"),
-    "usa_fireworks": A("Red, white & blue fireworks", ["USA"], _bursts, BU(_hx(US_RED, US_WHITE, US_BLUE), "#00000f", 1.3),
+    "usa_fireworks": A("Red, white & blue fireworks", ["USA", FAST], _bursts, BU(_hx(US_RED, US_WHITE, US_BLUE), "#00000f", 1.3),
                        "#dc0014,#ffffff,#1428c8", "Dynamic. Red, white and blue firework bursts over a dark sky."),
     "patriotic_wave": A("Patriotic wave", ["USA"], _stars_stripes, {"width": ("int", 4), "speed": ("float", 1.0)},
                         "#1428c8,#dc0014,#ffffff", "Dynamic. A blue field of twinkling stars, then red and white stripes, "
@@ -703,7 +868,7 @@ PATTERNS = {
                   TW(_hx((0, 170, 40), (0, 200, 90), (0, 110, 30)), _hx((255, 200, 60), WHITE), 0.2, 1.0, 0.7),
                   "#00aa28,#00c85a,#ffc83c", "Dynamic. St. Patrick's greens with gold and white twinkles."),
     "easter": S("Easter pastels", ["More US holidays"], _hx((255, 120, 170), (255, 230, 110), (120, 255, 170), (190, 140, 255), (120, 190, 255))),
-    "new_year": A("New Year's sparkle", ["More US holidays", "Celebration"], _bursts,
+    "new_year": A("New Year's sparkle", ["More US holidays", "Celebration", FAST], _bursts,
                   BU(_hx((255, 200, 80), WHITE, (200, 220, 255)), "#0a0814", 1.6), "#ffc850,#ffffff,#c8dcff",
                   "Dynamic. Gold, white and silver firework sparkles bursting all over the house."),
 
@@ -907,6 +1072,7 @@ BLENDS = ("over", "add", "max")
 SPANS = ("run", "house")
 MAX_LAYERS, MAX_STEPS, MAX_COLORS, MAX_NAME, MAX_THEMES, MAX_CELLS = 3, 8, 12, 40, 200, 400
 MY_GROUP = "My themes"
+REMOVED = {"christmas": "Christmas (static)"}      # built-ins that were taken out: id -> what it was called
 CUSTOM = {}                  # id -> clean theme; kept up to date by themes.py
 _DRAFTS = {}                 # json of an unsaved theme -> clean theme (the editor's preview / play)
 
@@ -1131,6 +1297,8 @@ def lookup(name, params=None):
         return pat, {}
     if str(name).startswith("my_"):
         raise ValueError(f"theme {name!r} no longer exists (it was deleted); pick another theme")
+    if name in REMOVED:
+        raise ValueError(f"the theme {REMOVED[name]!r} is no longer part of House Lights; pick another theme")
     raise ValueError(f"unknown pattern {name!r}")
 
 

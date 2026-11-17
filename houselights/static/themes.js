@@ -207,7 +207,8 @@ const Themes = (() => {
   const NICE = {width: "Band width (0 = a segment)", speed: "Speed", density: "How many", level: "Base brightness", count: "How many",
     size: "Size", trail: "Trail", sway: "Sway", rate: "How often", spread: "Spread", life: "Lasts (s)", soft: "Soft edges",
     blink: "Flicker", hold: "Hold each (s)", bpm: "Beats per minute", age: "Candles (age)", seed: "Shuffle", style: "Style",
-    bg: "Background", accents: "Accent colors", colors: "Colors", flash: "White flash", wavelength: "Wave length", color: "Color", beat: "Beat color"};
+    bg: "Background", accents: "Accent colors", colors: "Colors", flash: "White flash", wavelength: "Wave length", color: "Color", beat: "Beat color",
+    gap: "Lit every (lights)", both: "Both directions", bounce: "Back and forth"};
 
   function colorList(params, name, max, onchange) {
     const box = el("div", "th-colors"), get = () => params[name].split(",").filter(Boolean);
