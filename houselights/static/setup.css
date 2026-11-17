@@ -52,7 +52,8 @@
 .notfound > summary { cursor: pointer; font-weight: 600; }
 .notfound[open] > summary { margin-bottom: 10px; }
 .notfound > .note { margin-top: 10px; }
-.kinds { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.kinds { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }   /* the four kinds, 2 x 2 */
+@media (max-width: 700px) { .kinds { grid-template-columns: minmax(0, 1fr); } }
 .kcard { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel2); padding: 12px;
   display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .kcard p { margin: 0; }
