@@ -423,7 +423,7 @@ async function lookAgain(t, card) {
 // --- step 2: Spotlight. One controller at a time: it blinks, then you name what blinked ---------
 // W.n: {order: [controller ids], i, nothing}
 function startNaming() {
-  W.n = {order: W.cfg.runs.map(r => r.controller).filter(id => ctrlOf(id)), i: 0, nothing: false};
+  W.n = {order: W.cfg.runs.map(r => r.controller).filter(id => ctrlOf(id)), i: 0, nothing: false, seen: new Set()};
 }
 async function toNamed(i) {
   const c = ctrlOf(W.n.order[W.n.i]);
@@ -432,6 +432,7 @@ async function toNamed(i) {
   drawName(true);
 }
 function drawName(blink = false) {
+  W.n.seen.add(W.n.i);                      // Next at the bottom: only once every controller has blinked
   const n = W.n.order.length, c = ctrlOf(W.n.order[W.n.i]);
   const box = $("#n-one");
   if (!c) { box.replaceChildren(el("p", "muted", "No controllers yet: find them in step 1.")); return; }
@@ -441,15 +442,10 @@ function drawName(blink = false) {
   if (blink) runTest(c, "identify").then(() => drawName()).catch(e => err(e.message));
   const body = $("#n-body");
   body.innerHTML = "";
-  const blinkBtn = button("Blink lights", async () => {      // also undoes "Nothing blinked" pressed by mistake
-    await runTest(c, "identify");
-    if (W.n.nothing) { W.n.nothing = false; drawName(); } else blinkState();
-  }, "small");
-  blinkBtn.id = "n-blink";
   body.append(answers(
-    blinkBtn,
-    button("Nothing blinked", () => { W.n.nothing = !W.n.nothing; drawName(); }, "small" + (W.n.nothing ? " on" : ""))));
-  blinkState();
+    testBtn(c, "identify", "Blink lights", null, () => { if (W.n.nothing) { W.n.nothing = false; drawName(); } }),  // also undoes "Nothing blinked"
+    button("Nothing blinked", () => { W.n.nothing = !W.n.nothing; drawName(); }, W.n.nothing ? "on" : "")));
+  litTests();
   if (W.n.nothing) {
     const ul = el("ul", "note help");
     for (const t of ["Is the controller powered on, and do its lights work in its own app?",
@@ -496,12 +492,12 @@ function drawName(blink = false) {
   // navigation between controllers
   const nav = $("#n-nav");
   nav.innerHTML = "";
-  if (W.n.i > 0) nav.appendChild(button("◀ Previous controller", () => toNamed(W.n.i - 1), "ghost small"));
+  if (W.n.i > 0) nav.appendChild(button("◀ Previous controller", () => toNamed(W.n.i - 1), "ghost"));
   nav.appendChild(el("span", "spacer"));
   nav.appendChild(button("Remove it from the setup", () => {
     if (!confirm(`Leave ${where(c)} out of the setup?`)) return;
     stopTest(c); removeController(c.id); startNaming(); W.n.i = Math.min(W.n.i, W.n.order.length - 1); drawName(W.n.order.length > 0);
-  }, "ghost small"));
+  }, "ghost"));
   if (W.n.i < n - 1) nav.appendChild(button("Next controller ▶", () => {
     if (!String(r.name || "").trim()) throw new Error("Give these lights a name first.");
     return toNamed(W.n.i + 1);
@@ -534,9 +530,15 @@ function drawTest() {
   $("#t-title").textContent = W.t.only ? `Counting ${r.name}` : `${r.name} · run ${W.t.i + 1} of ${n}`;
   $("#t-sub").textContent = `${modelLabel(c.type, c.model)} · ${where(c)}`;
   const steps = ["count", ...(canCheck(c) ? ["check"] : []), "done"];
-  const label = {count: "Count", check: "Check the ends", done: "Done"};
+  const label = {count: ["Count", "How many lights"], check: ["Check the ends", "Which end is light 1"], done: ["Done", "On to the next run"]};
+  const reach = {count: true, check: hasLights(r), done: hasLights(r) && (!canCheck(c) || !!r.light1)};
   $("#t-phases").innerHTML = "";
-  for (const s of steps) $("#t-phases").appendChild(el("li", s === W.t.phase ? "on" : steps.indexOf(s) < steps.indexOf(W.t.phase) ? "done" : "", label[s]));
+  for (const s of steps) {
+    const li = el("li", (s === W.t.phase ? "on" : steps.indexOf(s) < steps.indexOf(W.t.phase) ? "done" : "") + (reach[s] && s !== W.t.phase ? " jump" : ""));
+    li.append(el("b", "", label[s][0]), el("small", "", label[s][1]));
+    if (reach[s] && s !== W.t.phase) li.onclick = () => { setPhase(s); if (s === "count") { W.t.recount = true; drawTest(); } };
+    $("#t-phases").appendChild(li);
+  }
   $("#t-restore").textContent = RESTORE_NOTE[capsOf(c).restore] || "";
   if (!W.testing[c.id]) {                  // between tests: an unlit strip as long as the run
     if (hasLights(r)) dots(r.lights);
@@ -545,11 +547,12 @@ function drawTest() {
   const body = $("#t-body");
   body.innerHTML = "";
   ({count: drawCountPhase, check: drawCheck, done: drawDone})[W.t.phase](c, r, body);
+  litTests();
   const nav = $("#t-nav");
   nav.innerHTML = "";
-  if (!W.t.only && W.t.i > 0) nav.appendChild(button("◀ Previous run", () => toController(W.t.i - 1), "ghost small"));
+  if (!W.t.only && W.t.i > 0) nav.appendChild(button("◀ Previous run", () => toController(W.t.i - 1), "ghost"));
   nav.appendChild(el("span", "spacer"));
-  if (W.t.phase !== "done") nav.appendChild(button(W.t.i < n - 1 ? "Skip this run" : "Skip", () => nextController(), "ghost small"));
+  if (W.t.phase !== "done") nav.appendChild(button(W.t.i < n - 1 ? "Skip this run" : "Skip", () => nextController(), "ghost"));
   drawMore(c);
 }
 async function nextController() {
@@ -572,7 +575,7 @@ function drawCountPhase(c, r, body) {
   const typed = () => {
     const inp = el("input"); inp.type = "number"; inp.min = 1; inp.max = max; inp.style.width = "6em";
     if (hasLights(r)) inp.value = r.lights;
-    return answers(el("span", "lbl", "Number of lights"), inp, button("Use this number", () => {
+    return answers(el("span", "lbl", "Number of lights"), inp, button(canCheck(c) ? "Next: check the ends" : "Use this number", () => {
       const v = Number(inp.value);
       if (!(v >= 1 && v <= max)) throw new Error(`Type a number from 1 to ${max}.`);
       r.lights = v; setPhase(canCheck(c) ? "check" : "done");
@@ -580,13 +583,13 @@ function drawCountPhase(c, r, body) {
   };
   if (!canCount(c) || W.t.typed) {
     body.append(q(W.t.typed ? "Type the number of lights from the Govee Home app." : `How many lights does ${r.name} have?`), typed());
-    if (W.t.typed) body.append(answers(button("Count them instead", () => { W.t.typed = false; drawTest(); }, "ghost small")));
+    if (W.t.typed) body.append(answers(button("Count them instead", () => { W.t.typed = false; drawTest(); })));
     return;
   }
   if (segCount(c)) return drawCountSegments(c, r, body, lps);
   // markers, then the red lights of the last segment
   body.append(q("Step 1: count the markers."),
-    answers(button(W.t.cnt ? "Show the markers again" : "Show markers", async () => { await runTest(c, "markers"); W.t.cnt = Math.max(W.t.cnt, 1); drawTest(); }, "live")));
+    answers(testBtn(c, "markers", "Marker pattern", null, () => { W.t.cnt = Math.max(W.t.cnt, 1); drawTest(); })));
   if (W.t.cnt >= 1) {
     const m = el("input"); m.type = "number"; m.min = 1; m.max = Math.ceil(max / lps); m.style.width = "5em";
     if (W.t.markers) m.value = W.t.markers;
@@ -599,13 +602,14 @@ function drawCountPhase(c, r, body) {
       }, "primary")));
   }
   if (W.t.cnt >= 2) body.append(...lastGroup(c, r, lps, W.t.markers, "Step 2: now the last group is red."));
-  body.append(answers(button("Type the number instead", () => { W.t.typed = true; drawTest(); }, "ghost small")));
+  body.append(answers(button("Type the number instead", () => { W.t.typed = true; drawTest(); })));
 }
 // "How many red lights at the end?" -> lps x (groups - 1) + red
 function lastGroup(c, r, lps, groups, title) {
   const red = el("input"); red.type = "number"; red.min = 1; red.max = lps; red.style.width = "4em";
   const sum = el("p", "tsum");
-  const use = button("Use this count", () => {
+  const next = n => canCheck(c) ? `Next: check the ends of ${n} lights` : `Use ${n} lights`;
+  const use = button(canCheck(c) ? "Next: check the ends" : "Use this count", () => {
     const v = Number(red.value), n = lps * (groups - 1) + v;
     if (!(v >= 1 && v <= lps)) throw new Error(`Type a number from 1 to ${lps}.`);
     if (!(n >= 1 && n <= maxLights(c))) throw new Error(`That makes ${n}: count again.`);
@@ -614,7 +618,7 @@ function lastGroup(c, r, lps, groups, title) {
   red.oninput = () => {
     const v = Number(red.value), ok = v >= 1 && v <= lps;
     sum.textContent = ok ? `${lps} × ${groups - 1} + ${v} = ${lps * (groups - 1) + v} lights` : "";
-    use.textContent = ok ? `Use ${lps * (groups - 1) + v} lights` : "Use this count";
+    use.textContent = ok ? next(lps * (groups - 1) + v) : canCheck(c) ? "Next: check the ends" : "Use this count";
   };
   return [q(title), answers(el("span", "lbl", "How many red lights at the end?"), red), sum, answers(use)];
 }
@@ -625,7 +629,8 @@ function drawCountSegments(c, r, body, lps) {
   const maxGroups = Math.ceil(maxLights(c) / lps);
   if (!W.t.started) { W.t.started = true; runTest(c, "seg4").then(drawTest).catch(e => err(e.message)); }
   body.append(q(`A · Every ${lps} lights change colour: green, white, red, yellow, then again.`),
-    answers(button("Show the colours again", () => runTest(c, "seg4"), "live small")),
+    answers(testBtn(c, "seg4", "Colour pattern", null, () => { W.t.cnt = Math.min(W.t.cnt, 1); W.t.segs = null; drawTest(); })),
+    el("p", "note", "It's on the lights by itself; press it to send it again."),
     el("p", "note", "What colour is the last block at the far end? A single light past it that never changes isn't driven by the controller: leave it out."));
   body.append(answers(...SEG_COLOURS.map(([name, hex], k) => {
     const b = button(name[0].toUpperCase() + name.slice(1), () => { W.t.last = k; drawTest(); }, "swatch" + (W.t.last === k ? " on" : ""));
@@ -650,21 +655,23 @@ function drawCountSegments(c, r, body, lps) {
     }, "primary")));
   }
   if (W.t.cnt >= 2 && W.t.segs) {
-    body.append(...lastGroup(c, r, lps, W.t.segs, "B · Now every group is white and only the last one is red."),
+    const segs = W.t.segs;
+    const part = lastGroup(c, r, lps, segs, "B · Now every group is white and only the last one is red.");
+    part.splice(1, 0, answers(testBtn(c, "seglast", "Last group pattern", () => ({markers: segs, lights: Math.min(maxLights(c), segs * lps)}))));
+    body.append(...part,
       el("p", "note", "Blue after the red? Then the colours were miscounted."),
-      answers(button("Count the colours again", async () => { W.t.cnt = 1; W.t.segs = null; await runTest(c, "seg4"); drawTest(); }, "ghost small")));
+      answers(button("Count the colours again", async () => { W.t.cnt = 1; W.t.segs = null; await runTest(c, "seg4"); drawTest(); })));
   }
-  body.append(answers(button("Type the number from the Govee app", () => { W.t.typed = true; drawTest(); }, "ghost small")));
+  body.append(answers(button("Type the number from the Govee app", () => { W.t.typed = true; drawTest(); })));
 }
 
 // B. Check the ends: which end is light 1 (and, on WLED, nothing past the last light)
 function drawCheck(c, r, body) {
   if (!hasLights(r)) { setPhase("count"); return; }
   if (testsOf(c).includes("ends")) return drawEnds(c, r, body);
-  const shown = W.testing[c.id] === "check" || W.testing[c.id] === "chase";
   if (!W.t.started) { W.t.started = true; runTest(c, "check").then(drawTest).catch(e => err(e.message)); }
   body.append(q(`Light 1 should be red, light ${r.lights} (the last one) blue, the ones between dim white.`),
-    answers(button(shown ? "Show it again" : "Show it", async () => { await runTest(c, "check"); W.t.dir = false; drawTest(); }, "live")));
+    answers(testBtn(c, "check", "Ends pattern", null, () => { W.t.dir = false; drawTest(); })));
   const set1 = v => { r.light1 = v; r.reverse = v === "right"; W.t.q1 = v || "unsure"; W.t.dir = false; drawTest(); };
   body.append(q("Where is the red light?"), answers(
     button("Yes, red is on the left", () => set1("left"), W.t.q1 === "left" ? "on" : ""),
@@ -695,22 +702,28 @@ function drawCheck(c, r, body) {
       answers(button(canCount(c) ? "Count again" : "Change the number", () => { setPhase("count"); W.t.recount = true; drawTest(); }, "primary")));
   }
 }
-// Govee: a frame of exactly the count, light 1 blue and the last light red. Each is a single
-// light only when the count is right (the controller spreads a frame over the whole run).
+// Govee C: a frame of exactly the count, light 1 red and the last light blue. Each is a single
+// light at the very end only when the count is right (the controller spreads a frame over the
+// lights it drives). Which end is red says whether the run is drawn reversed.
 function drawEnds(c, r, body) {
   if (!W.t.started) { W.t.started = true; runTest(c, "ends").then(drawTest).catch(e => err(e.message)); }
-  body.append(q(`C · Light 1 is blue and light ${r.lights}, the last one, is red. The rest are white.`),
-    answers(button("Show it again", () => runTest(c, "ends"), "live small")),
-    el("p", "note", "Are blue and red each a single light? Which end is blue?"));
-  const set1 = v => { r.light1 = v; r.reverse = v === "right"; setPhase("done"); };
+  body.append(q(`C · Light 1 is red and light ${r.lights}, the last one, is blue. The rest are white.`),
+    answers(testBtn(c, "ends", "Ends pattern")),
+    el("p", "note", "Red and blue should each be a single light, right at the two ends. If one covers two lights, or isn't at the very end, the count is off: count again."));
+  const set1 = v => { r.light1 = v; r.reverse = v === "right"; drawTest(); };
+  body.append(q("Which end is the red light at, as you face the house?"), answers(
+    button("Left end", () => set1("left"), r.light1 === "left" ? "on" : ""),
+    button("Right end", () => set1("right"), r.light1 === "right" ? "on" : "")));
+  if (r.light1) body.append(el("p", "note", r.light1 === "right"
+    ? "Light 1 is at the right end: this run is installed right to left, so the dashboard turns it round."
+    : "Light 1 is at the left end: this run is installed left to right."));
   body.append(answers(
-    button("Blue is on the left", () => set1("left"), "primary"),
-    button("Blue is on the right", () => set1("right"), "primary"),
-    button("Not single lights", () => { W.t.q1 = "off"; drawTest(); }, W.t.q1 === "off" ? "on" : "")));
-  if (W.t.q1 === "off") {
-    body.append(el("p", "note", `Then ${r.lights} isn't quite right: the colours are spread over more or fewer lights.`),
-      answers(button("Count again", () => { setPhase("count"); W.t.recount = true; drawTest(); }, "primary")));
-  }
+    button(`Use ${r.lights} lights`, () => {
+      if (!r.light1) throw new Error("Which end is the red light at? Pick the left or the right end first.");
+      setPhase("done");
+    }, "primary"),
+    button("Count again", () => { setPhase("count"); W.t.recount = true; drawTest(); }),
+    button("Type the number from the Govee app", () => { setPhase("count"); W.t.recount = true; W.t.typed = true; drawTest(); })));
 }
 
 // C. Done: summary for this run, with a sweep in the chosen direction
@@ -762,9 +775,9 @@ function drawMore(c) {
   box.innerHTML = "";
   for (const name of testsOf(c)) {
     if (COUNT_TESTS.includes(name)) continue;
-    box.appendChild(button(W.info.tests[name], () => runTest(c, name), "live small" + (W.testing[c.id] === name ? " on" : "")));
+    box.appendChild(testBtn(c, name, W.info.tests[name]));
   }
-  box.appendChild(button("Stop", () => stopTest(c), "danger small"));
+  box.appendChild(button("Stop", () => stopTest(c), "danger"));
 }
 
 const ui = s => $(`#${W.step === 1 ? "n" : "t"}-${s}`);
@@ -804,15 +817,22 @@ async function stopTest(c) {
   }
   if (ui("dots")) for (const i of ui("dots").children) { i.style.background = ""; i.style.boxShadow = ""; }
   if (ui("status")) ui("status").textContent = "";
-  blinkState();
+  litTests();
 }
-// Spotlight's Blink button stays lit (like Next controller) while the controller blinks.
-function blinkState() {
-  const b = $("#n-blink"), c = W.n && ctrlOf(W.n.order[W.n.i]);
-  if (!b || !c) return;
-  const on = W.testing[c.id] === "identify";
-  b.className = on ? "primary small" : "live small";
-  b.textContent = on ? "● Blinking lights" : "Blink lights";
+// A button that shows a test and stays lit (like Next) while that test is on the lights.
+// extra(): more for the test request; after(): run once it is on.
+function testBtn(c, name, label, extra = null, after = null) {
+  const b = button(label, async () => { await runTest(c, name, extra ? extra() : {}); litTests(); if (after) after(); }, "live");
+  Object.assign(b.dataset, {test: name, cid: c.id, label});
+  return b;
+}
+function litTests() {
+  for (const b of $$("button[data-test]")) {
+    const on = W.testing[b.dataset.cid] === b.dataset.test;
+    b.classList.toggle("primary", on);
+    b.classList.toggle("live", !on);
+    b.textContent = (on ? "● " : "") + b.dataset.label;
+  }
 }
 function animate(cid, pv, seconds) {
   clearInterval(W.anim);
@@ -825,7 +845,7 @@ function animate(cid, pv, seconds) {
     if (performance.now() - t0 > seconds * 1000) {
       clearInterval(W.anim); delete W.testing[cid];
       ui("status").textContent = "The test ended by itself.";
-      blinkState();
+      litTests();
     }
   };
   paint();
@@ -975,10 +995,25 @@ function check(step) {
     if (noKey) return `Type the 16-character local key for the Tuya device at ${noKey.ip}.`;
   }
   if (step === 1) {
+    // Next at the bottom before every controller has blinked: go to the first one not seen yet
+    if (W.step === 1 && W.n && !W.info.configured) {
+      const k = W.n.order.findIndex((id, i) => !W.n.seen.has(i));
+      if (k >= 0) {
+        toNamed(k);
+        return `Controller ${k + 1} of ${W.n.order.length} hasn't blinked yet: here it is. Name it, then press Next controller.`;
+      }
+    }
     const r = W.cfg.runs.find(r => !String(r.name || "").trim());
     if (r) return `Give every run a name: the one at ${where(ctrlOf(r.controller))} has none yet.`;
     const names = W.cfg.runs.map(r => String(r.name).trim().toLowerCase());
     if (new Set(names).size !== names.length) return "Give each run a different name.";
+  }
+  if (step === 2) {
+    const r = W.cfg.runs.find(r => ctrlOf(r.controller) && !hasLights(r));
+    if (r) {
+      if (W.step === 2 && W.t && !W.t.only) { const i = W.t.order.indexOf(r.controller); if (i >= 0 && i !== W.t.i) toController(i); }
+      return `${r.name}: count its lights first (or type the number).`;
+    }
   }
   if (step === 4) {
     const r = W.cfg.runs.find(r => !hasLights(r));

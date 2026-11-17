@@ -313,7 +313,7 @@ sl = setup._seglast(25, 0, 5, 4)
 check("seglast: segments before the last white, the last red, past it blue",
       sl[:15] == [setup.WHITE] * 15 and sl[15:20] == [setup.RED] * 5 and sl[20:] == [setup.BLUE] * 5)
 en = setup._ends(73, 0)
-check("ends: light 1 blue, the last red, the rest white", en[0] == setup.BLUE and en[-1] == setup.RED
+check("ends: light 1 red, the last blue, the rest white", en[0] == setup.RED and en[-1] == setup.BLUE
       and en[1:-1] == [setup.WHITE] * 71 and len(en) == 73)
 check("segment counting: the last colour and its blocks give the segments",
       all(4 * (blocks - 1) + place == segs for segs, place, blocks in

@@ -53,7 +53,7 @@ step by step:
 | H3A51, H3A52, H3A53 | Permanent Outdoor Lights 2 Pro | Basic control (LAN Control not confirmed); light-by-light animation to try |
 | Any other Govee model with LAN Control (floodlights, spotlights, path, string and wall lights) | | One colour at a time |
 
-"To try": the wizard's last counting test (light 1 blue, the last light red) shows at once
+"To try": the wizard's last counting test (light 1 red, the last light blue) shows at once
 whether your model plays light by light. If it does, please report the model so it can be marked as tested.
 Model numbers and names come from Govee's site and community lists; check your box or the
 Govee Home app for yours.
@@ -205,8 +205,10 @@ can run it again later from the **Settings** tab (**Change setup**).
        groups, like `4 × (6 − 1) + 4 = 24`.
      - **B**: every group is white and only the last is red. Type how many red lights you
        see: `5 × 23 + 5 = 120` lights. Blue after the red means a colour was miscounted.
-     - **C**: light 1 is blue and the last light red. Each should be a single light (if not,
-       count again); say which end is blue, and that end is light 1.
+     - **C**: light 1 is red and the last light blue, the rest white. Each should be a
+       single light right at the end (if not, count again). Say which end red is at: that end
+       is light 1, and a run whose light 1 is at the right end is turned round on the page.
+       Then **Use 120 lights**, **Count again** or **Type the number from the Govee app**.
      A light past the end that never changes isn't driven by the controller: Govee drives as
      many lights as it is set up for in the Govee Home app. You can also type the number
      from the app.

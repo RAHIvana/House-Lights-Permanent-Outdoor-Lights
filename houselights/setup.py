@@ -148,9 +148,11 @@ def _seglast(n, t, lps=5, segments=1):
 
 
 def _ends(n, t):
-    """Count step C (one colour per light only when n is the real count): light 1 blue, the
-    last light red, the rest white. Each a single light: the count is right; blue is light 1."""
-    return [BLUE] + [WHITE] * (n - 2) + [RED] if n >= 2 else [BLUE] * n
+    """Count step C (one colour per light only when n is the real count): light 1 red, the
+    last light blue, the rest white. Each a single light: the count is right; red is light 1,
+    which tells whether the run is drawn reversed. (Nothing past the count can be shown: the
+    controller spreads a frame over the lights it drives.)"""
+    return [RED] + [WHITE] * (n - 2) + [BLUE] if n >= 2 else [RED] * n
 
 
 # Counting tests send a frame whatever the light count; reverse doesn't apply to them.
@@ -165,7 +167,7 @@ PATTERNS = {"identify": ("Blink the whole run", _identify, True),
             "tail": ("Count: last segment", _tail, False),
             "seg4": ("Count: segment colours", _seg4, False),
             "seglast": ("Count: last segment red", _seglast, False),
-            "ends": ("Check: light 1 blue, last light red", _ends, False),
+            "ends": ("Check: light 1 red, last light blue", _ends, False),
             "check": ("Check the count and light 1", _check, False),
             "ruler": ("Check the count", _ruler, False),
             "chase": ("Direction: dot from light 1", _chase, True),

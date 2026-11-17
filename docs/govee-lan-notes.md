@@ -63,8 +63,10 @@ Counting on Govee (works on A):
    last colour and how many blocks of it -> segments.
 3. All segments white, the last red, any past it blue (segment command): count the red
    lights -> lights = 5 x (segments - 1) + red. Blue means the segment count was wrong.
-4. Confirm (stream of exactly that many colours): light 1 blue, the last light red, the rest
-   white. Each must be a single light; the blue end is light 1.
+4. Confirm (stream of exactly that many colours): light 1 red, the last light blue, the rest
+   white (tested with blue first, red last; the wizard swapped them to match WLED's check).
+   Each must be a single light; the red end is light 1. Nothing past the count can be shown:
+   the controller spreads the frame over the lights it drives.
 
 Lesson: a test must set every segment it might reach (up to the most the controller takes),
 or an old colour stays on a segment it didn't set and looks like part of the pattern.

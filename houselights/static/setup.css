@@ -75,8 +75,16 @@
 .fld small.note { font-size: 12px; }
 @media (max-width: 700px) { .rc-grid { grid-template-columns: 1fr 1fr; } }
 
-/* step 4: one controller at a time */
-.tphases li { padding: 3px 10px; font-size: 12px; }
+/* steps 2 and 3: one controller at a time */
+/* Count / Check the ends / Done: like the step tabs at the top, a size smaller; click to go back */
+.bigtabs.mini { margin: 0; gap: 6px; max-width: none; }
+.bigtabs.mini > * { padding: 6px 10px; font-size: 13px; border-radius: 8px; }
+.bigtabs.mini small { font-size: 11px; }
+.bigtabs .jump { cursor: pointer; }
+.bigtabs .jump:hover { border-color: var(--muted); }
+/* every button in a test box the same size as the rest of the wizard */
+.testrun button, .testrun button.small { padding: 7px 14px; font-size: 14px; min-height: 36px; }
+
 .tbody { display: grid; gap: 8px; }
 .tq { margin: 6px 0 0; font-weight: 600; }
 .answers { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -84,7 +92,7 @@
 .help { padding-left: 20px; }
 .help li { margin: 2px 0; }
 #t-nav { display: flex; gap: 8px; align-items: center; border-top: 1px solid var(--line); padding-top: 8px; }
-.tmore summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+.tmore summary { cursor: pointer; color: var(--fg); font-size: 14px; font-weight: 600; padding: 4px 0; }
 .tmore[open] summary { margin-bottom: 8px; }
 .sweep { display: grid; gap: 4px; }
 .sweep-dots { display: grid; gap: 2px; background: var(--night); padding: 8px; border-radius: 8px; }
