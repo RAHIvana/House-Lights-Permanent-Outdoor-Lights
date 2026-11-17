@@ -10,7 +10,7 @@ show only the free ones): those are marked **(public only)** and are done right 
 
 ## At a glance
 
-1. **Decide the name** (section 1), then rename and update the README if needed.
+1. **Choose the tagline** (section 1). The repository is already renamed.
 2. **Your account:** two-factor authentication, private email (section 3).
 3. **Repository settings while private:** About box, Dependabot, Features, Commits, labels, Actions (section 3).
 4. **Tests:** make sure Actions is on and the `tests` workflow is green on Python 3.10 and 3.13 (section 4).
@@ -22,8 +22,7 @@ show only the free ones): those are marked **(public only)** and are done right 
 ## 1. Decide the name (still open)
 
 Decided: the product is called **House Lights**, and "permanent outdoor lights" stays next to it
-because it describes what the project is for. Open: the one-line description (tagline) and the
-repository name.
+because it describes what the project is for. Open: the one-line description (tagline).
 
 **Tagline** (used in the About box, the first line of the README and the social image):
 
@@ -33,27 +32,21 @@ repository name.
 | 2 | House Lights: a dashboard for permanent outdoor lights, free for home use (it is under a noncommercial license, so say "free for home use", not just "free") |
 | 3 | House Lights: holiday themes and your own designs for permanent outdoor lights |
 
-**Repository name** (now `Permanent-Outdoor-Light-Controller`):
+**Repository name: decided.** The repository is `House-Lights-Permanent-Outdoor-Lights` (renamed on 2026-11-17). The product name
+and the descriptor are both in the address. (The clone commands put the code in a folder called
+`houselights`, so the long name makes no difference on disk.) Notes:
 
-| | Name | Why |
-|---|---|---|
-| A | **`house-lights`** (recommended) | Short, matches the product name. "Permanent outdoor lights" lives in the About text, the topics, the first line of the README and the social image. |
-| B | Keep `Permanent-Outdoor-Light-Controller` | Nothing to change, and the phrase is in the address. |
-
-Notes:
-
-- Before the repository is public is the cheapest time to rename: nobody has the address yet. GitHub
-  redirects the old name afterwards anyway.
+- GitHub redirects the old name `Permanent-Outdoor-Light-Controller`, so old links keep working. Don't
+  create another repository with the old name: that would stop the redirect.
 - Keep brand names (Govee, WLED, Tuya) out of the name and the logo. The README already says the
   project is not affiliated with them.
-- If you rename (A), these must change: the repository name (Settings, General, Repository name,
-  Rename), the clone address in `README.md` (two places) and `README_Raspberry.md` (one place),
-  your local remote (`git remote set-url origin git@github.com:RAHIvana/<new-name>.git`), the Website
-  link in the About box, and the tests badge if you add one (section 4).
+- Already updated to the new name: the clone commands in `README.md` (two places) and
+  `README_Raspberry.md` (one place), and the local remote. Still to use it: the Website link in the About
+  box and the tests badge, both below.
 
 - [ ] Tagline chosen: ______
-- [ ] Repository name chosen: ______
-- [ ] If renamed: README clone commands, Raspberry Pi guide and local remote updated and pushed
+- [x] Repository renamed to `House-Lights-Permanent-Outdoor-Lights`
+- [x] README clone commands, Raspberry Pi guide and local remote updated
 
 ## 2. Already done and checked
 
@@ -98,7 +91,7 @@ Settings is the tab in the repository's top bar (under **...** if it is hidden).
   Suggested topics (12): `permanent-outdoor-lights`, `govee`, `wled`, `holiday-lights`, `christmas-lights`,
   `halloween`, `diwali`, `led-lights`, `home-automation`, `smart-home`, `python`, `fastapi`
 
-  Website: `https://github.com/RAHIvana/<name>/blob/main/docs/themes.md`
+  Website: `https://github.com/RAHIvana/House-Lights-Permanent-Outdoor-Lights/blob/main/docs/themes.md`
 
 - [ ] **Settings, Security and quality, Advanced Security** (free for private repositories): switch on
   **Dependency graph** first, then **Dependabot alerts** and **Dependabot security updates**. **Grouped
@@ -161,12 +154,12 @@ file was pushed with the last commit. What can stop it is the repository's Actio
 - Private repositories use a monthly allowance of free Actions minutes and public repositories run on standard
   runners free; the limits change, so check Settings, Billing if runs ever stop.
 
-### Showing the result in the README (after the name is final)
+### Showing the result in the README
 
-- [ ] Add this line under the README title, with the real repository name (it appears green or red):
+- [ ] Add this line under the README title (it appears green or red):
 
   ```
-  [![tests](https://github.com/RAHIvana/<name>/actions/workflows/tests.yml/badge.svg)](https://github.com/RAHIvana/<name>/actions/workflows/tests.yml)
+  [![tests](https://github.com/RAHIvana/House-Lights-Permanent-Outdoor-Lights/actions/workflows/tests.yml/badge.svg)](https://github.com/RAHIvana/House-Lights-Permanent-Outdoor-Lights/actions/workflows/tests.yml)
   ```
 
 ### Making the tests a gate (optional, probably later)
@@ -189,7 +182,7 @@ every commit already tells you.
 
 Do these first:
 
-- [ ] Name decided and, if renamed, everything in section 1 pushed.
+- [ ] Tagline chosen, and the rename commit (README clone commands) pushed.
 - [ ] Sections 3 and 4 finished, and the Actions run is green.
 
 Then: **Settings, General, scroll to the Danger Zone, Change repository visibility, Change visibility,
