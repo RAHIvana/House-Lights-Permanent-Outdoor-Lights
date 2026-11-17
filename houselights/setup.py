@@ -725,8 +725,8 @@ def preview(body: dict):
         fps = drv.Kit.slow_fps
         frames = [[f"#{r:02x}{g:02x}{b:02x}" for r, g, b in _identify_slow(lights, k / 2, fps)] for k in range(8)]
         return {"frames": frames, "fps": 2, "animated": True}
-    frames = preview_frames(name, lights, lps, seconds=math.ceil((lights + 8) / 8) if name == "chase" else 2.0,
-                            markers=markers, frame=frame)
+    seconds = math.ceil((lights + 8) / 8) if name == "chase" else BLINK_S if name == "identify" else 2.0
+    frames = preview_frames(name, lights, lps, seconds=seconds, markers=markers, frame=frame)   # a whole cycle
     if body.get("reverse") and name not in PHYSICAL:
         frames = [f[::-1] for f in frames]
     return {"frames": frames, "fps": 8, "animated": PATTERNS[name][2]}

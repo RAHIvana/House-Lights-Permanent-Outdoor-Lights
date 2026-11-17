@@ -441,9 +441,12 @@ function drawName(blink = false) {
   if (blink) runTest(c, "identify").then(() => drawName()).catch(e => err(e.message));
   const body = $("#n-body");
   body.innerHTML = "";
+  const blinkBtn = button("Blink", async () => { await runTest(c, "identify"); blinkState(); }, "small");
+  blinkBtn.id = "n-blink";
   body.append(answers(
-    button("Blink again", () => runTest(c, "identify"), "live small"),
+    blinkBtn,
     button("Nothing blinked", () => { W.n.nothing = !W.n.nothing; drawName(); }, "small" + (W.n.nothing ? " on" : ""))));
+  blinkState();
   if (W.n.nothing) {
     const ul = el("ul", "note help");
     for (const t of ["Is the controller powered on, and do its lights work in its own app?",
@@ -798,6 +801,15 @@ async function stopTest(c) {
   }
   if (ui("dots")) for (const i of ui("dots").children) { i.style.background = ""; i.style.boxShadow = ""; }
   if (ui("status")) ui("status").textContent = "";
+  blinkState();
+}
+// Spotlight's Blink button stays lit (like Next controller) while the controller blinks.
+function blinkState() {
+  const b = $("#n-blink"), c = W.n && ctrlOf(W.n.order[W.n.i]);
+  if (!b || !c) return;
+  const on = W.testing[c.id] === "identify";
+  b.className = on ? "primary small" : "live small";
+  b.textContent = on ? "● Blinking: press to blink again" : "Blink again";
 }
 function animate(cid, pv, seconds) {
   clearInterval(W.anim);
@@ -810,6 +822,7 @@ function animate(cid, pv, seconds) {
     if (performance.now() - t0 > seconds * 1000) {
       clearInterval(W.anim); delete W.testing[cid];
       ui("status").textContent = "The test ended by itself.";
+      blinkState();
     }
   };
   paint();
