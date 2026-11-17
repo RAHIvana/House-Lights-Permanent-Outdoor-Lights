@@ -71,33 +71,82 @@ def _check(r):
     return r
 
 
+def _int(v):
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _pct(value, top):
+    """A raw level on TinyTuya's own scale (type A 0-255, type B 0-1000) as 1-100 %; None if unknown."""
+    v = _int(value)
+    return None if v is None else max(1, min(100, round(v * 100 / top)))
+
+
+def _hexint(text, a, b):
+    try:
+        return int(text[a:b], 16)
+    except (TypeError, ValueError):
+        return None
+
+
+def light_kind(dps):
+    """"B" (data points 20-28), "A" (1-9) or None: TinyTuya's own tell, a power data point plus a mode
+    data point that is text ("white", "colour"...). A plug has a power data point only; a dimmer switch has
+    a number in data point 2; a multi-socket switch has on/off values there."""
+    dps = {str(k): v for k, v in (dps or {}).items()}
+    if "20" in dps and isinstance(dps.get("21"), str):
+        return "B"
+    if "1" in dps and isinstance(dps.get("2"), str):
+        return "A"
+    return None
+
+
+def looks_like_light(dps):
+    """A colour light: light_kind plus a colour data point. A white-only bulb has no colour, so the
+    colour commands would fail on it; plugs, switches and dimmers aren't lights."""
+    kind = light_kind(dps)
+    dps = {str(k): v for k, v in (dps or {}).items()}
+    return (kind == "B" and isinstance(dps.get("24"), str)) or (kind == "A" and isinstance(dps.get("5"), str))
+
+
 def parse_dps(dps):
     """Tuya light data points -> {onOff, brightness, color, colorTemInKelvin}.
-    Type B (20 power, 21 mode, 22 brightness 10-1000, 23 temperature 0-1000, 24 colour HSV hex)
-    and type A (1 power, 2 mode, 3 brightness 25-255, 4 temperature 0-255, 5 colour hex)."""
+    Type B (20 power, 21 mode, 22 white brightness 10-1000, 23 temperature 0-1000, 24 colour HSV hex)
+    and type A (1 power, 2 mode, 3 white brightness 25-255, 4 temperature 0-255, 5 colour hex).
+    Brightness is that of the mode the light is in, on TinyTuya's own scale, so what a command sets is
+    what is read back: the white level in white mode, the colour's value (V) in colour mode. None when
+    the light doesn't say (never a made-up 100)."""
     dps = {str(k): v for k, v in (dps or {}).items()}
     if "20" in dps:
         on, mode, bri, temp, col = dps.get("20"), dps.get("21"), dps.get("22"), dps.get("23"), dps.get("24")
-        pct = round((int(bri) - 10) * 100 / 990) if bri is not None else 100
-        tpct = int(temp) / 1000 if temp is not None else 0
-        rgb = (0, 0, 0)
+        tpct = (_int(temp) or 0) / 1000
+        rgb, value = (0, 0, 0), None
         if isinstance(col, str) and len(col) >= 12:
-            h, s, v = int(col[0:4], 16), int(col[4:8], 16), int(col[8:12], 16)
-            rgb = tuple(round(x * 255) for x in colorsys.hsv_to_rgb(h / 360, s / 1000, v / 1000))
+            h, s, v = _hexint(col, 0, 4), _hexint(col, 4, 8), _hexint(col, 8, 12)
+            if None not in (h, s, v):
+                rgb = tuple(round(x * 255) for x in colorsys.hsv_to_rgb(h / 360, s / 1000, v / 1000))
+                value = _pct(v, 1000)
+        pct = value if mode == "colour" and value is not None else _pct(bri, 1000)
     elif "1" in dps:
         on, mode, bri, temp, col = dps.get("1"), dps.get("2"), dps.get("3"), dps.get("4"), dps.get("5")
-        pct = round((int(bri) - 25) * 100 / 230) if bri is not None else 100
-        tpct = int(temp) / 255 if temp is not None else 0
-        rgb = (0, 0, 0)
+        tpct = (_int(temp) or 0) / 255
+        rgb, value = (0, 0, 0), None
         if isinstance(col, str) and len(col) >= 6:
-            rgb = (int(col[0:2], 16), int(col[2:4], 16), int(col[4:6], 16))
+            r, g, b = _hexint(col, 0, 2), _hexint(col, 2, 4), _hexint(col, 4, 6)
+            if None not in (r, g, b):
+                rgb = (r, g, b)
+                v = _hexint(col, 12, 14) if len(col) >= 14 else None
+                value = _pct(v if v is not None else max(rgb), 255)
+        pct = value if mode == "colour" and value is not None else _pct(bri, 255)
     else:
         return None
     white = mode == "white"
     kelvin = round(2700 + tpct * 3800) if white else 0
     if white:
         rgb = net.kelvin_to_rgb(kelvin)
-    return {"onOff": 1 if on else 0, "brightness": max(1, min(100, pct)),
+    return {"onOff": 1 if on else 0, "brightness": pct,
             "color": {"r": rgb[0], "g": rgb[1], "b": rgb[2]}, "colorTemInKelvin": kelvin}
 
 
@@ -123,8 +172,8 @@ def probe(info):
     ip = str(info.get("ip", "")).strip()
     opts, sec = options(info, {})
     r = _check(_device(opts["device_id"], ip, sec["local_key"], opts["version"]).status())
-    if not parse_dps(r.get("dps")):
-        raise ValueError("that Tuya device doesn't look like a light")
+    if not looks_like_light(r.get("dps")):
+        raise ValueError("that Tuya device doesn't look like a colour light (a plug, switch or dimmer, or a bulb that reports no colour?)")
     return [{"ip": ip, "type": "tuya", "model": "Tuya light", "supported": True, "device_id": opts["device_id"],
              "version": opts["version"], "device_tail": opts["device_id"][-5:], "lights": None,
              "label": "Tuya light (key works)"}]
@@ -145,7 +194,8 @@ class Kit(BaseKit):
         o, s = controller.options or {}, controller.secret or {}
         self.dev_id, self.version, self.key = o.get("device_id", ""), o.get("version", "3.3"), s.get("local_key", "")
         self._d = None
-        self._bri = 100
+        self._bri = None            # the brightness (percent) set from the page; None until then
+        self._kind = None           # "A" or "B", learned from the light's status
 
     def _dev(self):
         """The library's device object. Every use of it (making it included) happens with self.lock held:
@@ -164,13 +214,45 @@ class Kit(BaseKit):
         with self.lock:
             self._call("on" if on else "off", "turn_on" if on else "turn_off")
 
+    def _learn(self):
+        """Ask the light once what kind it is and how bright it is now: the kind gives the lowest safe
+        brightness, and the brightness is where colours and whites start, so the current percentage carries
+        across white and colour. Caller holds self.lock. If it can't be read nothing is made up."""
+        if not self.live or (self._kind is not None and self._bri is not None):
+            return
+        try:
+            dps = _check(self._dev().status()).get("dps")
+        except OSError:
+            return
+        if self._kind is None:
+            self._kind = light_kind(dps)
+        if self._bri is None:
+            st = parse_dps(dps)
+            self._bri = st["brightness"] if st else None
+
+    def _min_pct(self):
+        """The lowest percent TinyTuya takes without switching the light OFF (below the model's minimum it
+        turns the light off): 10 for type A (25 of 255), 1 for type B (10 of 1000). Unknown: the safe 10."""
+        self._learn()
+        return 1 if self._kind == "B" else 10
+
     def brightness(self, value):
+        """Brightness of the mode the light is in (the white level, or the colour's value): never below the
+        minimum, so the slider can't switch the light off. It is kept for the colours and whites after it
+        (and until it is set, they start from what the light has)."""
         with self.lock:
-            self._bri = max(1, min(100, int(value)))
+            self._bri = max(self._min_pct(), min(100, int(value)))
             self._call("brightness", "set_brightness_percentage", self._bri)
 
     def _colour(self, rgb):
-        self._call("colour", "set_colour", *[int(v) for v in rgb[:3]])
+        """Colour at the light's brightness: the one set from the page, else the one the light has. (TinyTuya
+        sends a colour at its own value, so a bare full red would be 100%.) If neither is known the colour goes
+        out as it is, never a made-up level. Caller holds self.lock."""
+        self._learn()
+        r, g, b = [int(v) for v in rgb[:3]]
+        if self._bri is not None:
+            r, g, b = (round(v * self._bri / 100) for v in (r, g, b))
+        self._call("colour", "set_colour", r, g, b)
 
     def color(self, rgb):
         with self.lock:
@@ -179,7 +261,11 @@ class Kit(BaseKit):
     def kelvin(self, k):
         pct = max(0, min(100, round((int(k) - 2700) * 100 / 3800)))
         with self.lock:
-            self._call("white", "set_white_percentage", self._bri, pct)
+            self._learn()
+            if self._bri is None:                 # brightness unknown: leave the light's own level alone
+                self._call("white", "set_colourtemp_percentage", pct)
+            else:
+                self._call("white", "set_white_percentage", self._bri, pct)
 
     def segments(self, segs, rgb, nseg):
         """One segment: the whole strip. Caller holds self.lock."""
@@ -191,7 +277,8 @@ class Kit(BaseKit):
         return parse_dps(r.get("dps"))
 
     def snapshot(self):
-        if not self.live:
+        self._bri = 100                           # only wizard tests take a snapshot: their colours show at full
+        if not self.live:                         # brightness, so they can be seen whatever the light is set to
             return None
         try:
             with self.lock:

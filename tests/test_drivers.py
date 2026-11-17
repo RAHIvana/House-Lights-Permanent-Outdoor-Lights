@@ -300,6 +300,37 @@ bb = z.shown("Front")[0]
 st.stop()
 check("JellyFish slow blink test: white then blue", a == "#ffffff" and bb == "#0000ff")
 
+
+# JellyFish: brightness needs a pattern we sent, and a zone that was switched off stays off
+zb = fj[0]
+kb = drivers.make_kit(Controller("j2", "jellyfish", "JellyFish", "127.0.0.31", "", True, {"zone": "Back"}), live=True)
+try:
+    kb.brightness(30)
+    said = False
+except ValueError as e:
+    said = "pick a colour or theme" in str(e)
+check("JellyFish: brightness before any colour or theme says so, and sends nothing",
+      said and zb.running["Back"]["data"] is None and zb.running["Back"]["state"] == 0)
+kb.power(True)
+kb.brightness(30)
+check("JellyFish: power on shows a pattern, and brightness then applies to it",
+      zb.running["Back"]["state"] == 1 and zb.running["Back"]["data"]["runData"]["brightness"] == 30)
+kb.color((0, 255, 0))
+kb.power(False)
+kb.brightness(60)
+check("JellyFish: brightness on a zone that is off keeps it off, with the new level",
+      zb.running["Back"]["state"] == 0 and zb.running["Back"]["data"]["runData"]["brightness"] == 60)
+kb.power(True)
+check("JellyFish: switching on afterwards uses that level",
+      zb.running["Back"]["state"] == 1 and zb.running["Back"]["data"]["runData"]["brightness"] == 60)
+kb.brightness(80)
+check("JellyFish: brightness on a zone that is on keeps it on",
+      zb.running["Back"]["state"] == 1 and zb.running["Back"]["data"]["runData"]["brightness"] == 80)
+kb.power(False)
+with kb.lock:
+    kb.show_lights([(255, 0, 0)] * 45)
+check("JellyFish: a new theme switches the zone on", zb.running["Back"]["state"] == 1)
+
 # --- Tuya --------------------------------------------------------------------------------------
 w = net.kelvin_to_rgb(4600)
 check("Tuya type B status (white)", tuya.parse_dps(DPS) == {"onOff": 1, "brightness": 100, "colorTemInKelvin": 4600,
@@ -413,6 +444,148 @@ try:
 except drivers.NotAllowed:
     refused = True
 check("Tuya: a disabled controller gets no restore", refused and CALLS == [])
+
+
+# --- Tuya brightness: what is read is what is set; never switched off; colours and whites keep it -------------
+check("Tuya brightness: white mode reads the white level (type B, 100 of 1000 = 10%)",
+      tuya.parse_dps({"20": True, "21": "white", "22": 100, "23": 0})["brightness"] == 10)
+check("Tuya brightness: colour mode reads the colour's value, not the white level",
+      tuya.parse_dps({"20": True, "21": "colour", "22": 1000, "24": "000003e803e8"})["brightness"] == 100
+      and tuya.parse_dps({"20": True, "21": "colour", "22": 1000, "24": "000003e800c8"})["brightness"] == 20)
+check("Tuya brightness: type A white 51 of 255 = 20%, and type A colour value 51 = 20%",
+      tuya.parse_dps({"1": True, "2": "white", "3": 51})["brightness"] == 20
+      and tuya.parse_dps({"1": True, "2": "colour", "3": 255, "5": "ff00000000ff33"})["brightness"] == 20)
+check("Tuya brightness: unknown stays unknown (no made-up 100%), and bad data doesn't crash",
+      tuya.parse_dps({"20": True, "21": "white"})["brightness"] is None
+      and tuya.parse_dps({"20": True, "21": "colour", "24": "zzzz"})["brightness"] is None
+      and tuya.parse_dps({"20": True, "21": "colour", "22": "x", "24": "zzzzzzzzzzzz"})["brightness"] is None)
+
+# the real TinyTuya, if it is installed: what its set_brightness_percentage sends reads back as the same percent
+stand_in = sys.modules.pop("tinytuya")
+try:
+    import importlib
+    real_tt = importlib.import_module("tinytuya")
+except Exception:                                     # noqa: BLE001
+    real_tt = None
+finally:
+    sys.modules.pop("tinytuya", None)
+    sys.modules["tinytuya"] = stand_in
+if real_tt is None:
+    check("Tuya brightness round trip with TinyTuya's own scales: skipped (tinytuya not installed)", True)
+else:
+    scales, worst = real_tt.BulbDevice.DEFAULT_DPSET, 0
+    for kind, make in (("A", lambda raw: {"1": True, "2": "white", "3": raw}),
+                       ("B", lambda raw: {"20": True, "21": "white", "22": raw})):
+        vmin, vmax = scales[kind]["value_min"], scales[kind]["value_max"]
+        for pct in range(-(-vmin * 100 // vmax), 101):
+            raw = int(vmax * pct // 100)                 # what set_brightness_percentage(pct) sends
+            worst = max(worst, abs(tuya.parse_dps(make(raw))["brightness"] - pct))
+    check(f"Tuya brightness round trip with TinyTuya's own scales: set then read differs by at most 1% (worst {worst})",
+          worst <= 1)
+
+
+class TypedBulb(FakeBulb):
+    dps = {}
+    broken = False
+
+    def status(self):
+        if self.broken:
+            raise OSError("no answer")
+        return {"dps": dict(self.dps)}
+
+
+class TypeA(TypedBulb):
+    dps = {"1": True, "2": "white", "3": 255, "4": 0, "5": "ff00000000ffff"}
+
+
+class TypeB(TypedBulb):
+    dps = {"20": True, "21": "white", "22": 1000, "23": 0, "24": "000003e803e8"}
+
+
+class TypeB40(TypedBulb):                             # a type B light that is at 40% in white mode
+    dps = {"20": True, "21": "white", "22": 400, "23": 0, "24": "000003e803e8"}
+
+
+class TypeBColour20(TypedBulb):                       # in colour mode at 20%
+    dps = {"20": True, "21": "colour", "22": 1000, "23": 0, "24": "000003e800c8"}
+
+
+class TypeBSilent(TypeB):
+    broken = True
+
+
+class PlugBulb(TypedBulb):
+    dps = {"1": True, "9": 0}
+
+
+tt = sys.modules["tinytuya"]
+orig_bulb = tt.BulbDevice
+
+
+def tuya_kit(bulb):
+    tt.BulbDevice = bulb
+    return drivers.make_kit(ct, live=True)
+
+
+try:
+    for bulb, low in ((TypeA, 10), (TypeB, 1)):
+        kk = tuya_kit(bulb)
+        CALLS.clear()
+        for v in (0, 5, 100):
+            kk.brightness(v)
+        got = [c[1][0] for c in CALLS if c[0] == "set_brightness_percentage"]
+        check(f"Tuya type {bulb.__name__[-1]}: the slider never goes below {low}%, so it never switches the light off",
+              got == [low, max(low, 5), 100])
+
+    kk = tuya_kit(TypeB40)
+    CALLS.clear()
+    kk.color((200, 100, 0))
+    kk.kelvin(2700)
+    kk.brightness(50)
+    kk.color((200, 100, 0))
+    check("Tuya: colours and whites start from the light's own 40%, and keep the slider's brightness once it is set",
+          CALLS == [("set_colour", (80, 40, 0)), ("set_white_percentage", (40, 0)),
+                    ("set_brightness_percentage", (50,)), ("set_colour", (100, 50, 0))])
+    check("Tuya status: colour mode reports the colour's brightness, an unreadable value stays None",
+          tuya_kit(TypeBColour20).status()["brightness"] == 20
+          and tuya.parse_dps({"20": True, "21": "white"})["brightness"] is None)
+
+    kk = tuya_kit(TypeBSilent)
+    CALLS.clear()
+    kk.color((200, 100, 0))
+    kk.kelvin(2700)
+    check("Tuya: a light that can't be read: colours go out as they are and whites keep the light's own level",
+          CALLS == [("set_colour", (200, 100, 0)), ("set_colourtemp_percentage", (0,))])
+
+    kk = tuya_kit(TypeB40)
+    CALLS.clear()
+    stt = Streamer(kk, 60)
+    stt.start_fn("test", lambda t: [(255, 0, 0)] * 60, False, seconds=2, slow_ok=True)
+    time.sleep(0.3)
+    stt.stop()
+    check("Tuya: a wizard test shows its colour at full brightness so it can be seen, whatever the light is set to",
+          CALLS[0] == ("set_colour", (255, 0, 0)))
+
+    # plugs, switches and dimmers are not lights
+    cases = {"plug": {"1": True, "9": 0}, "dimmer switch": {"1": True, "2": 10, "3": 10, "4": "incandescent"},
+             "two-socket switch": {"1": True, "2": True, "3": False},
+             "white-only bulb": {"20": True, "21": "white", "22": 60}, "no data points": {}, "power only, type B": {"20": True}}
+    wrongly = [name for name, dps in cases.items() if tuya.looks_like_light(dps)]
+    check(f"Tuya: plugs, switches, dimmers and white-only bulbs are not colour lights {wrongly}", not wrongly)
+    check("Tuya: colour lights of type A and B are", tuya.looks_like_light(TypeA.dps) and tuya.looks_like_light(TypeB.dps)
+          and tuya.looks_like_light({str(k): v for k, v in TypeB.dps.items()}))
+    tt.BulbDevice = PlugBulb
+    try:
+        tuya.probe({"ip": "127.0.0.41", "device_id": "abcdef0123456789abcd", "local_key": "0123456789abcdef"})
+        message = ""
+    except ValueError as e:
+        message = str(e)
+    check("Tuya probe: a plug whose key works is refused, with a reason", "colour light" in message and "plug" in message)
+    tt.BulbDevice = TypeB
+    check("Tuya probe: a colour light is accepted",
+          tuya.probe({"ip": "127.0.0.41", "device_id": "abcdef0123456789abcd", "local_key": "0123456789abcdef"})[0]["supported"])
+finally:
+    tt.BulbDevice = orig_bulb
 
 # --- Govee scan: retries the addresses that didn't answer ----------------------------------------
 ASKED = {}

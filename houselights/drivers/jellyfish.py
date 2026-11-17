@@ -139,6 +139,7 @@ class Kit(BaseKit):
         self.zone = (controller.options or {}).get("zone", "")
         self._bri = 100
         self._data = None                     # the last pattern sent, for brightness and power on
+        self._on = None                       # whether the zone was last switched on or off (None: not yet)
 
     def _run(self, data, state, what):
         self.guard()
@@ -155,20 +156,26 @@ class Kit(BaseKit):
 
     def power(self, on):
         with self.lock:
-            data = self._data or self._solid((255, 160, 80))
-            self._run(data, 1 if on else 0, "on" if on else "off")
+            self._data = self._data or self._solid((255, 160, 80))        # what we sent is what it shows
+            self._run(self._data, 1 if on else 0, "on" if on else "off")
+            self._on = bool(on)
 
     def brightness(self, value):
+        """Brightness is a field of the pattern, so it needs a pattern we sent. A zone that was switched off
+        stays off (the next power on uses the new level)."""
         with self.lock:
+            if not self._data:
+                raise ValueError("JellyFish can't report what a zone is showing: pick a colour or theme first, "
+                                 "then change the brightness")
             self._bri = max(1, min(100, int(value)))
-            if self._data:
-                self._data["runData"]["brightness"] = self._bri
-                self._run(self._data, 1, f"brightness {self._bri}")
+            self._data["runData"]["brightness"] = self._bri
+            self._run(self._data, 0 if self._on is False else 1, f"brightness {self._bri}")
 
     def color(self, rgb):
         with self.lock:
             self._data = self._solid(rgb)
             self._run(self._data, 1, "colour #%02X%02X%02X" % tuple(rgb[:3]))
+            self._on = True
 
     def kelvin(self, k):
         self.color(net.kelvin_to_rgb(k))
@@ -186,3 +193,4 @@ class Kit(BaseKit):
             flat = [v for c in pal for v in c[:3]]
             self._data = pattern(flat, "Multi-Paint", b, self._bri, speed=100)
         self._run(self._data, 1, f"{len(pal)} colour(s), {b} light(s) each")
+        self._on = True

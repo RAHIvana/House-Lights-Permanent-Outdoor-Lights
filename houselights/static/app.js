@@ -306,11 +306,11 @@ function drawStatus(card) {
   if (!lan) box.innerHTML = '<span class="dot"></span>' + (capsOf(sec).status === false ? "status not reported by this controller" : "no reply") + (st ? `<br><span class="live-tag">● Playing ${esc(labelOf(st.pattern))}</span>` : "");
   else {
     const col = lan.colorTemInKelvin ? `${num(lan.colorTemInKelvin)} K` : `rgb ${num(lan.color.r)},${num(lan.color.g)},${num(lan.color.b)}`;
-    box.innerHTML = `<span class="dot ${lan.onOff ? "on" : ""}"></span>${lan.onOff ? "On" : "Off"} · ${num(lan.brightness)}%`
+    box.innerHTML = `<span class="dot ${lan.onOff ? "on" : ""}"></span>${lan.onOff ? "On" : "Off"} · ${lan.brightness == null ? "–" : num(lan.brightness) + "%"}`
       + (st ? `<br><span class="live-tag">● Playing ${esc(labelOf(st.pattern))}</span>`
             : `<br><span class="swatch" style="background:${lanHex(lan)}"></span> ${col}`);
     const slider = $('[data-act="brightness"]', el);
-    if (document.activeElement !== slider) { slider.value = lan.brightness; slider.nextElementSibling.value = lan.brightness; }
+    if (lan.brightness != null && document.activeElement !== slider) { slider.value = lan.brightness; slider.nextElementSibling.value = lan.brightness; }
   }
 }
 

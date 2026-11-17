@@ -88,7 +88,8 @@ answered at ...") when nothing of your kind is there. Other fields the user type
 {"onOff": 1, "brightness": 50, "color": {"r": 255, "g": 140, "b": 0}, "colorTemInKelvin": 0}
 ```
 
-`onOff` is 0 or 1, `brightness` is 1 to 100, `colorTemInKelvin` is 0 when the light shows a colour.
+`onOff` is 0 or 1, `brightness` is 1 to 100 (or `None` when the light doesn't say, never a made-up 100;
+the page shows a dash), `colorTemInKelvin` is 0 when the light shows a colour.
 Use `None` for a controller that did not answer. The dashboard asks every 15 seconds, so ask all
 controllers **at once** (`net.probe_many`) and keep the timeout short. A driver that cannot report
 state sets `status: False` in its caps and returns `None` for everything.
@@ -343,8 +344,19 @@ class Kit(BaseKit):
   one light** (a lone light goes as DRGB; a lone light at the end of a long frame moves into the packet
   before it).
 - **Tuya devices take one connection at a time**, so close the Smart Life app while testing.
+- **Tuya brightness** is that of the mode the light is in: the white level in white mode, the colour's value
+  (V) in colour mode, both on TinyTuya's own scale (type A 25 to 255, type B 10 to 1000), so what is set is what
+  is read back. TinyTuya **switches the light off** when asked for less than the model's minimum (10% on type A,
+  1% on type B), and it sends a bare colour at the colour's own value (full red is 100%). The driver therefore
+  never goes below the minimum, keeps the brightness set on the page (or the light's own, read once) for later
+  colours and whites, and shows colours in wizard tests at full brightness so they can be seen.
+- **A Tuya device is a light only if** it has a power data point, a text mode data point and a colour data
+  point (TinyTuya's own tell, plus colour). A plug (power only), a dimmer switch (a number in data point 2), a
+  multi-socket switch and a white-only bulb are refused when you add them by address with their key.
 - **JellyFish cannot report what a zone shows** (`status: False`, `restore: "none"`) and holds at most 30
-  colour blocks in a pattern, so its static themes are approximations: implement `preview_static`.
+  colour blocks in a pattern, so its static themes are approximations: implement `preview_static`. Brightness
+  is a field of the pattern, so it needs a pattern the driver sent (otherwise it says to pick a colour or
+  theme first), and a zone that was switched off stays off when the brightness changes.
 - **Windows and UDP ports.** Do not set `SO_REUSEADDR` on a listening UDP socket there: the bind then
   succeeds beside another program already on the port, and that program keeps getting every reply.
   Without it the bind fails and says why.
