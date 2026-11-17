@@ -15,7 +15,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import drivers, settings, setup, themes
+from . import drivers, guard, settings, setup, themes
 from . import patterns as P
 from .drivers import NotAllowed
 from .schedule import Scheduler
@@ -138,6 +138,7 @@ def _start_job(sec, kit, label, calls):
 # --- API ---------------------------------------------------------------------------------
 app = FastAPI(title="House Lights", docs_url=None, redoc_url=None)
 app.include_router(setup.router)
+guard.install(app)
 
 
 @app.middleware("http")

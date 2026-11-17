@@ -129,6 +129,24 @@ def ws_exchange(host, port, path, messages, reply=True, timeout=3.0):
 
 
 # --- scanning ------------------------------------------------------------------------------
+HOME_ADDRESSES = "192.168.x.x, 10.x.x.x, 172.16 to 172.31.x.x"
+
+
+def is_home_address(ip):
+    """True for an address on your own network: loopback, 192.168.x.x, 10.x.x.x, 172.16-31.x.x,
+    link-local, and IPv6 private ones. House Lights sends packets to what it is told to, and it has
+    no login, so it will not be pointed at the internet."""
+    try:
+        a = ipaddress.ip_address(str(ip).strip())
+    except ValueError:
+        return False
+    if a.version == 6 and a.ipv4_mapped:
+        a = a.ipv4_mapped
+    # "reserved" is only meaningful for IPv4 here (240.x.x.x, broadcast); Python also calls ::1 reserved
+    return (a.is_private or a.is_loopback or a.is_link_local) and not (
+        a.is_multicast or a.is_unspecified or (a.version == 4 and a.is_reserved))
+
+
 def local_networks():
     """This computer's own /24 network, to scan when the user typed no addresses.
     (Connecting a UDP socket sends nothing; it only picks the outgoing interface.)"""

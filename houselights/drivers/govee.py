@@ -28,6 +28,7 @@ import time
 
 from .base import ONE_COLOUR_CAPS, NotAllowed
 from .base import Kit as BaseKit
+from . import net as _net
 
 log = logging.getLogger("houselights")
 
@@ -221,7 +222,8 @@ LAN = Lan()
 
 
 def expand_targets(text, limit=1024):
-    """'192.168.2.0/24, 192.168.2.7' -> list of addresses to scan one by one."""
+    """'192.168.2.0/24, 192.168.2.7' -> list of addresses to scan one by one. Only addresses on your own
+    network: a scan sends packets to every address, and this server has no login."""
     out = []
     for part in str(text or "").replace(";", ",").replace(" ", ",").split(","):
         part = part.strip()
@@ -230,13 +232,18 @@ def expand_targets(text, limit=1024):
         try:
             if "/" in part:
                 net = ipaddress.ip_network(part, strict=False)
+                if not (_net.is_home_address(net.network_address) and _net.is_home_address(net.broadcast_address)):
+                    raise ValueError(f"{part} isn't on your own network: only home addresses are scanned ({_net.HOME_ADDRESSES})")
                 if net.num_addresses > limit:
                     raise ValueError(f"{part} is too big to scan (at most {limit} addresses)")
                 out += [str(h) for h in (net.hosts() if net.num_addresses > 2 else net)]
             else:
-                out.append(str(ipaddress.ip_address(part)))
+                one = ipaddress.ip_address(part)
+                if not _net.is_home_address(one):
+                    raise ValueError(f"{part} isn't on your own network: only home addresses are scanned ({_net.HOME_ADDRESSES})")
+                out.append(str(one))
         except ValueError as e:
-            raise ValueError(str(e) if "too big" in str(e) else f"{part!r} is not an address or network") from None
+            raise ValueError(str(e) if ("too big" in str(e) or "own network" in str(e)) else f"{part!r} is not an address or network") from None
     if len(out) > limit:
         raise ValueError(f"too many addresses to scan (at most {limit})")
     return out

@@ -225,6 +225,8 @@ def validate(raw, secrets=None):
             ip = str(ipaddress.ip_address(_text(c.get("ip"), f"{what} IP address", 45, True)))
         except ValueError:
             raise ValueError(f"{what}: {c.get('ip')!r} is not an IP address") from None
+        if not drivers.net.is_home_address(ip):
+            raise ValueError(f"{what}: {ip} isn't on your own network ({drivers.net.HOME_ADDRESSES})")
         try:
             opts, sec = drv.options(c, secrets.get(cid) or {})
         except ValueError as e:

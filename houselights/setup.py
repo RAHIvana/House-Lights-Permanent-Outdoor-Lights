@@ -337,6 +337,11 @@ def probe(body: dict):
     ok, reason = drv.available()
     if not ok:
         raise HTTPException(400, reason)
+    from .drivers.govee import expand_targets
+    try:
+        expand_targets(str(body.get("ip", "")))             # home addresses only
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     info = dict(body)
     if not info.get("local_key") and info.get("id"):
         info["local_key"] = (settings.read_secrets().get(info["id"]) or {}).get("local_key", "")

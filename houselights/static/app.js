@@ -57,8 +57,10 @@ function kelvinToHex(k) {                                // rough, for display o
   const h = v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
   return "#" + h(r) + h(g) + h(b);
 }
-const lanHex = lan => lan.colorTemInKelvin ? kelvinToHex(lan.colorTemInKelvin)
-  : "#" + [lan.color.r, lan.color.g, lan.color.b].map(v => v.toString(16).padStart(2, "0")).join("");
+// What a controller reports is used as numbers only, so nothing it sends can become page markup.
+const num = v => Number.isFinite(Number(v)) ? Number(v) : 0;
+const lanHex = lan => lan.colorTemInKelvin ? kelvinToHex(num(lan.colorTemInKelvin))
+  : "#" + [lan.color.r, lan.color.g, lan.color.b].map(v => Math.max(0, Math.min(255, Math.round(num(v)))).toString(16).padStart(2, "0")).join("");
 
 // A theme that isn't in the list (an unsaved one from the Themes tab, or one deleted since)
 // still gets a usable entry, so nothing breaks on it.
@@ -300,11 +302,11 @@ function drawStatus(card) {
   const box = $(".status", el), st = status && status.stream;
   if (!sec.enabled) { box.textContent = "not enabled"; return; }
   const lan = status && status.lan;
-  if (!lan) box.innerHTML = '<span class="dot"></span>' + (capsOf(sec).status === false ? "status not reported by this controller" : "no reply") + (st ? `<br><span class="live-tag">● Playing ${labelOf(st.pattern)}</span>` : "");
+  if (!lan) box.innerHTML = '<span class="dot"></span>' + (capsOf(sec).status === false ? "status not reported by this controller" : "no reply") + (st ? `<br><span class="live-tag">● Playing ${esc(labelOf(st.pattern))}</span>` : "");
   else {
-    const col = lan.colorTemInKelvin ? `${lan.colorTemInKelvin} K` : `rgb ${lan.color.r},${lan.color.g},${lan.color.b}`;
-    box.innerHTML = `<span class="dot ${lan.onOff ? "on" : ""}"></span>${lan.onOff ? "On" : "Off"} · ${lan.brightness}%`
-      + (st ? `<br><span class="live-tag">● Playing ${labelOf(st.pattern)}</span>`
+    const col = lan.colorTemInKelvin ? `${num(lan.colorTemInKelvin)} K` : `rgb ${num(lan.color.r)},${num(lan.color.g)},${num(lan.color.b)}`;
+    box.innerHTML = `<span class="dot ${lan.onOff ? "on" : ""}"></span>${lan.onOff ? "On" : "Off"} · ${num(lan.brightness)}%`
+      + (st ? `<br><span class="live-tag">● Playing ${esc(labelOf(st.pattern))}</span>`
             : `<br><span class="swatch" style="background:${lanHex(lan)}"></span> ${col}`);
     const slider = $('[data-act="brightness"]', el);
     if (document.activeElement !== slider) { slider.value = lan.brightness; slider.nextElementSibling.value = lan.brightness; }
@@ -599,7 +601,7 @@ async function quickTheme(id) {
 function buildQuick() {
   const tg = $("#targets");
   tg.innerHTML = `<button data-t="all">Whole house</button>`
-    + CONFIG.sections.map(s => `<button data-t="${s.id}"${s.enabled ? "" : " disabled"}>${shortName(s.id)}</button>`).join("");
+    + CONFIG.sections.map(s => `<button data-t="${s.id}"${s.enabled ? "" : " disabled"}>${esc(shortName(s.id))}</button>`).join("");
   tg.onclick = e => {
     const b = e.target.closest("[data-t]");
     if (!b) return;
@@ -751,8 +753,8 @@ function sync() {
   $("#all-off").classList.toggle("on", known === false);
   const live = all.filter(sid => STATUS[sid] && STATUS[sid].stream);
   $("#now-playing").innerHTML = live.length
-    ? "Playing live: " + live.map(sid => `<b>${shortName(sid)} · ${labelOf(STATUS[sid].stream.pattern)}</b>`).join(", ")
-    : `Nothing playing live. Tap a theme to play it on ${ids.length === all.length ? "the whole house" : names(ids) || "the lights you pick"}.`;
+    ? "Playing live: " + live.map(sid => `<b>${esc(shortName(sid))} · ${esc(labelOf(STATUS[sid].stream.pattern))}</b>`).join(", ")
+    : `Nothing playing live. Tap a theme to play it on ${ids.length === all.length ? "the whole house" : esc(names(ids)) || "the lights you pick"}.`;
   $("#bar-stop").disabled = !live.length;
 
   // visualization
