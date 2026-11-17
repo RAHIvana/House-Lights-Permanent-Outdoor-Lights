@@ -2,10 +2,12 @@
 :root {
   --bg: #e6e0d4; --panel: #f3efe7; --panel2: #ebe5da; --line: #d2c9b9; --fg: #2b2720; --muted: #6c6457;
   --amber: #e9992a; --amber-ink: #8a4f00; --amber-fill-ink: #23170a; --red: #b83a32; --red-bg: #f6e2dc;
-  --green: #2c7f4f; --night: #23262b; --night-fg: #b3b6bb; --dot-off: #41454c; --focus: #2f6fde;
+  --green: #2c7f4f; --focus: #2f6fde;
+  /* light strips (Your house, wizard, run panels): light beige here, night grey on the dark page */
+  --night: #d9d2c5; --night-fg: #4f483c; --night-ink: #2b2720; --night-chip: #c9c0b0; --night-line: #a99f8d; --dot-off: #bdb3a2;
   --dry: #b7791f; --toast: #2b2720; --toast-fg: #f3efe7; --err-bg: #8f2f28;
   --band: #1c2541; --band-fg: #f7e7c6; --tab-on: #fbe7be; --tab-on-ink: #5a3a06; --tab-done: #e2edd6; --tab-done-ink: #2f5410;
-  --pick: #a0a0a0;   /* the lit theme tile's 4 px border: dark silver (bright yellow on the dark page) */
+  --pick: #2b2720; --pick-ink: #fff;   /* the lit theme tile: 4 px border and a tick badge, charcoal (dark page: bright yellow) */
   --gutter: max(20px, env(safe-area-inset-left, 0px)); --gutter-r: max(20px, env(safe-area-inset-right, 0px));
   --radius: 12px;
   color-scheme: light;
@@ -14,12 +16,16 @@
   --bg: #2b2e33; --panel: #34383e; --panel2: #3d4148; --line: #4b5058; --fg: #e9e6e0; --muted: #a6a9ae;
   --amber-ink: #ffbe5c; --red: #ff7b72; --red-bg: #4a2b2b; --green: #6fcf97; --focus: #7aa7ff;
   --toast: #e9e6e0; --toast-fg: #2b2e33; --band: #0e1a3a; --tab-on: #4a3510; --tab-on-ink: #fbe0a6;
-  --tab-done: #22331a; --tab-done-ink: #b9dc8f; --pick: #ffd400; color-scheme: dark } }
+  --tab-done: #22331a; --tab-done-ink: #b9dc8f; --pick: #ffd400; --pick-ink: #2b2720;
+  --night: #23262b; --night-fg: #b3b6bb; --night-ink: #eceae5; --night-chip: #3a3e45; --night-line: #50555d; --dot-off: #41454c;
+  color-scheme: dark } }
 :root[data-theme="dark"] {
   --bg: #2b2e33; --panel: #34383e; --panel2: #3d4148; --line: #4b5058; --fg: #e9e6e0; --muted: #a6a9ae;
   --amber-ink: #ffbe5c; --red: #ff7b72; --red-bg: #4a2b2b; --green: #6fcf97; --focus: #7aa7ff;
   --toast: #e9e6e0; --toast-fg: #2b2e33; --band: #0e1a3a; --tab-on: #4a3510; --tab-on-ink: #fbe0a6;
-  --tab-done: #22331a; --tab-done-ink: #b9dc8f; --pick: #ffd400; color-scheme: dark }
+  --tab-done: #22331a; --tab-done-ink: #b9dc8f; --pick: #ffd400; --pick-ink: #2b2720;
+  --night: #23262b; --night-fg: #b3b6bb; --night-ink: #eceae5; --night-chip: #3a3e45; --night-line: #50555d; --dot-off: #41454c;
+  color-scheme: dark }
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -123,9 +129,11 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .tile-st { font-size: 11px; color: var(--muted); padding: 0 9px 7px; }
 /* Quick Settings: a tile or button that's on keeps its look and gets a thick amber border */
 .tile.on { position: relative; background: var(--panel2); color: var(--fg); border-color: var(--line); }
-/* the theme that's on: a 4 px border on top of its colours, silver (dark page: bright yellow) */
+/* the theme that's on: a 4 px border on top of its colours and a tick badge, charcoal (dark page: bright yellow) */
 .tile.on::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
   box-shadow: inset 0 0 0 4px var(--pick); }
+.tile.on::before { content: "\2713"; position: absolute; top: 6px; right: 6px; z-index: 1; width: 18px; height: 18px;
+  border-radius: 50%; background: var(--pick); color: var(--pick-ink); font-size: 12px; font-weight: 700; line-height: 18px; text-align: center; }
 .tile:active { transform: scale(.97); }
 #now-playing b { color: var(--amber-ink); }
 
@@ -133,7 +141,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .viewer { position: relative; background: var(--night); border-radius: 10px; overflow: hidden; }
 .vbadge { position: absolute; top: 10px; left: 12px; z-index: 2; pointer-events: none;
   font: 700 11px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .06em; padding: 6px 9px; border-radius: 99px; }
-.vbadge.idle { background: #3a3e45; color: var(--night-fg); }
+.vbadge.idle { background: var(--night-chip); color: var(--night-fg); }
 .vbadge.preview { background: rgba(35, 38, 43, .75); color: #eceae5; border: 1px dashed #eceae5; }
 .vbadge.live { background: var(--amber); color: var(--amber-fill-ink); }
 .vbadge.dry { background: var(--dry); color: #fff; }
@@ -146,11 +154,11 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .vrun > .vl { grid-row: span 2; }
 .vl { color: var(--night-fg); font-size: 12px; display: flex; flex-direction: column; gap: 2px; position: sticky; left: 0; z-index: 1;
   background: var(--night); }
-.vl b { color: #eceae5; font-size: 13px; font-weight: 600; }
+.vl b { color: var(--night-ink); font-size: 13px; font-weight: 600; }
 .dots, .ticks { display: grid; gap: 2px; }
 .dots i { height: 22px; border-radius: 3px; background: var(--dot-off); width: 100%; }
 .strips.fit .dots i { width: min(100%, 12px); justify-self: center; }
-.ticks span { font: 10px/1.2 ui-monospace, Menlo, monospace; color: var(--night-fg); border-inline-start: 1px solid #50555d;
+.ticks span { font: 10px/1.2 ui-monospace, Menlo, monospace; color: var(--night-fg); border-inline-start: 1px solid var(--night-line);
   padding-inline-start: 2px; overflow: hidden; white-space: nowrap; }
 /* light 1 at the right end of the run: drawn from the right, light numbers running right to left */
 .vrun.rev .dots, .vrun.rev .ticks { direction: rtl; justify-self: end; }
@@ -185,10 +193,10 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .strip { display: flex; gap: 3px; padding: 12px 8px; background: var(--night); border-radius: 8px; overflow-x: auto; }
 .seg { flex: 1 0 auto; display: flex; justify-content: space-around; gap: 2px; padding: 5px 3px; border-radius: 6px;
   border: 1px solid transparent; background: none; cursor: pointer; min-width: 28px; position: relative; }
-.seg:hover { border-color: #5a606a; }
+.seg:hover { border-color: var(--night-line); }
 .seg.selected { border-color: var(--amber); background: rgba(233, 153, 42, .15); }
 .seg.mixed::after { content: ""; position: absolute; top: -6px; right: 2px; width: 5px; height: 5px; border-radius: 50%; background: var(--dry); }
-.seg.unreach { border: 1px dashed #5a606a; cursor: default; }
+.seg.unreach { border: 1px dashed var(--night-line); cursor: default; }
 .strip.rev, .strip.rev .seg { flex-direction: row-reverse; }   /* light 1 at the right end */
 .light { width: 7px; height: 7px; border-radius: 50%; background: var(--dot-off); }
 .strip.preview { outline: 1px dashed var(--amber); }
