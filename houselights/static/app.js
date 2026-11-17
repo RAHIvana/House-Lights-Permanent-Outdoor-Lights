@@ -736,6 +736,10 @@ function sync() {
     t.classList.toggle("on", on.length > 0);
     $(".tile-st", t).textContent = on.length ? `${anim ? "● Playing on" : "● Showing on"} ${names(on)}` : anim ? "animated" : "static";
   }
+  // On / Off stay lit while every picked run is on (or off)
+  const power = ids.map(sid => { const st = STATUS[sid]; return st && st.lan ? st.lan.onOff === 1 : st && st.assumed ? st.assumed.power !== false : null; });
+  $("#all-on").classList.toggle("on", power.length > 0 && power.every(p => p === true));
+  $("#all-off").classList.toggle("on", power.length > 0 && power.every(p => p === false));
   const live = all.filter(sid => STATUS[sid] && STATUS[sid].stream);
   $("#now-playing").innerHTML = live.length
     ? "Playing live: " + live.map(sid => `<b>${shortName(sid)} · ${labelOf(STATUS[sid].stream.pattern)}</b>`).join(", ")
