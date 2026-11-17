@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>House Lights: log in</title>
+<script src="theme-init.js?v=1"></script>
+<link rel="stylesheet" href="style.css?v=27">
+<link rel="stylesheet" href="login.css?v=1">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="icon-192.png" sizes="192x192">
+<meta name="theme-color" content="#1c2541">
+</head>
+<body>
+<header class="topbar">
+  <h1><svg class="bulb" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h1m8 -9v1m8 8h1m-15.4 -6.4l.7 .7m12.1 -.7l-.7 .7"/><path d="M9 16a5 5 0 1 1 6 0a3.5 3.5 0 0 0 -1 3a2 2 0 0 1 -4 0a3.5 3.5 0 0 0 -1 -3"/><path d="M9.7 17l4.6 0"/></svg>House Lights</h1>
+</header>
+<main class="login">
+  <form class="panel" id="form">
+    <h2>Log in</h2>
+    <p class="muted">This dashboard is protected by a password.</p>
+    <label><span>Password</span>
+      <input type="password" id="pw" autocomplete="current-password" autofocus required></label>
+    <p class="err" id="msg" role="alert"></p>
+    <button class="primary" id="go" type="submit">Log in</button>
+  </form>
+</main>
+<script src="login.js?v=1"></script>
+</body>
+</html>

@@ -223,7 +223,7 @@ LAN = Lan()
 
 def expand_targets(text, limit=1024):
     """'192.168.2.0/24, 192.168.2.7' -> list of addresses to scan one by one. Only addresses on your own
-    network: a scan sends packets to every address, and this server has no login."""
+    network: a scan sends packets to every address, and this server's login is optional."""
     out = []
     for part in str(text or "").replace(";", ",").replace(" ", ",").split(","):
         part = part.strip()

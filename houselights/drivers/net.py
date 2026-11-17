@@ -134,8 +134,8 @@ HOME_ADDRESSES = "192.168.x.x, 10.x.x.x, 172.16 to 172.31.x.x"
 
 def is_home_address(ip):
     """True for an address on your own network: loopback, 192.168.x.x, 10.x.x.x, 172.16-31.x.x,
-    link-local, and IPv6 private ones. House Lights sends packets to what it is told to, and it has
-    no login, so it will not be pointed at the internet."""
+    link-local, and IPv6 private ones. House Lights sends packets to what it is told to, and its login
+    is optional, so it will not be pointed at the internet."""
     try:
         a = ipaddress.ip_address(str(ip).strip())
     except ValueError:

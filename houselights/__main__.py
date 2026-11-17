@@ -1,6 +1,7 @@
 """Start the House Lights server:
 
     python -m houselights [--home DIR] [--host HOST] [--port PORT] [--dry]
+    python -m houselights --set-password | --remove-password     (the optional dashboard password)
 
 On the first start there are no settings yet: open the page and the setup wizard appears.
 --dry is practice mode: commands are logged and nothing is sent to the lights.
@@ -17,12 +18,20 @@ def main():
     ap.add_argument("--host", help="address to listen on (default from settings, else 0.0.0.0)")
     ap.add_argument("--port", type=int, help="port to listen on (default from settings, else 8090)")
     ap.add_argument("--dry", action="store_true", help="practice mode: log commands, send nothing to the lights")
+    pw = ap.add_mutually_exclusive_group()
+    pw.add_argument("--set-password", action="store_true", help="set or change the dashboard password, then exit")
+    pw.add_argument("--remove-password", action="store_true",
+                    help="turn the dashboard password off (also the way back in if you forgot it), then exit")
     args = ap.parse_args()
 
     if args.home:
         os.environ["HOUSELIGHTS_HOME"] = os.path.abspath(args.home)
     if args.dry:
         os.environ["HOUSELIGHTS_DRY"] = "1"
+
+    if args.set_password or args.remove_password:
+        from . import auth
+        sys.exit(auth.cli(set_it=args.set_password))
 
     import uvicorn
     from . import runtime, settings

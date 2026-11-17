@@ -15,7 +15,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import drivers, guard, settings, setup, themes
+from . import auth, drivers, guard, settings, setup, themes
 from . import patterns as P
 from .drivers import NotAllowed
 from .schedule import Scheduler
@@ -138,6 +138,7 @@ def _start_job(sec, kit, label, calls):
 # --- API ---------------------------------------------------------------------------------
 app = FastAPI(title="House Lights", docs_url=None, redoc_url=None)
 app.include_router(setup.router)
+auth.install(app)                 # the login: inside the guard, so Host and Origin are checked first
 guard.install(app)
 
 
@@ -152,6 +153,7 @@ async def no_cache(request, call_next):
 @app.on_event("startup")
 def _startup():
     SCHED.start()
+    log.info("dashboard password: %s", "on" if auth.enabled() else "off (anyone on your network can open the page)")
 
 
 @app.on_event("shutdown")
@@ -164,6 +166,7 @@ def _shutdown():
 @app.get("/api/config")
 def config():
     return {"configured": S.configured,
+            "password": auth.enabled(),
             "mode": S.mode,
             "stream_fps": S.stream_fps,
             "timezone": S.timezone,

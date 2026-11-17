@@ -212,7 +212,10 @@ Your settings in `data/` are kept. Back up that folder to keep your setup, for e
 
 ## Good to know
 
-- **No login**: anyone on your home network who opens the page can control the lights. Don't
-  forward port 8090 on your router to the internet.
+- **No login unless you turn it on**: anyone on your home network who opens the page can control the
+  lights. To ask for a password, run `venv/bin/python -m houselights --set-password` on the Pi (it
+  takes effect at once, no restart needed), or set one in the setup wizard.
+  Forgot it? `venv/bin/python -m houselights --remove-password`. Don't forward port 8090 on your
+  router to the internet.
 - The SD card is the weak point of a Pi that runs for years. Keep a backup of `data/`, and
   if the card dies, write a new one with these steps and copy `data/` back.

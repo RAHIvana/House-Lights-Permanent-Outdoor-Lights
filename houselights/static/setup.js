@@ -15,6 +15,10 @@ async function api(path, body) {
   const res = await fetch(path, body === undefined ? {} : {
     method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && data.login) {                    // the dashboard password is on and this browser isn't logged in
+    location.href = "/login?next=" + encodeURIComponent(location.pathname + location.search);
+    throw new Error("Please log in.");
+  }
   if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
   return data;
 }
@@ -967,6 +971,7 @@ function drawSummary() {
 async function save() {
   const msg = check(0) || check(1) || check(4);
   if (msg) return err(msg);
+  try { await setTypedPassword(); } catch (e) { return err(e.message); }      // typed but not yet set: set it first
   err(""); $("#next").disabled = true; $("#prev").disabled = true;
   await stopAllTests();
   syncNames();
@@ -977,6 +982,67 @@ async function save() {
     await waitForRestart();
   } catch (e) { err(e.message); $("#next").disabled = false; $("#prev").disabled = false; }
 }
+// --- the optional dashboard password (step 5) -------------------------------------------------
+// It acts at once (no restart) and is kept in its own file, not in the setup that Go live saves.
+function pwField(label, id, auto) {
+  const l = el("label", "fld"), i = document.createElement("input");
+  i.type = "password"; i.id = id; i.autocomplete = auto;
+  l.append(el("span", "", label), i);
+  return l;
+}
+function pwSay(text, bad = false) { const m = $("#pw-msg"); m.textContent = text || ""; m.className = "pwmsg" + (bad ? " bad" : ""); }
+function pwValue(id) { const i = $(id); return i ? i.value : ""; }
+function pwNew() {
+  const a = pwValue("#pw-new"), b = pwValue("#pw-new2");
+  if (a !== b) throw new Error("The two password boxes differ.");
+  if (a.length < 8) throw new Error("Use at least 8 characters.");
+  return a;
+}
+async function pwCall(path, make, on, text) {         // make() builds the request; its mistakes show here, by the boxes
+  try { const body = make(); pwSay("Working…"); await api(path, body); } catch (e) { pwSay(e.message, true); return; }
+  W.info.password = on; W.pw = "";
+  drawPassword(); pwSay(text);
+}
+async function setTypedPassword() {              // Go live with a password typed but not yet set
+  if (W.info.password || !$("#pw-new") || !(pwValue("#pw-new") || pwValue("#pw-new2"))) return;
+  await api("/api/password", {new: pwNew()});
+  W.info.password = true;
+}
+async function logout() {
+  try { await api("/api/logout", {}); } catch (e) { /* the login page opens either way */ }
+  location.href = "/login";
+}
+function drawPassword() {
+  const body = $("#pw-body"), on = W.info.password;
+  W.pw = W.pw || "";                              // "", "change" or "remove"
+  body.replaceChildren();
+  $("#logout").hidden = !on;
+  $("#logout").onclick = logout;
+  pwSay("");
+  $("#pw-state").textContent = on
+    ? "A password is on: this page and the dashboard ask for it, and a browser that logged in stays logged in for 30 days."
+    : "Off: anyone on your home network who opens this page can control your lights. A password asks for it first. "
+      + "Leave the boxes empty to skip; a password typed here is also set when you press Go live.";
+  if (on && !W.pw) {
+    body.append(button("Change password", () => { W.pw = "change"; drawPassword(); }),
+                button("Remove password", () => { W.pw = "remove"; drawPassword(); }, "ghost"));
+    return;
+  }
+  if (on) body.append(pwField("Current password", "pw-cur", "current-password"));
+  if (!on || W.pw === "change") body.append(pwField("New password (8 or more characters)", "pw-new", "new-password"),
+                                            pwField("Type it again", "pw-new2", "new-password"));
+  const cancel = button("Cancel", () => { W.pw = ""; drawPassword(); }, "ghost");
+  if (!on) {
+    body.append(button("Set password", () => pwCall("/api/password", () => ({new: pwNew()}), true, "Password set. You stay logged in on this browser.")));
+  } else if (W.pw === "change") {
+    body.append(button("Change password", () => pwCall("/api/password", () => ({current: pwValue("#pw-cur"), new: pwNew()}), true,
+                                                        "Password changed. Other browsers must log in again.")), cancel);
+  } else {
+    body.append(button("Remove password", () => pwCall("/api/password/remove", () => ({current: pwValue("#pw-cur")}), false,
+                                                        "Password removed: the dashboard opens without one.")), cancel);
+  }
+}
+
 async function waitForRestart() {
   await new Promise(r => setTimeout(r, 2500));
   for (let k = 0; k < 40; k++) {
@@ -1041,7 +1107,7 @@ async function go(step, keepTests = false) {
   if (step === 1) { startNaming(); drawName(true); }
   if (step === 2) { if (!keepTests || !W.t) startTests(); drawTest(); }
   if (step === 3) drawPlace();
-  if (step === 4) drawSummary();
+  if (step === 4) { drawSummary(); drawPassword(); }
   scrollTo(0, 0);
 }
 

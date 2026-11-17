@@ -309,7 +309,8 @@ def _owner_only(p):
             raise OSError("whoami did not give this user's id")
         subprocess.run(["icacls", p, "/inheritance:r", "/grant:r", f"*{sid}:(F)"], **quiet)
     except (OSError, subprocess.CalledProcessError) as e:
-        raise ValueError(f"could not make {SECRETS_NAME} readable only by you ({e})") from None
+        name = os.path.basename(p).removesuffix(".tmp")
+        raise ValueError(f"could not make {name} readable only by you ({e})") from None
 
 
 def _write_private(name, data):
@@ -325,6 +326,11 @@ def _write_private(name, data):
         os.remove(tmp)
         raise
     os.replace(tmp, path(name))               # the file keeps its permissions when moved
+
+
+def write_private(name, data):
+    """Write a JSON file in the settings folder that only this user can read (secrets.json, access.json)."""
+    _write_private(name, data)
 
 
 def read_raw():

@@ -23,7 +23,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException
 
-from . import drivers, runtime, settings
+from . import auth, drivers, runtime, settings
 from .drivers import net
 from .settings import Controller
 from .stream import Streamer
@@ -271,6 +271,7 @@ def state():
         d["max_lights"] = {m: i["max_lights"] for m, i in infos.items()}
         d["lights_per_segment"] = {m: i["lights_per_segment"] for m, i in infos.items()}
     return {"configured": bool(s and s.configured),
+            "password": auth.enabled(),
             "error": error,
             "config": config,
             "drivers": cat,

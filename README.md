@@ -402,15 +402,23 @@ delete, the schedule reports an error until you pick another theme.
 
 ## Good to know
 
-- **No login.** Anyone who can open the page can control the lights. Keep it on your home
-  network and don't forward the port to the internet.
+- **Login is optional, and off until you turn it on.** With no password, anyone who can open the
+  page can control the lights. To ask for a password first, set one in the setup wizard's last
+  step (Settings tab, **Set one**) or run `python -m houselights --set-password`. A browser that
+  logs in stays logged in for 30 days, five wrong guesses make that address wait, and
+  changing the password logs every other browser out. It keeps out guests and curious people on
+  your Wi-Fi; the page is plain HTTP, so it doesn't stop someone who is already watching the
+  traffic on your network. **Forgot it?** Run `python -m houselights --remove-password` on the
+  computer that runs House Lights (or delete `data/access.json`). With or without a password,
+  keep it on your home network and don't forward the port to the internet.
   House Lights also refuses what a web page on another site could try through your browser:
   it answers only to IP addresses, `localhost` and names on your own network (like
   `pi.local`), so a made-up name pointed at your computer gets nothing, and changes must come
   from its own page. To reach it through another name (a reverse proxy, say), start it with
   `HOUSELIGHTS_ALLOWED_HOSTS=name1,name2` set. Apart from the wizard's ZIP lookup, it only
   talks to addresses on your own network (192.168.x.x, 10.x.x.x, 172.16 to 172.31.x.x).
-- Your files in `data/`: `config.json` (settings), `secrets.json` (Tuya keys, if any),
+- Your files in `data/`: `config.json` (settings), `secrets.json` (Tuya keys, if any), `access.json` (the dashboard
+  password's hash, if you set one),
   `schedules.json`, `themes.json` (your themes), `state.json` (what was last applied) and
   `logs/`. Back up this folder to keep your setup.
 - To update: `git pull`, then `venv/bin/pip install -r requirements.txt` (Windows:
@@ -438,6 +446,7 @@ venv/bin/python tests/test_themes.py       # theme engine, storage, whole-house 
 venv/bin/python tests/test_drivers.py      # Linux and Windows: uses 127.0.0.x addresses
 venv/bin/python tests/test_security.py     # Host and Origin checks, headers, home addresses, escaped names
 venv/bin/python tests/test_stream.py       # the animation worker: one at a time, stops and restarts cleanly
+venv/bin/python tests/test_auth.py         # the optional dashboard password: login, lockout, change, remove
 ```
 
 On Windows use `venv\Scripts\python tests\test_settings.py` and so on.

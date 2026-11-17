@@ -362,7 +362,7 @@ class Kit(BaseKit):
 - **Windows and UDP ports.** Do not set `SO_REUSEADDR` on a listening UDP socket there: the bind then
   succeeds beside another program already on the port, and that program keeps getting every reply.
   Without it the bind fails and says why.
-- **Only home addresses.** House Lights has no login. Scans, **Add by address** and saved controllers are
+- **Only home addresses.** House Lights's login is optional (off by default). Scans, **Add by address** and saved controllers are
   limited to your own network, and drivers must use `expand_targets` for typed addresses.
 - **Secrets stay in `secrets.json`**: never in `config.json`, never in a log line, never in a row sent to the
   page (the user's typed key goes the other way only).

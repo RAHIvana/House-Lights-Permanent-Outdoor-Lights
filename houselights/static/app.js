@@ -19,8 +19,17 @@ async function api(path, body) {
   const res = await fetch(path, body === undefined ? {} : {
     method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && data.login) {                    // the dashboard password is on and this browser isn't logged in
+    location.href = "/login?next=" + encodeURIComponent(location.pathname + location.search);
+    throw new Error("Please log in.");
+  }
   if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
   return data;
+}
+
+async function logout() {
+  try { await api("/api/logout", {}); } catch (e) { /* the login page opens either way */ }
+  location.href = "/login";
 }
 
 function toast(msg, err = false) {
@@ -848,6 +857,8 @@ function buildSettings() {
     <p>Mode: <b>${CONFIG.mode === "live" ? "Live (sends to the lights)" : "Practice (nothing is sent)"}</b> ·
       Time zone: <b>${esc(CONFIG.timezone)}</b> ·
       Location: <b>${CONFIG.location ? "set (sunrise/sunset schedules work)" : "not set (clock-time schedules only)"}</b></p>
+    <p>Dashboard password: <b>${CONFIG.password ? "on" : "off (anyone on your network can open this page)"}</b> ·
+      <a href="setup.html?step=save">${CONFIG.password ? "Change or remove it" : "Set one"}</a></p>
     <p class="muted">Settings file: ${esc(inHome(CONFIG.home, "config.json"))}</p>`;
 }
 
@@ -885,6 +896,7 @@ async function init() {
   const main = $("#sections");
   for (const sec of CONFIG.sections) main.appendChild(buildCard(sec));
   $("#refresh").onclick = () => refresh();
+  if (CONFIG.password) { $("#logout").hidden = false; $("#logout").onclick = logout; }
   if (typeof Themes !== "undefined") Themes.init();
   buildSettings();
   for (const b of document.querySelectorAll("[data-tab]")) b.onclick = () => setTab(b.dataset.tab);

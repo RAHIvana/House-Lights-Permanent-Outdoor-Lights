@@ -1,9 +1,10 @@
 # Security
 
-House Lights is a small program for a home network. It has **no login**: anyone who can open
-the page can control the lights, change the settings and add controllers. That is on purpose,
-so keep it on your home network and **never forward its port to the internet**. See "Good to
-know" in the [README](README.md).
+House Lights is a small program for a home network. Its login is **off until you
+turn it on**: with no password, anyone who can open the page can control the lights, change the
+settings and add controllers. You can set a password (see "Good to know" in the
+[README](README.md)), but either way keep it on your home network and **never forward its port
+to the internet**.
 
 ## Reporting a problem
 
@@ -26,10 +27,13 @@ Reports that help:
   the person using it didn't intend.
 - A way to read or change files outside the settings folder, or to read the stored Tuya keys.
 - Commands going to devices that weren't chosen.
+- A way past the password when one is set, or a way to read the stored password hash.
 
 Not security bugs:
 
-- The dashboard having no password on your own network (that is by design).
+- The dashboard having no password on your own network when you haven't set one (that is by design).
+- The password not stopping someone who is already watching the traffic on your network: the page is
+  plain HTTP.
 - Anything that needs access to the computer it runs on or to its settings folder.
 
 ## Supported versions

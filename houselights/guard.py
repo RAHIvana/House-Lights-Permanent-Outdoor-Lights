@@ -1,4 +1,5 @@
-"""Checks on every web request, because House Lights has no login.
+"""Checks on every web request, because House Lights has no login unless the owner turns on the
+password (auth.py), and a password doesn't stop a web page on another site from using your browser.
 
 Without them, a web page you open on some other site could talk to the dashboard through your
 own browser: by pointing a made-up name at your computer's address ("DNS rebinding"), by sending
