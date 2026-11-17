@@ -745,7 +745,7 @@ function drawDone(c, r, body) {
     button("Count it again", () => { setPhase("count"); W.t.recount = true; drawTest(); }, "ghost")));
 }
 function sweep(r) {
-  const n = Math.min(r.lights, 60), wrap = el("div", "sweep"), strip = el("div", "sweep-dots");
+  const n = Math.min(r.lights, 300), wrap = el("div", "sweep"), strip = el("div", "sweep-dots");
   strip.style.gridTemplateColumns = `repeat(${n}, minmax(0, 1fr))`;
   strip.innerHTML = "<i></i>".repeat(n);
   const ends = el("div", "sweep-ends");
@@ -785,7 +785,7 @@ function dots(n) {
   const d = ui("dots");
   n = Math.max(1, Math.min(3000, Number(n) || 1));
   if (d.children.length !== n) {
-    d.style.gridTemplateColumns = `repeat(${Math.min(n, 60)}, minmax(0, 1fr))`;
+    d.style.gridTemplateColumns = `repeat(${n}, minmax(0, 1fr))`;      // every light in one row
     d.innerHTML = "<i></i>".repeat(n);
   }
   return [...d.children];

@@ -95,8 +95,8 @@
 .tmore summary { cursor: pointer; color: var(--fg); font-size: 14px; font-weight: 600; padding: 4px 0; }
 .tmore[open] summary { margin-bottom: 8px; }
 .sweep { display: grid; gap: 4px; }
-.sweep-dots { display: grid; gap: 2px; background: var(--night); padding: 8px; border-radius: 8px; }
-.sweep-dots i { display: block; aspect-ratio: 1; border-radius: 50%; background: var(--dot-off); }
+.sweep-dots { display: grid; gap: 2px; background: var(--night); padding: 10px; border-radius: 8px; }
+.sweep-dots i { display: block; height: 22px; border-radius: 3px; background: var(--dot-off); max-width: 12px; width: 100%; justify-self: center; }
 .sweep-ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
 
 /* step 5 */

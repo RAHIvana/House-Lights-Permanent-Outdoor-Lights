@@ -323,8 +323,9 @@ a.button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .wiz .ok { color: var(--green); font-weight: 600; }
 .wiz .navrow { display: flex; gap: 8px; justify-content: flex-end; }
 .testrun { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; display: grid; gap: 8px; background: var(--panel2); }
-.testdots { display: grid; gap: 2px; background: var(--night); padding: 8px; border-radius: 8px; }
-.testdots i { display: block; aspect-ratio: 1; border-radius: 50%; background: var(--dot-off); }
+.testdots { display: grid; gap: 2px; background: var(--night); padding: 10px; border-radius: 8px; }
+/* tall bars like Your house on the dashboard: one bar per light, all in one row */
+.testdots i { display: block; height: 22px; border-radius: 3px; background: var(--dot-off); max-width: 12px; width: 100%; justify-self: center; }
 .kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; align-items: center; }
 @media (max-width: 640px) { .kv { grid-template-columns: 1fr; } }
 .testrun .count { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px; border: 1px dashed var(--line); border-radius: 8px; }
