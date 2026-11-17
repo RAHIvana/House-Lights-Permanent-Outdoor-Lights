@@ -103,7 +103,7 @@ sudo apt install -y python3 python3-venv git
 python3 --version        # must be 3.10 or newer
 uname -m                 # aarch64 means the 64-bit OS
 
-git clone https://github.com/RAHIvana/Permanent-Outdoor-Liight-Controller.git houselights
+git clone https://github.com/RAHIvana/Permanent-Outdoor-Light-Controller.git houselights
 cd houselights
 python3 -m venv venv
 venv/bin/pip install -r requirements.txt
