@@ -1,13 +1,15 @@
 # House Lights
 
 A web dashboard for permanent outdoor lights (roofline and eave lights), run on a computer in
-your home. It works with **Govee**, **JellyFish**, **ASAHOM**, **TreatLife**, likely
-**Astoria**, and the many other brands that use the Smart Life / Tuya platform, and
-open-source **WLED** controllers (see [Supported controllers](#supported-controllers)).
-Play animated themes light by light, apply
-static themes, schedule them by clock time or sunrise/sunset, and make your own themes. No
-cloud account and no app login: it talks to the light controllers directly over your home
-network. Free for personal and other noncommercial use (see [License](#license)).
+your home. It is tested on **Govee H806A** controllers. Open-source **WLED** controllers,
+**JellyFish**, and lights on the Smart Life / Tuya platform (**ASAHOM**, **TreatLife**, likely
+**Astoria** and many other brands) are supported but not yet tested on real hardware (see
+[Supported controllers](#supported-controllers)). Play animated themes light by light, apply
+static themes, schedule them by clock time or sunrise/sunset, and make your own themes. It talks
+to the light controllers directly over your home network: no cloud service and no app login while
+it runs (Tuya / Smart Life lights need a one-time key lookup, see
+[Getting each kind of controller ready](#getting-each-kind-of-controller-ready)). Free for
+personal and other noncommercial use (see [License](#license)).
 
 Run it on a computer you already have (**Windows**, **Mac** or Linux) or on a
 **Raspberry Pi 3 or newer**, on the same home network as the lights. Leave it running for
@@ -50,7 +52,8 @@ one does (Quick Settings, schedules) and can be exported as a file to share. [Ho
 | **Patriot racers** (USA) | <img src="docs/themes/patriot_racers.png" alt="Patriot racers" width="436"> |
 | **Neon racers** (Animated-fast) | <img src="docs/themes/neon_racers.png" alt="Neon racers" width="436"> |
 
-Light-by-light animation works on **Govee H806A** (tested on real lights) and **WLED**; see
+Light-by-light animation works on **Govee H806A** (tested on real lights) and **WLED** (so far
+tested only with a simulator); see
 [Supported controllers](#supported-controllers) for what each kind can do.
 [Full theme gallery](docs/themes.md).
 
@@ -454,7 +457,7 @@ Govee for a free API key in the Govee Home app). It would let House Lights contr
 models without LAN Control, and offer Govee's own scenes, on any computer it runs on
 (Windows, Mac, Linux or Raspberry Pi). It needs the internet and a Govee account, and Govee
 limits how many requests a key may send, so it fits schedules and scene changes rather than
-light-by-light animation. Today everything works locally, without a cloud account.
+light-by-light animation. Today everything works locally, without a cloud service (apart from Tuya's one-time key lookup).
 
 ## License
 
