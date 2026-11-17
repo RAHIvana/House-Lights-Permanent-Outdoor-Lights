@@ -441,7 +441,10 @@ function drawName(blink = false) {
   if (blink) runTest(c, "identify").then(() => drawName()).catch(e => err(e.message));
   const body = $("#n-body");
   body.innerHTML = "";
-  const blinkBtn = button("Blink", async () => { await runTest(c, "identify"); blinkState(); }, "small");
+  const blinkBtn = button("Blink lights", async () => {      // also undoes "Nothing blinked" pressed by mistake
+    await runTest(c, "identify");
+    if (W.n.nothing) { W.n.nothing = false; drawName(); } else blinkState();
+  }, "small");
   blinkBtn.id = "n-blink";
   body.append(answers(
     blinkBtn,
@@ -809,7 +812,7 @@ function blinkState() {
   if (!b || !c) return;
   const on = W.testing[c.id] === "identify";
   b.className = on ? "primary small" : "live small";
-  b.textContent = on ? "● Blinking: press to blink again" : "Blink again";
+  b.textContent = on ? "● Blinking lights" : "Blink lights";
 }
 function animate(cid, pv, seconds) {
   clearInterval(W.anim);
