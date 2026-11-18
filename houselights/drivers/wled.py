@@ -3,8 +3,8 @@
 Following the WLED docs (kno.wled.ge, JSON API and UDP realtime):
 - GET /json/info: name, brand, MAC, version and the light count (info.leds.count).
 - POST /json/state: "on", "bri" (1-255), "seg": [{"id": 0, "col": [[r, g, b]]}] for a solid
-  colour, and per-light colours with "i" ([start, "RRGGBB", "RRGGBB", ...], at most 256
-  colours per call). Per-light colours stay until the effect changes or the light turns off.
+  color, and per-light colors with "i" ([start, "RRGGBB", "RRGGBB", ...], at most 256
+  colors per call). Per-light colors stay until the effect changes or the light turns off.
 - Animated themes stream over UDP as DNRGB packets (protocol 4: start index, then r, g, b per
   light, at most 489 per packet) to the port the controller lists as "udpport" in /json/info
   (21324 unless changed). Byte 1 is a timeout: WLED goes back to its normal look that many
@@ -36,7 +36,7 @@ HTTP_PORT, UDP_PORT = (int(p) for p in os.environ.get("HOUSELIGHTS_WLED_PORTS", 
 TIMEOUT_S = 2                     # realtime timeout byte: back to normal 2 s after the last frame
 PER_PACKET = 489                  # DNRGB limit
 RELEASE = bytes([4, 0, 0, 0])     # timeout 0: leave realtime mode at once
-PER_CALL = 256                    # "i" colours per JSON call
+PER_CALL = 256                    # "i" colors per JSON call
 
 
 def _url(ip, path):
@@ -71,7 +71,7 @@ def _num(v, default=0):
 
 
 def layout_warning(state, count=None):
-    """A sentence when this controller's segments would make static colours and themes differ from animations,
+    """A sentence when this controller's segments would make static colors and themes differ from animations,
     or "" when segment 0 is the plain whole strip. Static commands go to segment 0 and count from its own first
     LED (grouping, spacing, mirror, reverse and offset apply to them), while live data from an animation lights
     every LED whatever the segments are (kno.wled.ge JSON API and segments pages). Read-only: it only looks at
@@ -103,7 +103,7 @@ def layout_warning(state, count=None):
         why.append("segment 0 is switched off")
     if not why:
         return ""
-    return ("Static colours and themes go to segment 0 only, but animations light every LED, so they won't match "
+    return ("Static colors and themes go to segment 0 only, but animations light every LED, so they won't match "
             "here: " + "; ".join(why) + ". To make them match, set segment 0 to cover the whole strip in WLED (no "
             "grouping, spacing, mirror, reverse or offset). House Lights changes nothing in WLED.")
 
@@ -246,10 +246,10 @@ class Kit(BaseKit):
         self._post({"seg": {"id": 0, "i": body}}, f"lights {segs[:8]}{'...' if len(segs) > 8 else ''} #{_hex(rgb)}")
 
     def show_lights(self, colors):
-        """Caller holds self.lock. Turn on first: WLED ignores per-light colours sent together with "on"."""
+        """Caller holds self.lock. Turn on first: WLED ignores per-light colors sent together with "on"."""
         self._post({"on": True}, "on")
         for k, body in enumerate(i_calls(colors)):
-            self._post(body, f"per-light colours, part {k + 1} ({len(body['seg']['i']) - 1} lights)")
+            self._post(body, f"per-light colors, part {k + 1} ({len(body['seg']['i']) - 1} lights)")
 
     def stream_begin(self):
         self.guard()

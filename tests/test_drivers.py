@@ -88,7 +88,7 @@ pk = wled.dnrgb_packets([(1, 2, 3)] * 600)
 check("WLED DNRGB: 2 packets, header and start index", len(pk) == 2 and pk[0][:4] == bytes([4, 2, 0, 0])
       and pk[1][:4] == bytes([4, 2, 489 >> 8, 489 & 255]) and len(pk[0]) == 4 + 3 * 489)
 calls = wled.i_calls([(255, 0, 0)] * 300)
-check("WLED per-light calls: 256 + 44 colours", len(calls) == 2 and calls[1]["seg"]["i"][0] == 256
+check("WLED per-light calls: 256 + 44 colors", len(calls) == 2 and calls[1]["seg"]["i"][0] == 256
       and len(calls[0]["seg"]["i"]) == 257 and calls[0]["seg"]["i"][1] == "FF0000")
 rows = wled.discover("127.0.0.21, 127.0.0.22, 127.0.0.23")
 check("WLED discover finds 2 with their light counts", [(r["ip"], r["lights"]) for r in rows]
@@ -105,7 +105,7 @@ k = drivers.make_kit(c, live=True)
 k.power(True)
 k.brightness(50)
 k.color((0, 0, 255))
-check("WLED colour and brightness", fw[0].bri == 128 and fw[0].shown()[5] == [0, 0, 255])
+check("WLED color and brightness", fw[0].bri == 128 and fw[0].shown()[5] == [0, 0, 255])
 st = wled.read_status([k])["w1"]
 check("WLED status", st == {"onOff": 1, "brightness": 50, "color": {"r": 0, "g": 0, "b": 255}, "colorTemInKelvin": 0})
 frame = [(i, 0, 255 - i) for i in range(60)]
@@ -260,7 +260,7 @@ finally:
     logging.disable(logging.NOTSET)
 
 
-# WLED segment layout: a read-only warning when static colours (segment 0) and animations (every LED) wouldn't match
+# WLED segment layout: a read-only warning when static colors (segment 0) and animations (every LED) wouldn't match
 seg0 = {"id": 0, "start": 0, "stop": 60, "len": 60, "grp": 1, "spc": 0, "of": 0, "on": True, "rev": False, "mi": False}
 check("WLED layout: the plain whole strip gives no warning", wled.layout_warning({"seg": [seg0]}, 60) == "")
 check("WLED layout: unused slots are ignored",
@@ -305,14 +305,14 @@ pal, b = jellyfish.blocks([(1, 1, 1), (2, 2, 2)] * 40)
 check("JellyFish blocks: repeating pattern", pal == [(1, 1, 1), (2, 2, 2)] and b == 1)
 frame = [(i, i, i) for i in range(100)]
 pal, b = jellyfish.blocks(frame)
-check("JellyFish blocks: rounded to <= 30 colours", len(pal) <= 30 and b == 4)
+check("JellyFish blocks: rounded to <= 30 colors", len(pal) <= 30 and b == 4)
 rows = jellyfish.discover("127.0.0.31, 127.0.0.32")
 check("JellyFish discover: one row per zone", [(r["zone"], r["lights"]) for r in rows] == [("Front", 120), ("Back", 45)])
 cj = Controller("j1", "jellyfish", "JellyFish", "127.0.0.31", "", True, {"zone": "Front"})
 kj = drivers.make_kit(cj, live=True)
 kj.color((255, 0, 0))
 z = fj[0]
-check("JellyFish solid colour on its zone only", z.running["Front"]["state"] == 1 and z.shown("Front")[0] == "#ff0000"
+check("JellyFish solid color on its zone only", z.running["Front"]["state"] == 1 and z.shown("Front")[0] == "#ff0000"
       and z.running["Back"]["state"] == 0)
 kj.brightness(40)
 check("JellyFish brightness inside the pattern", z.running["Front"]["data"]["runData"]["brightness"] == 40)
@@ -347,8 +347,8 @@ try:
     kb.brightness(30)
     said = False
 except ValueError as e:
-    said = "pick a colour or theme" in str(e)
-check("JellyFish: brightness before any colour or theme says so, and sends nothing",
+    said = "pick a color or theme" in str(e)
+check("JellyFish: brightness before any color or theme says so, and sends nothing",
       said and zb.running["Back"]["data"] is None and zb.running["Back"]["state"] == 0)
 kb.power(True)
 kb.brightness(30)
@@ -405,7 +405,7 @@ st = Streamer(kt, 60)
 st.start_fn("test", lambda t: [(255, 0, 0)] * 60, False, seconds=2, slow_ok=True)
 time.sleep(0.3)
 st.stop()
-check("Tuya test shows a colour, then puts the light back",
+check("Tuya test shows a color, then puts the light back",
       CALLS[0] == ("set_colour", (255, 0, 0)) and CALLS[-1][0] == "set_multiple_values" and DPS == before)
 
 
@@ -485,13 +485,13 @@ except drivers.NotAllowed:
 check("Tuya: a disabled controller gets no restore", refused and CALLS == [])
 
 
-# --- Tuya brightness: what is read is what is set; never switched off; colours and whites keep it -------------
+# --- Tuya brightness: what is read is what is set; never switched off; colors and whites keep it -------------
 check("Tuya brightness: white mode reads the white level (type B, 100 of 1000 = 10%)",
       tuya.parse_dps({"20": True, "21": "white", "22": 100, "23": 0})["brightness"] == 10)
-check("Tuya brightness: colour mode reads the colour's value, not the white level",
+check("Tuya brightness: color mode reads the color's value, not the white level",
       tuya.parse_dps({"20": True, "21": "colour", "22": 1000, "24": "000003e803e8"})["brightness"] == 100
       and tuya.parse_dps({"20": True, "21": "colour", "22": 1000, "24": "000003e800c8"})["brightness"] == 20)
-check("Tuya brightness: type A white 51 of 255 = 20%, and type A colour value 51 = 20%",
+check("Tuya brightness: type A white 51 of 255 = 20%, and type A color value 51 = 20%",
       tuya.parse_dps({"1": True, "2": "white", "3": 51})["brightness"] == 20
       and tuya.parse_dps({"1": True, "2": "colour", "3": 255, "5": "ff00000000ff33"})["brightness"] == 20)
 check("Tuya brightness: unknown stays unknown (no made-up 100%), and bad data doesn't crash",
@@ -545,7 +545,7 @@ class TypeB40(TypedBulb):                             # a type B light that is a
     dps = {"20": True, "21": "white", "22": 400, "23": 0, "24": "000003e803e8"}
 
 
-class TypeBColour20(TypedBulb):                       # in colour mode at 20%
+class TypeBColor20(TypedBulb):                       # in color mode at 20%
     dps = {"20": True, "21": "colour", "22": 1000, "23": 0, "24": "000003e800c8"}
 
 
@@ -582,18 +582,18 @@ try:
     kk.kelvin(2700)
     kk.brightness(50)
     kk.color((200, 100, 0))
-    check("Tuya: colours and whites start from the light's own 40%, and keep the slider's brightness once it is set",
+    check("Tuya: colors and whites start from the light's own 40%, and keep the slider's brightness once it is set",
           CALLS == [("set_colour", (80, 40, 0)), ("set_white_percentage", (40, 0)),
                     ("set_brightness_percentage", (50,)), ("set_colour", (100, 50, 0))])
-    check("Tuya status: colour mode reports the colour's brightness, an unreadable value stays None",
-          tuya_kit(TypeBColour20).status()["brightness"] == 20
+    check("Tuya status: color mode reports the color's brightness, an unreadable value stays None",
+          tuya_kit(TypeBColor20).status()["brightness"] == 20
           and tuya.parse_dps({"20": True, "21": "white"})["brightness"] is None)
 
     kk = tuya_kit(TypeBSilent)
     CALLS.clear()
     kk.color((200, 100, 0))
     kk.kelvin(2700)
-    check("Tuya: a light that can't be read: colours go out as they are and whites keep the light's own level",
+    check("Tuya: a light that can't be read: colors go out as they are and whites keep the light's own level",
           CALLS == [("set_colour", (200, 100, 0)), ("set_colourtemp_percentage", (0,))])
 
     kk = tuya_kit(TypeB40)
@@ -602,7 +602,7 @@ try:
     stt.start_fn("test", lambda t: [(255, 0, 0)] * 60, False, seconds=2, slow_ok=True)
     time.sleep(0.3)
     stt.stop()
-    check("Tuya: a wizard test shows its colour at full brightness so it can be seen, whatever the light is set to",
+    check("Tuya: a wizard test shows its color at full brightness so it can be seen, whatever the light is set to",
           CALLS[0] == ("set_colour", (255, 0, 0)))
 
     # plugs, switches and dimmers are not lights
@@ -610,8 +610,8 @@ try:
              "two-socket switch": {"1": True, "2": True, "3": False},
              "white-only bulb": {"20": True, "21": "white", "22": 60}, "no data points": {}, "power only, type B": {"20": True}}
     wrongly = [name for name, dps in cases.items() if tuya.looks_like_light(dps)]
-    check(f"Tuya: plugs, switches, dimmers and white-only bulbs are not colour lights {wrongly}", not wrongly)
-    check("Tuya: colour lights of type A and B are", tuya.looks_like_light(TypeA.dps) and tuya.looks_like_light(TypeB.dps)
+    check(f"Tuya: plugs, switches, dimmers and white-only bulbs are not color lights {wrongly}", not wrongly)
+    check("Tuya: color lights of type A and B are", tuya.looks_like_light(TypeA.dps) and tuya.looks_like_light(TypeB.dps)
           and tuya.looks_like_light({str(k): v for k, v in TypeB.dps.items()}))
     tt.BulbDevice = PlugBulb
     try:
@@ -619,9 +619,9 @@ try:
         message = ""
     except ValueError as e:
         message = str(e)
-    check("Tuya probe: a plug whose key works is refused, with a reason", "colour light" in message and "plug" in message)
+    check("Tuya probe: a plug whose key works is refused, with a reason", "color light" in message and "plug" in message)
     tt.BulbDevice = TypeB
-    check("Tuya probe: a colour light is accepted",
+    check("Tuya probe: a color light is accepted",
           tuya.probe({"ip": "127.0.0.41", "device_id": "abcdef0123456789abcd", "local_key": "0123456789abcdef"})[0]["supported"])
 finally:
     tt.BulbDevice = orig_bulb
@@ -692,7 +692,7 @@ def refuses(kit, fn):
     return False
 
 
-check("Govee try and basic kits refuse segment colours",
+check("Govee try and basic kits refuse segment colors",
       refuses(ktry, lambda: ktry.segments([0], (1, 2, 3), 10)) and refuses(kbasic, lambda: kbasic.segments([0], (1, 2, 3), 10))
       and fg_try["127.0.0.17"]["segment_packets"] == 0)
 check("Govee basic kit refuses streaming", refuses(kbasic, kbasic.stream_begin)
@@ -709,7 +709,7 @@ kbasic.power(True)
 kbasic.brightness(70)
 kbasic.color((10, 20, 30))
 b = fg_basic["127.0.0.18"]
-check("Govee basic kit: on, brightness, colour", (b["onOff"], b["brightness"], b["color"]) == (1, 70, {"r": 10, "g": 20, "b": 30}))
+check("Govee basic kit: on, brightness, color", (b["onOff"], b["brightness"], b["color"]) == (1, 70, {"r": 10, "g": 20, "b": 30}))
 kbasic.kelvin(3000)
 check("Govee basic kit: white", b["colorTemInKelvin"] == 3000)
 st = govee.read_status([kbasic])["gb"]
@@ -724,7 +724,7 @@ st.start_fn("test", lambda t: [(255, 0, 0)] * 40, False, seconds=3, slow_ok=True
 time.sleep(2.0)
 shown = dict(b["color"])
 st.stop()
-check("Govee basic test: shows the colour, then puts the light back",
+check("Govee basic test: shows the color, then puts the light back",
       shown == {"r": 255, "g": 0, "b": 0} and b["colorTemInKelvin"] == 3000 and b["brightness"] == 70 and b["onOff"] == 1)
 check("Govee tests per model", setup.allowed_tests(drivers.model_caps("govee", "H7060")) == ["identify"]
       and "ends" in setup.allowed_tests(drivers.model_caps("govee", "H706B"))

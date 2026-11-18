@@ -6,10 +6,10 @@ ws://<controller>:9000/ws, one connection per command, no login.
 - {"cmd": "toCtlrSet", "runPattern": {"file": "", "data": "<pattern JSON as a string>", "id": "",
   "state": 1 or 0, "zoneName": [zones]}} runs a pattern (state 0 turns the zones off).
   Brightness lives in the pattern ("runData": {"brightness": 0-100}).
-- A pattern holds at most 30 colours, and there is no per-light streaming and no way to read
-  what a zone shows. So: whole-zone colour, on/off and brightness work; static themes are
-  sent as up to 30 colour blocks ("Multi-Paint", numOfLeds lights each), exact when the theme
-  repeats with 30 colours or fewer, otherwise approximated; animated themes can't play.
+- A pattern holds at most 30 colors, and there is no per-light streaming and no way to read
+  what a zone shows. So: whole-zone color, on/off and brightness work; static themes are
+  sent as up to 30 color blocks ("Multi-Paint", numOfLeds lights each), exact when the theme
+  repeats with 30 colors or fewer, otherwise approximated; animated themes can't play.
 Tested only against tools/fake_jellyfish.py so far, not a real JellyFish controller.
 """
 import json
@@ -23,7 +23,7 @@ from .base import Kit as BaseKit
 log = logging.getLogger("houselights")
 
 LABEL = "JellyFish Lighting"
-NOTE = ("Each zone becomes its own run. Static themes and colours only (no animated themes); "
+NOTE = ("Each zone becomes its own run. Static themes and colors only (no animated themes); "
         "not yet tested with real JellyFish hardware.")
 TESTED = False
 
@@ -98,7 +98,7 @@ def pattern(colors_flat, kind="Color", num_leds=1, brightness=100, speed=10):
 
 
 def blocks(colors, limit=MAX_COLORS):
-    """(palette, lights per block) that shows `colors` with at most `limit` colours:
+    """(palette, lights per block) that shows `colors` with at most `limit` colors:
     exact if the frame is made of equal blocks repeating within the limit, else rounded."""
     import math
     n = len(colors)
@@ -165,7 +165,7 @@ class Kit(BaseKit):
         stays off (the next power on uses the new level)."""
         with self.lock:
             if not self._data:
-                raise ValueError("JellyFish can't report what a zone is showing: pick a colour or theme first, "
+                raise ValueError("JellyFish can't report what a zone is showing: pick a color or theme first, "
                                  "then change the brightness")
             self._bri = max(1, min(100, int(value)))
             self._data["runData"]["brightness"] = self._bri
@@ -174,7 +174,7 @@ class Kit(BaseKit):
     def color(self, rgb):
         with self.lock:
             self._data = self._solid(rgb)
-            self._run(self._data, 1, "colour #%02X%02X%02X" % tuple(rgb[:3]))
+            self._run(self._data, 1, "color #%02X%02X%02X" % tuple(rgb[:3]))
             self._on = True
 
     def kelvin(self, k):
@@ -192,5 +192,5 @@ class Kit(BaseKit):
         else:
             flat = [v for c in pal for v in c[:3]]
             self._data = pattern(flat, "Multi-Paint", b, self._bri, speed=100)
-        self._run(self._data, 1, f"{len(pal)} colour(s), {b} light(s) each")
+        self._run(self._data, 1, f"{len(pal)} color(s), {b} light(s) each")
         self._on = True

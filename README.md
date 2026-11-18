@@ -72,12 +72,12 @@ tested only with a simulator); see
 
 | Controller | What works | Tested with real hardware? |
 |---|---|---|
-| **Govee H806A** | Everything: animated themes light by light, static themes, colours, schedules | **Yes** |
+| **Govee H806A** | Everything: animated themes light by light, static themes, colors, schedules | **Yes** |
 | **Govee permanent outdoor lights** (other models, see below) | Basic control; animated themes light by light to try | Not yet |
-| **Any other Govee light with LAN Control** | One colour at a time: colours, warm white, on/off, brightness, schedules. Themes show their main colour | Not yet |
-| **WLED**: the open-source controller firmware (ESP8266/ESP32), also on some brand-name kits | Everything: animated themes light by light, static themes, colours, schedules | Not yet: tested against a simulator built from the WLED documentation |
-| **JellyFish Lighting** | Static themes (up to 30 colours per pattern: exact for banded themes, rounded otherwise), colours, on/off, brightness, schedules. Animated themes show as a still picture | Not yet: simulator built from JellyFish's API documentation |
-| **Tuya / Smart Life**: the app platform behind many Amazon brands, e.g. most ASAHOM kits | One colour at a time: colours, warm white, on/off, brightness, schedules. Themes show their main colour | Not yet: tested with a stand-in for the tinytuya library |
+| **Any other Govee light with LAN Control** | One color at a time: colors, warm white, on/off, brightness, schedules. Themes show their main color | Not yet |
+| **WLED**: the open-source controller firmware (ESP8266/ESP32), also on some brand-name kits | Everything: animated themes light by light, static themes, colors, schedules | Not yet: tested against a simulator built from the WLED documentation |
+| **JellyFish Lighting** | Static themes (up to 30 colors per pattern: exact for banded themes, rounded otherwise), colors, on/off, brightness, schedules. Animated themes show as a still picture | Not yet: simulator built from JellyFish's API documentation |
+| **Tuya / Smart Life**: the app platform behind many Amazon brands, e.g. most ASAHOM kits | One color at a time: colors, warm white, on/off, brightness, schedules. Themes show their main color | Not yet: tested with a stand-in for the tinytuya library |
 
 If you try one of the untested kinds, please report what works and what doesn't.
 
@@ -85,7 +85,7 @@ If you try one of the untested kinds, please report what works and what doesn't.
 
 House Lights talks to Govee lights over your home network with Govee's LAN API: switch on
 **LAN Control** for each device in the Govee Home app. Govee documents only the basic LAN
-commands (on/off, brightness, colour, status). Colouring segments and streaming every light
+commands (on/off, brightness, color, status). Coloring segments and streaming every light
 use two further Govee commands that are checked on the H806A only, so other models get them
 step by step:
 
@@ -98,7 +98,7 @@ step by step:
 | H805A, H805B, H805C | Permanent Outdoor Lights Elite | Basic control; light-by-light animation to try |
 | H707A, H707B, H707C | Permanent Outdoor Lights Prism | Basic control; light-by-light animation to try |
 | H3A51, H3A52, H3A53 | Permanent Outdoor Lights 2 Pro | Basic control (LAN Control not confirmed); light-by-light animation to try |
-| Any other Govee model with LAN Control (floodlights, spotlights, path, string and wall lights) | | One colour at a time |
+| Any other Govee model with LAN Control (floodlights, spotlights, path, string and wall lights) | | One color at a time |
 
 "To try": the wizard's last counting test (light 1 red, the last light blue) shows at once
 whether your model plays light by light. If it does, please report the model so it can be marked as tested.
@@ -135,11 +135,11 @@ controller and keep the lights; then pick WLED. Check that the WLED controller s
 lights (LED type, voltage) before you swap. Support for a brand can change with new models
 and firmware: if yours has gained a local API, please open an issue.
 
-Govee and WLED both give every light its own colour and smooth animated themes. If you have
+Govee and WLED both give every light its own color and smooth animated themes. If you have
 Govee lights, keep the Govee controller and pick Govee: House Lights uses Govee's own LAN API,
 which is tested on real H806A controllers and works better than swapping in a WLED
 controller, and you keep the Govee Home app too. For other brands without a local API, a
-WLED controller is the most capable choice. Tuya / Smart Life lights take one colour at a
+WLED controller is the most capable choice. Tuya / Smart Life lights take one color at a
 time.
 
 ## Install
@@ -262,7 +262,7 @@ which patterns it plays on them, and what it does with your answers is explained
    Each kind shows how many it found, then one list: tick **Use** for the controllers to
    use (found ones are ticked). A JellyFish controller shows one line per zone; each zone
    becomes its own run. Govee models other than the H806A show what they can do ("basic
-   control" or "one colour at a time"). Smart Life devices are found even without tinytuya
+   control" or "one color at a time"). Smart Life devices are found even without tinytuya
    (they announce themselves on this computer's own network section, and a typed address
    is tried on Tuya's port 6668), but can be used only once tinytuya is installed.
    Plugs, bulbs and other smart-home gadgets use Smart Life too, so a Smart Life row may not
@@ -274,7 +274,7 @@ which patterns it plays on them, and what it does with your answers is explained
      controllers ignore many requests (often three in four), so a quick scan can miss them;
      asking again finds them. **Add by address** asks one address as every kind and adds
      whatever answers ("192.168.2.50 is a WLED controller").
-   - **Not finding yours?** One card per kind: how to recognise it (its app, example
+   - **Not finding yours?** One card per kind: how to recognize it (its app, example
      brands), how to get it ready, and **How many controllers?** with **Look for … again**:
      if it finds fewer than the number you picked, it runs a deep scan by itself.
    Other brands (Oelo, Trimlight, Gemstone, Eufy and more) have no local control House
@@ -287,11 +287,11 @@ which patterns it plays on them, and what it does with your answers is explained
    blinked** lists what to check.
 3. **Tally** (count the lights): one run at a time, by name.
    - **Govee** counts like the Govee Home app, in groups of 5 lights (segments):
-     - **A**: the groups light up green, white, red, yellow, then again. Say the colour of
-       the last block and how many blocks of that colour you see: the wizard works out the
+     - **A**: the groups light up green, white, red, yellow, then again. Say the color of
+       the last block and how many blocks of that color you see: the wizard works out the
        groups, like `4 × (6 − 1) + 4 = 24`.
      - **B**: every group is white and only the last is red. Type how many red lights you
-       see: `5 × 23 + 5 = 120` lights. Blue after the red means a colour was miscounted.
+       see: `5 × 23 + 5 = 120` lights. Blue after the red means a color was miscounted.
      - **C**: light 1 is red and the last light blue, the rest white. Each should be a
        single light right at the end (if not, count again). Say which end red is at: that end
        is light 1, and a run whose light 1 is at the right end is turned round on the page.
@@ -305,8 +305,8 @@ which patterns it plays on them, and what it does with your answers is explained
    - **Done**: a summary like "Garage: 50 lights, light 1 at the right end".
 
    JellyFish, Tuya and basic Govee models can't show single lights: type the count and pick
-   which end light 1 is at. **More tests** has the extra patterns (colours, segment groups).
-   Streamed tests stop by themselves after a minute; the Govee counting colours stay until
+   which end light 1 is at. **More tests** has the extra patterns (colors, segment groups).
+   Streamed tests stop by themselves after a minute; the Govee counting colors stay until
    the next test or theme. Govee and WLED go back to what they showed; Tuya lights are saved
    before the test and put back afterwards. JellyFish can't report what it showed, so after
    testing pick a theme or use the JellyFish app.
@@ -430,7 +430,7 @@ redraw the gallery.
   colors from one color (complementary, triadic and so on) or from a photo (the photo stays
   in your browser), warm/cool and brightness for the whole palette, **Tap tempo** for the
   beat, and **Paint by hand**, segment by segment.
-- **Favourites** (★) come first in Quick Settings; built-in groups you don't use can be
+- **Favorites** (★) come first in Quick Settings; built-in groups you don't use can be
   hidden there. **Export** downloads your themes as a `.json` file; **Import** adds them on
   another house.
 

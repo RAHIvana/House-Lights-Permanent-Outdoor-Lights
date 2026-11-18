@@ -185,7 +185,7 @@ const Schedules = (() => {
     $("#sd-describe").textContent = pat === "keep" ? "Turns the kits on with whatever they showed last."
       : pat === "warm_white" ? "Plain warm white on every light."
       : p.animated ? `${p.describe || ""} Animated: the dashboard plays it light by light while the schedule is on.`
-      : (p.describe || "Static theme, set as segment colours on each kit.");
+      : (p.describe || "Static theme, set as segment colors on each kit.");
     f("level").disabled = pat === "keep";
   }
 

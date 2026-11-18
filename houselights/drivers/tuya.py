@@ -3,8 +3,8 @@ LAN with the tinytuya library (pip install tinytuya).
 
 Local control needs each device's id, its protocol version and its 16-character "local key".
 The key comes from Tuya's cloud once: run `python -m tinytuya wizard` (see the README).
-These lights show one colour at a time: no per-light colours, no animated themes. A static
-theme is shown as its main colour. Tests save the light's state and put it back afterwards.
+These lights show one color at a time: no per-light colors, no animated themes. A static
+theme is shown as its main color. Tests save the light's state and put it back afterwards.
 Tested only with a stand-in for tinytuya so far, not a real Tuya device.
 """
 import colorsys
@@ -17,9 +17,9 @@ from .base import Kit as BaseKit
 
 log = logging.getLogger("houselights")
 
-LABEL = "Tuya / Smart Life (one colour at a time)"
+LABEL = "Tuya / Smart Life (one color at a time)"
 NOTE = ("For lights using the Smart Life or Tuya Smart app (most ASAHOM kits, many Amazon brands). Needs: pip install tinytuya, and each device's local key (python -m tinytuya wizard). "
-        "Whole-strip colour only. Not yet tested with real Tuya hardware.")
+        "Whole-strip color only. Not yet tested with real Tuya hardware.")
 TESTED = False
 
 MODELS = {"Tuya light": {"label": "Tuya / Smart Life light strip", "lights_per_segment": 0, "max_lights": 2000}}
@@ -104,8 +104,8 @@ def light_kind(dps):
 
 
 def looks_like_light(dps):
-    """A colour light: light_kind plus a colour data point. A white-only bulb has no colour, so the
-    colour commands would fail on it; plugs, switches and dimmers aren't lights."""
+    """A color light: light_kind plus a color data point. A white-only bulb has no color, so the
+    color commands would fail on it; plugs, switches and dimmers aren't lights."""
     kind = light_kind(dps)
     dps = {str(k): v for k, v in (dps or {}).items()}
     return (kind == "B" and isinstance(dps.get("24"), str)) or (kind == "A" and isinstance(dps.get("5"), str))
@@ -113,10 +113,10 @@ def looks_like_light(dps):
 
 def parse_dps(dps):
     """Tuya light data points -> {onOff, brightness, color, colorTemInKelvin}.
-    Type B (20 power, 21 mode, 22 white brightness 10-1000, 23 temperature 0-1000, 24 colour HSV hex)
-    and type A (1 power, 2 mode, 3 white brightness 25-255, 4 temperature 0-255, 5 colour hex).
+    Type B (20 power, 21 mode, 22 white brightness 10-1000, 23 temperature 0-1000, 24 color HSV hex)
+    and type A (1 power, 2 mode, 3 white brightness 25-255, 4 temperature 0-255, 5 color hex).
     Brightness is that of the mode the light is in, on TinyTuya's own scale, so what a command sets is
-    what is read back: the white level in white mode, the colour's value (V) in colour mode. None when
+    what is read back: the white level in white mode, the color's value (V) in color mode. None when
     the light doesn't say (never a made-up 100)."""
     dps = {str(k): v for k, v in (dps or {}).items()}
     if "20" in dps:
@@ -173,7 +173,7 @@ def probe(info):
     opts, sec = options(info, {})
     r = _check(_device(opts["device_id"], ip, sec["local_key"], opts["version"]).status())
     if not looks_like_light(r.get("dps")):
-        raise ValueError("that Tuya device doesn't look like a colour light (a plug, switch or dimmer, or a bulb that reports no colour?)")
+        raise ValueError("that Tuya device doesn't look like a color light (a plug, switch or dimmer, or a bulb that reports no color?)")
     return [{"ip": ip, "type": "tuya", "model": "Tuya light", "supported": True, "device_id": opts["device_id"],
              "version": opts["version"], "device_tail": opts["device_id"][-5:], "lights": None,
              "label": "Tuya light (key works)"}]
@@ -216,8 +216,8 @@ class Kit(BaseKit):
 
     def _learn(self):
         """Ask the light once what kind it is and how bright it is now: the kind gives the lowest safe
-        brightness, and the brightness is where colours and whites start, so the current percentage carries
-        across white and colour. Caller holds self.lock. If it can't be read nothing is made up."""
+        brightness, and the brightness is where colors and whites start, so the current percentage carries
+        across white and color. Caller holds self.lock. If it can't be read nothing is made up."""
         if not self.live or (self._kind is not None and self._bri is not None):
             return
         try:
@@ -237,16 +237,16 @@ class Kit(BaseKit):
         return 1 if self._kind == "B" else 10
 
     def brightness(self, value):
-        """Brightness of the mode the light is in (the white level, or the colour's value): never below the
-        minimum, so the slider can't switch the light off. It is kept for the colours and whites after it
+        """Brightness of the mode the light is in (the white level, or the color's value): never below the
+        minimum, so the slider can't switch the light off. It is kept for the colors and whites after it
         (and until it is set, they start from what the light has)."""
         with self.lock:
             self._bri = max(self._min_pct(), min(100, int(value)))
             self._call("brightness", "set_brightness_percentage", self._bri)
 
-    def _colour(self, rgb):
-        """Colour at the light's brightness: the one set from the page, else the one the light has. (TinyTuya
-        sends a colour at its own value, so a bare full red would be 100%.) If neither is known the colour goes
+    def _color(self, rgb):
+        """Color at the light's brightness: the one set from the page, else the one the light has. (TinyTuya
+        sends a color at its own value, so a bare full red would be 100%.) If neither is known the color goes
         out as it is, never a made-up level. Caller holds self.lock."""
         self._learn()
         r, g, b = [int(v) for v in rgb[:3]]
@@ -256,7 +256,7 @@ class Kit(BaseKit):
 
     def color(self, rgb):
         with self.lock:
-            self._colour(rgb)
+            self._color(rgb)
 
     def kelvin(self, k):
         pct = max(0, min(100, round((int(k) - 2700) * 100 / 3800)))
@@ -269,7 +269,7 @@ class Kit(BaseKit):
 
     def segments(self, segs, rgb, nseg):
         """One segment: the whole strip. Caller holds self.lock."""
-        self._colour(rgb)
+        self._color(rgb)
 
     def status(self):
         with self.lock:                           # the dashboard asks every 15 s, whatever else is going on
@@ -277,7 +277,7 @@ class Kit(BaseKit):
         return parse_dps(r.get("dps"))
 
     def snapshot(self):
-        self._bri = 100                           # only wizard tests take a snapshot: their colours show at full
+        self._bri = 100                           # only wizard tests take a snapshot: their colors show at full
         if not self.live:                         # brightness, so they can be seen whatever the light is set to
             return None
         try:

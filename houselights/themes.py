@@ -3,7 +3,7 @@
     {"version": 1,
      "themes": [{id: "my_<slug>", name, group, layers: [...], direction, mirror, span,
                  sequence?: [{theme, seconds}], fade?}],
-     "favourites": [theme ids],
+     "favorites": [theme ids],
      "hidden_groups": [built-in group names]}
 
 What a theme is and how it is checked and drawn lives in patterns.py; this file only keeps
@@ -28,7 +28,7 @@ _LOCK = threading.RLock()
 class Store:
     def __init__(self, path=None):
         self.path = path or settings.path(FILE)
-        self.themes, self.favourites, self.hidden_groups = [], [], []
+        self.themes, self.favorites, self.hidden_groups = [], [], []
         self.load()
 
     # file
@@ -52,7 +52,8 @@ class Store:
             except ValueError as e:
                 log.error("themes.json: skipped %r: %s", (t or {}).get("name") if isinstance(t, dict) else t, e)
         self.themes = themes
-        self.favourites = [x for x in raw.get("favourites", []) if isinstance(x, str)]
+        # files saved before 2026-11-17 used the British spelling "favourites"; read it once, then save as "favorites"
+        self.favorites = [x for x in raw.get("favorites", raw.get("favourites", [])) if isinstance(x, str)]
         self.hidden_groups = [x for x in raw.get("hidden_groups", []) if x in P.CATEGORIES]
         P.set_custom(self.themes)
 
@@ -66,7 +67,7 @@ class Store:
         P.set_custom(self.themes)
 
     def data(self):
-        return {"version": VERSION, "themes": self.themes, "favourites": self.favourites,
+        return {"version": VERSION, "themes": self.themes, "favorites": self.favorites,
                 "hidden_groups": self.hidden_groups}
 
     def get(self, tid):
@@ -103,15 +104,15 @@ class Store:
             if not th:
                 raise KeyError(tid)
             self.themes.remove(th)
-            self.favourites = [f for f in self.favourites if f != tid]
+            self.favorites = [f for f in self.favorites if f != tid]
             self._write()
             return [t["name"] for t in self.themes if any(s["theme"] == tid for s in t.get("sequence") or [])]
 
-    def set_prefs(self, favourites=None, hidden_groups=None):
+    def set_prefs(self, favorites=None, hidden_groups=None):
         with _LOCK:
-            if favourites is not None:
+            if favorites is not None:
                 ok = set(P.PATTERNS) | {t["id"] for t in self.themes}
-                self.favourites = list(dict.fromkeys(f for f in favourites if f in ok))[:100]
+                self.favorites = list(dict.fromkeys(f for f in favorites if f in ok))[:100]
             if hidden_groups is not None:
                 self.hidden_groups = [g for g in dict.fromkeys(hidden_groups) if g in P.CATEGORIES]
             self._write()

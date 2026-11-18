@@ -507,7 +507,7 @@ const Themes = (() => {
 
   // --- list ----------------------------------------------------------------------------------
   function renderList() {
-    const q = $("#th-search").value.trim().toLowerCase(), box = $("#th-items"), {favourites, hidden_groups} = themePrefs();
+    const q = $("#th-search").value.trim().toLowerCase(), box = $("#th-items"), {favorites, hidden_groups} = themePrefs();
     box.innerHTML = "";
     const groups = {};
     for (const p of CONFIG.patterns) (groups[p.custom ? "My themes" : p.group] = groups[p.custom ? "My themes" : p.group] || []).push(p);
@@ -524,10 +524,10 @@ const Themes = (() => {
         it.setAttribute("role", "option"); it.setAttribute("aria-selected", String(!!sel)); it.tabIndex = 0;
         const face = el("span", "th-face"); face.style.background = faceGradient(p.face);
         const lab = el("span", "th-label", p.label);
-        const fav = favourites.includes(p.id), star = el("button", "th-star" + (fav ? " on" : ""), fav ? "★" : "☆");
-        star.type = "button"; star.title = fav ? "Remove from favourites" : "Favourite: first in Quick Settings";
-        star.setAttribute("aria-pressed", String(fav)); star.setAttribute("aria-label", "Favourite " + p.label);
-        star.onclick = e => { e.stopPropagation(); prefs({favourites: fav ? favourites.filter(x => x !== p.id) : [...favourites, p.id]}); };
+        const fav = favorites.includes(p.id), star = el("button", "th-star" + (fav ? " on" : ""), fav ? "★" : "☆");
+        star.type = "button"; star.title = fav ? "Remove from favorites" : "Favorite: first in Quick Settings";
+        star.setAttribute("aria-pressed", String(fav)); star.setAttribute("aria-label", "Favorite " + p.label);
+        star.onclick = e => { e.stopPropagation(); prefs({favorites: fav ? favorites.filter(x => x !== p.id) : [...favorites, p.id]}); };
         it.append(face, lab, el("span", "th-anim", p.animated ? "" : "still"), star);
         const go = () => open(p.custom ? {custom: true, id: p.id} : {builtin: p.id});
         it.onclick = go;
@@ -752,7 +752,7 @@ const Themes = (() => {
       let used = false;
       for (const ly of cur.draft.layers) {
         if ("bpm" in ly.params) { ly.params.bpm = bpm; used = true; }
-        else if ("hold" in ly.params) { ly.params.hold = +(240 / bpm).toFixed(2); used = true; }      // one colour per bar
+        else if ("hold" in ly.params) { ly.params.hold = +(240 / bpm).toFixed(2); used = true; }      // one color per bar
       }
       $("#th-tap-msg").textContent = `${bpm} BPM` + (used ? "" : " (use Beat, Heartbeat or Steps to follow it)");
       if (used) { renderLayers(); changed(); }

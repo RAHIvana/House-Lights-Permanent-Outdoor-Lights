@@ -26,10 +26,10 @@ gets saved and how it is checked).
 |---|---|
 | **Controller** | The box on your network that drives lights (a Govee, WLED, JellyFish or Tuya / Smart Life device). It has an IP address. |
 | **Run** | One series of lights on one controller, in a line, like the eave over the garage. The page and `config.json` call it a run. One controller gives one run; a JellyFish controller has several zones and each zone is its own run. |
-| **Light** | One LED (or one pixel). Themes give every light its own colour. |
+| **Light** | One LED (or one pixel). Themes give every light its own color. |
 | **Light 1** | The first light of a run, the way the controller counts. It can be at either end of the house, so the wizard finds out which. |
-| **Segment** | A group of lights the controller colours as one. Govee H806A: 5 lights. WLED and JellyFish: 1 (every light is its own). Tuya and basic Govee models: the whole run is one segment. |
-| **Frame** | One colour for every light, sent many times a second to play an animated theme ("streaming", 15 frames a second). |
+| **Segment** | A group of lights the controller colors as one. Govee H806A: 5 lights. WLED and JellyFish: 1 (every light is its own). Tuya and basic Govee models: the whole run is one segment. |
+| **Frame** | One color for every light, sent many times a second to play an animated theme ("streaming", 15 frames a second). |
 | **Test pattern** | A pattern the wizard plays on a run so that you can look at the lights and answer a question. |
 
 ## The five steps at a glance
@@ -124,9 +124,9 @@ to the other. (The controller takes the run's name as its own.)
 
 ## Step 3: Tally, counting the lights and finding light 1
 
-Why it matters: a theme is one colour per light. A wrong count shows as a pattern cut off or
+Why it matters: a theme is one color per light. A wrong count shows as a pattern cut off or
 spilling past the end, and without knowing which end is light 1 an animation can run the wrong
-way along the house. Govee H806A also colours **static** themes per 5-light segment, so the
+way along the house. Govee H806A also colors **static** themes per 5-light segment, so the
 segment count has to be right too.
 
 For each run, in order along the house, the wizard goes through three phases: **Count**,
@@ -138,24 +138,24 @@ in the [drivers guide](../houselights/drivers/README.md#capabilities-caps)):
 
 | Controller | How the count is found | How light 1 is found |
 |---|---|---|
-| **Govee H806A** (full) | Counted with segment colours, patterns A and B below | Pattern C |
-| **Govee H705, H706, H707, H805, H3A5x** ("try") | Typed (no segment colours on these) | Pattern C. It also shows at once whether the model plays light by light. |
+| **Govee H806A** (full) | Counted with segment colors, patterns A and B below | Pattern C |
+| **Govee H705, H706, H707, H805, H3A5x** ("try") | Typed (no segment colors on these) | Pattern C. It also shows at once whether the model plays light by light. |
 | **WLED** | The controller reports it; the wizard asks you to confirm it | The Check pattern, with orange lights past the end |
 | **JellyFish** | The zone reports its pixel count | You pick the end from a list: it cannot show single lights |
 | **Tuya, other Govee models** (basic) | Typed | You pick the end from a list |
 
 ### Govee H806A: A, B and C
 
-Why not just stream a frame of the right length? A Govee stream frame of N colours is
+Why not just stream a frame of the right length? A Govee stream frame of N colors is
 **stretched over the whole run in N equal parts**, so it cannot show "lights past the end".
-Counting therefore uses the **segment command**, which colours fixed groups of 5 lights from light 1,
+Counting therefore uses the **segment command**, which colors fixed groups of 5 lights from light 1,
 the same way the Govee Home app counts. (The findings behind this are in
 [govee-lan-notes.md](govee-lan-notes.md).)
 
 | | What the lights show | The question | What we do with the answer |
 |---|---|---|---|
-| **A** `seg4` ("Colour pattern") | Every group of 5 lights takes the next colour in turn: green, white, red, yellow, then green again. It is set when the page opens and stays on the lights until the next test or theme. | "What colour is the last block at the far end?" and "How many blocks of that colour?" | groups = 4 × (blocks − 1) + the colour's place (green 1, white 2, red 3, yellow 4). Example: 6 red blocks → 4 × (6 − 1) + 3 = 23 groups. |
-| **B** `seglast` ("Last group pattern") | Every group is white and only group number *groups* is red. If the groups were miscounted, any group after the red is blue. | "How many red lights at the end?" (1 to 5) | lights = 5 × (groups − 1) + red. Example: 5 × 23 + 5 = 120 lights. **Blue after the red means a colour was miscounted:** count again. |
+| **A** `seg4` ("Color pattern") | Every group of 5 lights takes the next color in turn: green, white, red, yellow, then green again. It is set when the page opens and stays on the lights until the next test or theme. | "What color is the last block at the far end?" and "How many blocks of that color?" | groups = 4 × (blocks − 1) + the color's place (green 1, white 2, red 3, yellow 4). Example: 6 red blocks → 4 × (6 − 1) + 3 = 23 groups. |
+| **B** `seglast` ("Last group pattern") | Every group is white and only group number *groups* is red. If the groups were miscounted, any group after the red is blue. | "How many red lights at the end?" (1 to 5) | lights = 5 × (groups − 1) + red. Example: 5 × 23 + 5 = 120 lights. **Blue after the red means a color was miscounted:** count again. |
 | **C** `ends` ("Ends pattern") | A frame of exactly the count: light 1 red, the last light blue, everything between white. | "Red and blue should each be a single light at the very ends. Which end is the red at?" | `light1` = left or right. If red or blue covers two lights, or is not at the very end, the count is off: count again. |
 
 A single light past the end that never changes is not driven by the controller: the controller
@@ -171,7 +171,7 @@ frame is deliberately longer than the count). The questions, in order:
 1. **"Where is the red light?"** Left, right, or "can't tell". If you cannot tell, the **Direction**
    pattern (`chase`) runs a white dot from light 1 to the last light at 8 lights a second:
    "Where does it start?" Answers: `light1` = left or right (or still unknown).
-2. **"Do you see any other colour, like orange, after the blue?"**
+2. **"Do you see any other color, like orange, after the blue?"**
    - **No, blue is the last light:** the count is right.
    - **Yes, orange after the blue:** the count is too low. You say **how many orange lights** (1 to 20),
      the wizard adds them to `lights` and checks again. All 20 orange? Add them and check again:
@@ -180,7 +180,7 @@ frame is deliberately longer than the count). The questions, in order:
      Count again or change the number.
 
 **A note about segments.** Under a WLED controller in the Scout list you may see a ⚠ note. House Lights sets static
-colours, themes and picked lights on **segment 0**, counted from its own first LED, while an animation lights **every LED**
+colors, themes and picked lights on **segment 0**, counted from its own first LED, while an animation lights **every LED**
 whatever the segments are (WLED's own documentation says live data ignores segments). They agree when segment 0 is the plain
 whole strip, which is WLED's default, and then there is no note. If segment 0 covers only part of the strip, there are more
 segments, or segment 0 uses grouping, spacing, mirror, reverse or offset, the note says so and how to fix it in WLED. It only
@@ -189,7 +189,7 @@ mismatch, because it is drawn the way animations are.
 
 ### Controllers that cannot show single lights
 
-JellyFish, Tuya and basic Govee models change one colour (or a limited palette) at a time, so there
+JellyFish, Tuya and basic Govee models change one color (or a limited palette) at a time, so there
 is nothing to count by eye. You type the count (for JellyFish it is prefilled from the zone) and, on
 the **Done** page, pick which end light 1 is at (**Left end**, **Right end**, or **Not sure yet**).
 
@@ -199,10 +199,10 @@ the **Done** page, pick which end light 1 is at (**Left end**, **Right end**, or
 |---|---|---|
 | `ruler` "Check the count" | Light 1 red, last light blue, every 10th light white, every 5th dim | Check the count by eye |
 | `chase` "Direction" | A white dot runs from light 1 (red) to the last light (blue) | Find light 1's end |
-| `rgb` "Colours" | First third red, middle third green, last third blue | See whether the colours are right. If not, please report the controller. |
+| `rgb` "Colors" | First third red, middle third green, last third blue | See whether the colors are right. If not, please report the controller. |
 | `segments` "Segment groups" | Groups of one segment in alternating orange and blue | See how the run divides into segments (the size static themes are sent in) |
 
-Controllers with `count: "manual"` and one colour per light (no controller today) would count with the
+Controllers with `count: "manual"` and one color per light (no controller today) would count with the
 **marker** patterns instead: `markers` (dim white with the first light of every segment red or green
 in turn, every tenth blue; you count the markers) and `tail` (the last group red; lights =
 segment size × (markers − 1) + red).
@@ -218,7 +218,7 @@ round as needed, so patterns travel the same way along the whole house.
 | You answer | The wizard works out | Saved as |
 |---|---|---|
 | The lights blinked; a name and short name; a place | nothing | `runs[].name`, `runs[].short`, order of `runs` |
-| Last colour and number of blocks (Govee A) | groups = 4 × (blocks − 1) + place of the colour | nothing yet: it sets pattern B |
+| Last color and number of blocks (Govee A) | groups = 4 × (blocks − 1) + place of the color | nothing yet: it sets pattern B |
 | Red lights at the end (Govee B) | lights = 5 × (groups − 1) + red | `runs[].lights` |
 | A typed number | the number, 1 to the model's maximum (255 for streaming Govee) | `runs[].lights` |
 | Orange lights after the blue (WLED) | lights = lights + orange | `runs[].lights`, then it checks again |
@@ -231,9 +231,9 @@ And what the saved values are used for afterwards:
 
 - `lights` and the model's segment size give the segments: `ceil(lights / lights_per_segment)`.
   The dashboard draws every run to scale.
-- **Static themes** are rounded to one colour per segment and sent as segment commands (one per
-  colour); controllers that take a whole frame (WLED, JellyFish) get one colour per light.
-- **Animated themes** are sent as one colour per light, 15 times a second.
+- **Static themes** are rounded to one color per segment and sent as segment commands (one per
+  color); controllers that take a whole frame (WLED, JellyFish) get one color per light.
+- **Animated themes** are sent as one color per light, 15 times a second.
 - `reverse` makes the dashboard turn a run's frames round, so an animation moves across the house
   the way it moves on the page.
 - The order of `runs` is the left to right order of the house, used for whole-house themes.
@@ -290,7 +290,7 @@ Runs are listed left to right along the house. `baseline` is the warm white a ru
 ## Safety
 
 - **Scanning only reads.** Tests do change the lights: each streamed test stops by itself after 60
-  seconds. The Govee counting colours (A and B) stay until the next test or theme.
+  seconds. The Govee counting colors (A and B) stay until the next test or theme.
 - **Going back.** When a test stops, Govee and WLED return to what they showed; Tuya lights are saved
   before the test and put back afterwards; JellyFish cannot report what it showed, so afterwards pick a
   theme or use its own app. The wizard says which applies to the controller in front of you.
@@ -305,7 +305,7 @@ Runs are listed left to right along the house. `baseline` is the warm white a ru
 | What you see | What it means | What to do |
 |---|---|---|
 | Nothing blinks | The command did not arrive | Power, Govee LAN Control, same network, firewall (see Spotlight above) |
-| Govee: blue after the red in pattern B | A colour was miscounted in pattern A | **Count the colours again** |
+| Govee: blue after the red in pattern B | A color was miscounted in pattern A | **Count the colors again** |
 | Govee: red or blue in pattern C covers two lights | The count is off by some lights | **Count again**, or type the number from the Govee app |
 | WLED: orange after the blue | The count is too low | Say how many orange lights; the wizard adds them |
 | WLED: no blue at all | The count is too high | Count again or change the number |

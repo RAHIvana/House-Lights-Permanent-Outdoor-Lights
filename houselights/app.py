@@ -178,9 +178,9 @@ def config():
                              "model_label": (drivers.model_info(c.type, c.model) or {}).get("label", c.model)}
                             for c in S.controllers.values()],
             "sections": [s.public() for s in S.sections.values()],
-            "patterns": P.catalogue(),
+            "patterns": P.catalog(),
             "categories": P.categories(),
-            "theme_prefs": {"favourites": THEMES.favourites, "hidden_groups": THEMES.hidden_groups}}
+            "theme_prefs": {"favorites": THEMES.favorites, "hidden_groups": THEMES.hidden_groups}}
 
 
 LAST_LAN = {}                     # last status per controller id, for the fast read below
@@ -206,7 +206,7 @@ class Brightness(BaseModel):
     value: int
 
 
-class Colour(BaseModel):
+class Color(BaseModel):
     color: str | None = None
     kelvin: int | None = None
 
@@ -251,7 +251,7 @@ def brightness(sid: str, body: Brightness):
 
 
 @app.post("/api/sections/{sid}/color")
-def colour(sid: str, body: Colour):
+def color(sid: str, body: Color):
     sec, kit = _section(sid)
     _stop_stream(sid)
     if body.kelvin:
@@ -268,8 +268,8 @@ def colour(sid: str, body: Colour):
 
 
 def _segments_for(sec, lights):
-    """What Apply sends: (colours as shown, which are rounded, calls). Controllers that take a
-    whole frame get one call; the others one packet per colour group of segments."""
+    """What Apply sends: (colors as shown, which are rounded, calls). Controllers that take a
+    whole frame get one call; the others one packet per color group of segments."""
     kit = KITS[sec.controller.id]
     if sec.caps.get("static") in ("lights", "palette"):
         shown = [tuple(c) for c in kit.preview_static(lights)]
@@ -290,7 +290,7 @@ def _house_runs(sec):
 
 
 def _lights(sec, pattern, params, t=0.0, seg_width=None):
-    """One colour per light of this run at time t: the run's own frame, or its slice of the
+    """One color per light of this run at time t: the run's own frame, or its slice of the
     whole house for a theme spanning the house."""
     seg = seg_width or sec.lights_per_segment or 5
     if P.span_of(pattern, params) == "house":
@@ -339,7 +339,7 @@ def out_still(sec):
 
 @app.post("/api/sections/{sid}/pattern")
 def apply_pattern(sid: str, body: PatternReq, still: bool = False):
-    """Static patterns as segment colours (persist on the controller). Animated ones need
+    """Static patterns as segment colors (persist on the controller). Animated ones need
     /play, except as a still picture (still=true) on controllers that can't stream."""
     sec, kit = _section(sid)
     if _run(lambda: P.is_animated(body.pattern, body.params)) and not (still and not _can_stream(sec)):
@@ -348,7 +348,7 @@ def apply_pattern(sid: str, body: PatternReq, still: bool = False):
     lights = _run(lambda: _lights(sec, body.pattern, body.params))
     segs, mixed, calls = _segments_for(sec, lights)
     seg_hex = [P.rgb_to_hex(c) for c in segs]
-    if len(calls) == 1 and not callable(calls[0]):     # one colour: whole controller
+    if len(calls) == 1 and not callable(calls[0]):     # one color: whole controller
         _run(lambda: kit.color(calls[0][0]))
         _remember(sid, segments=seg_hex, pattern=body.pattern, params=body.params,
                   color=seg_hex[0], kelvin=None)
@@ -362,7 +362,7 @@ def apply_pattern(sid: str, body: PatternReq, still: bool = False):
 def set_segments(sid: str, body: Segments):
     sec, kit = _section(sid)
     if not sec.caps.get("pick"):
-        raise HTTPException(409, f"{sec.name}: this controller can't colour segments one by one")
+        raise HTTPException(409, f"{sec.name}: this controller can't color segments one by one")
     rgb = _run(lambda: P.hex_to_rgb(body.color))
     segs = sorted(set(body.segments))
     if not segs or segs[0] < 0 or segs[-1] >= sec.used_segments:
@@ -379,7 +379,7 @@ def set_segments(sid: str, body: Segments):
 
 @app.post("/api/sections/{sid}/play")
 def play(sid: str, body: PlayReq):
-    """Stream one colour per light (static or animated) until stopped."""
+    """Stream one color per light (static or animated) until stopped."""
     sec, kit = _section(sid)
     _run(lambda: _lights(sec, body.pattern, body.params))                 # validate first
     if not _can_stream(sec):                                              # show it as a still picture
@@ -470,7 +470,7 @@ class ApplyAll(BaseModel):
 
 @app.post("/api/apply-all")
 def apply_all(body: ApplyAll):
-    """A static theme as segment colours on several kits (each kit's own job)."""
+    """A static theme as segment colors on several kits (each kit's own job)."""
     if _run(lambda: P.is_animated(body.pattern, body.params)):
         raise HTTPException(400, "animated themes play per light: use Play live")
     jobs, skipped = {}, {}
@@ -534,7 +534,7 @@ class _ScheduleActions:
             power(sid, Power(on=True))
             brightness(sid, Brightness(value=level))
             if pat == "warm_white":
-                colour(sid, Colour(kelvin=2200))
+                color(sid, Color(kelvin=2200))
             elif pat != "keep":
                 apply_pattern(sid, PatternReq(pattern=pat, params=theme["params"]))
         finally:
@@ -634,14 +634,14 @@ def schedule_pause(body: SchedPause):
 
 # --- themes you make (Themes tab) ---------------------------------------------------------
 def _themes_out():
-    return {"themes": THEMES.themes, "patterns": P.catalogue(), "categories": P.categories(),
-            "prefs": {"favourites": THEMES.favourites, "hidden_groups": THEMES.hidden_groups},
+    return {"themes": THEMES.themes, "patterns": P.catalog(), "categories": P.categories(),
+            "prefs": {"favorites": THEMES.favorites, "hidden_groups": THEMES.hidden_groups},
             **P.movements()}
 
 
 @app.get("/api/themes")
 def themes_list():
-    """Saved themes (full definitions), the catalogue every picker uses, favourites and
+    """Saved themes (full definitions), the catalog every picker uses, favorites and
     hidden groups, and the movements the editor offers."""
     return _themes_out()
 
@@ -674,13 +674,13 @@ def theme_delete(body: ThemeId):
 
 
 class ThemePrefs(BaseModel):
-    favourites: list[str] | None = None
+    favorites: list[str] | None = None
     hidden_groups: list[str] | None = None
 
 
 @app.post("/api/themes/prefs")
 def theme_prefs(body: ThemePrefs):
-    _run(lambda: THEMES.set_prefs(body.favourites, body.hidden_groups))
+    _run(lambda: THEMES.set_prefs(body.favorites, body.hidden_groups))
     return {"ok": True, **_themes_out()}
 
 

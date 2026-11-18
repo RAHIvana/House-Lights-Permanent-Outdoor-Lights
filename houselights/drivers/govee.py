@@ -4,17 +4,17 @@ Protocol: JSON over UDP. Commands go to the device on port 4003, discovery ("sca
 4001 (multicast 239.255.255.250 or unicast), and devices answer on port 4002 of the sender.
 LAN control has to be switched on for each device in the Govee Home app.
 
-Govee documents only the basic LAN commands: turn, brightness, colorwc (colour or colour
-temperature) and devStatus. Segment colours use "ptReal" packets (BLE-style 20-byte frames)
+Govee documents only the basic LAN commands: turn, brightness, colorwc (color or color
+temperature) and devStatus. Segment colors use "ptReal" packets (BLE-style 20-byte frames)
 and per-light animation the "razer" (DreamView) streaming mode; neither is documented, and
 both were verified on model H806A only. So what a controller may do depends on its model
 (SKU), in three tiers (model_info()):
-  full   H806A: per-light streaming, segment colours (5 lights each), up to 255 lights
+  full   H806A: per-light streaming, segment colors (5 lights each), up to 255 lights
   try    permanent outdoor families with LAN control (H705x, H706x, H707x, H805x, H3A5x):
          basic control, per-light streaming allowed but untested ("stream_untested"), no
-         segment colours: a static theme shows its main colour (or plays as a stream)
-  basic  any other model that answers the scan: on/off, brightness, one colour, white,
-         status, schedules; a theme shows its main colour
+         segment colors: a static theme shows its main color (or plays as a stream)
+  basic  any other model that answers the scan: on/off, brightness, one color, white,
+         status, schedules; a theme shows its main color
 """
 import base64
 import ipaddress
@@ -26,7 +26,7 @@ import socket
 import threading
 import time
 
-from .base import ONE_COLOUR_CAPS, NotAllowed
+from .base import ONE_COLOR_CAPS, NotAllowed
 from .base import Kit as BaseKit
 from . import net as _net
 
@@ -38,26 +38,26 @@ TESTED = True
 
 # What each tier may do (see base.py for the keys). "stream_untested": per-light streaming is
 # allowed but has not been seen working on that model: the page and wizard say "try it".
-# "frame": "stretch": a stream frame of N colours is spread over the whole run in N equal parts
+# "frame": "stretch": a stream frame of N colors is spread over the whole run in N equal parts
 # (seen on H806A), so a frame has to carry exactly the run's light count to be one per light.
 FULL_CAPS = {"stream": True, "static": "segments", "pick": True, "status": True, "count": "manual",
              "restore": "auto", "frame": "stretch"}
 TRY_CAPS = {"stream": True, "stream_untested": True, "static": "segments", "pick": False, "status": True,
             "count": "manual", "restore": "auto", "frame": "stretch"}
-BASIC_CAPS = dict(ONE_COLOUR_CAPS)        # like a Tuya strip: one colour at a time, put back after a test
+BASIC_CAPS = dict(ONE_COLOR_CAPS)        # like a Tuya strip: one color at a time, put back after a test
 
-# lights_per_segment: how many lights one segment colours, counted from light 1 (0: no
-# segments, the whole run is one colour). max_lights: a streaming frame carries at most 255
+# lights_per_segment: how many lights one segment colors, counted from light 1 (0: no
+# segments, the whole run is one color). max_lights: a streaming frame carries at most 255
 # lights; a run that doesn't stream only needs a count to draw it on the page.
 TIERS = {
     "full": {"label": "Full support", "caps": FULL_CAPS, "lights_per_segment": 5, "max_lights": 255,
-             "note": "Everything: themes light by light, segment colours. Tested on real controllers."},
+             "note": "Everything: themes light by light, segment colors. Tested on real controllers."},
     "try": {"label": "Basic control; light-by-light themes to try", "caps": TRY_CAPS, "lights_per_segment": 0,
             "max_lights": 255,
-            "note": "On/off, brightness, colours and schedules work. Light-by-light themes (Play live) are "
-                    "untested on this model: try them. Static themes show their main colour."},
+            "note": "On/off, brightness, colors and schedules work. Light-by-light themes (Play live) are "
+                    "untested on this model: try them. Static themes show their main color."},
     "basic": {"label": "Basic control", "caps": BASIC_CAPS, "lights_per_segment": 0, "max_lights": 3000,
-              "note": "On/off, brightness, one colour, white and schedules. Themes show their main colour."},
+              "note": "On/off, brightness, one color, white and schedules. Themes show their main color."},
 }
 
 TRY_FAMILIES = ("H705A", "H705B", "H705C", "H705D", "H705E", "H705F",      # Permanent Outdoor Lights (2)
@@ -392,7 +392,7 @@ class Kit(BaseKit):
     def segments(self, segs, rgb, nseg):
         self.guard()
         if not self.caps.get("pick"):
-            raise NotAllowed(f"{self.info['label']} can't colour segments one by one (checked on H806A only)")
+            raise NotAllowed(f"{self.info['label']} can't color segments one by one (checked on H806A only)")
         segs = sorted(set(int(s) for s in segs))
         if not segs or segs[0] < 0 or segs[-1] >= nseg:
             raise ValueError(f"segments out of range 0..{nseg - 1}: {segs}")

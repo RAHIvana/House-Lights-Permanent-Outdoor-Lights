@@ -54,15 +54,15 @@ with tempfile.TemporaryDirectory() as tmp:
     check("save as new makes a copy", c["id"] != a["id"] and len(st.themes) == 3)
     cp = st.save({"id": "diya_glow", "name": "My diya", "layers": [{"movement": "builtin:diya_glow", "params": {"speed": 2}}]})
     check("saving a built-in makes a copy (built-in unchanged)", cp["id"].startswith("my_") and "diya_glow" in P.PATTERNS)
-    st.set_prefs(favourites=[a["id"], "diya_glow", "nope"], hidden_groups=["Halloween", "Nope"])
+    st.set_prefs(favorites=[a["id"], "diya_glow", "nope"], hidden_groups=["Halloween", "Nope"])
     with open(path, encoding="utf-8") as f:
         raw = json.load(f)
     check("file is UTF-8 JSON with version", raw["version"] == 1 and raw["themes"][0]["name"] == "Diwali Night ✨")
     st2 = themes.Store(path)
-    check("round trip", st2.themes == st.themes and st2.favourites == [a["id"], "diya_glow"]
+    check("round trip", st2.themes == st.themes and st2.favorites == [a["id"], "diya_glow"]
           and st2.hidden_groups == ["Halloween"])
-    check("custom themes in the catalogue", any(p["id"] == a["id"] and p["custom"] and p["group"] == P.MY_GROUP
-                                                 and "Diwali" in p["categories"] for p in P.catalogue()))
+    check("custom themes in the catalog", any(p["id"] == a["id"] and p["custom"] and p["group"] == P.MY_GROUP
+                                                 and "Diwali" in p["categories"] for p in P.catalog()))
     st2.delete(b["id"])
     check("delete", st2.get(b["id"]) is None and len(st2.themes) == 3)
     check("deleted theme fails clearly", raises(lambda: P.frame(b["id"], 10, {}), "no longer exists"))
@@ -72,9 +72,9 @@ with tempfile.TemporaryDirectory() as tmp:
     check("name max 40", raises(lambda: P.clean_theme(theme(name="x" * 41)), "40"))
     check("max 3 layers", raises(lambda: P.clean_theme(theme(layers=[{"movement": "solid"}] * 4)), "layers"))
     check("unknown movement", raises(lambda: P.clean_theme(theme(layers=[{"movement": "zap"}])), "movement"))
-    check("max 12 colours", raises(lambda: P.clean_theme(theme(layers=[{"movement": "bands", "params": {
+    check("max 12 colors", raises(lambda: P.clean_theme(theme(layers=[{"movement": "bands", "params": {
         "colors": ",".join(["#ffffff"] * 13)}}])), "12"))
-    check("bad colour", raises(lambda: P.clean_theme(theme(layers=[{"movement": "bands", "params": {"colors": "#ff"}}]))))
+    check("bad color", raises(lambda: P.clean_theme(theme(layers=[{"movement": "bands", "params": {"colors": "#ff"}}]))))
     check("speed out of range", raises(lambda: P.clean_theme(theme(layers=[{"movement": "chase", "params": {"speed": 500}}])), "speed"))
     check("not a number", raises(lambda: P.clean_theme(theme(layers=[{"movement": "chase", "params": {"speed": "fast"}}])), "number"))
     check("bad direction", raises(lambda: P.clean_theme(theme(direction="up")), "direction"))
@@ -187,7 +187,7 @@ check("asking for it explains", raises(lambda: P.frame("christmas", 10, {}), "no
 
 
 def moves(pid, lights=120, fps=15, seconds=4):
-    """Lights changing colour per second, as a share of all lights (how lively a theme is)."""
+    """Lights changing color per second, as a share of all lights (how lively a theme is)."""
     fr = [P.frame(pid, lights, {}, k / fps) for k in range(int(seconds * fps))]
     return sum(a != b for x, y in zip(fr, fr[1:]) for a, b in zip(x, y)) / (len(fr) - 1) / lights
 

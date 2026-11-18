@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-  <!-- House Lights logo: the bulb from the Tabler "bulb" icon (MIT licence, tabler.io/icons), amber on night blue -->
+  <!-- House Lights logo: the bulb from the Tabler "bulb" icon (MIT license, tabler.io/icons), amber on night blue -->
   <rect width="24" height="24" rx="5" fill="#1c2541"/>
   <g transform="translate(2.4 2.4) scale(0.8)" fill="none" stroke="#f2b544" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M3 12h1m8 -9v1m8 8h1m-15.4 -6.4l.7 .7m12.1 -.7l-.7 .7"/>

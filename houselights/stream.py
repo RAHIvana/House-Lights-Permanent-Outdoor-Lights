@@ -1,4 +1,4 @@
-"""Per-light streaming: one colour per light, sent to the controller every 1/fps seconds.
+"""Per-light streaming: one color per light, sent to the controller every 1/fps seconds.
 
 One Streamer per run. Animated themes are rendered here at time t. The setup wizard's test
 patterns use start_fn() with their own render function and a time limit.
@@ -108,7 +108,7 @@ class Streamer:
             log.info("%s STREAM %s stop", self.kit.prefix, self.kit.tag)
 
     def _run_slow(self, name, render, animated, level, seconds, stop):
-        """No streaming: show frames with show_lights() (or the main colour) at most
+        """No streaming: show frames with show_lights() (or the main color) at most
         kit.slow_fps times a second, then put the controller back if it allows."""
         log.info("%s SLOW %s start %s (%d lights)", self.kit.prefix, self.kit.tag, name, self.lights)
         snap = self.kit.snapshot() if self.kit.caps.get("restore") == "snapshot" else None

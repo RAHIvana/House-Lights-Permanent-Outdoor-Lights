@@ -34,9 +34,9 @@ const KINDS = ["govee", "wled", "jellyfish", "tuya"];
 const KIND_NAME = {govee: "Govee", wled: "WLED", jellyfish: "JellyFish", tuya: "Tuya / Smart Life"};
 // Govee models differ (tiers): full = everything, nothing to say.
 const TIER_NOTE = {try: "Basic control; light-by-light animation untested on this model: try it in the Check test",
-                   basic: "One colour at a time"};
+                   basic: "One color at a time"};
 const INSTALL_TUYA = {win: "venv\\Scripts\\pip install tinytuya", nix: "venv/bin/pip install tinytuya"};
-// "Not finding yours?": how to recognise each kind, and how to get it ready.
+// "Not finding yours?": how to recognize each kind, and how to get it ready.
 const HELP = {
   govee: {know: "Any Govee light that has LAN Control in the Govee Home app.",
     note: "The H806A is fully tested. Other models work at a basic level until someone tests them.",
@@ -61,8 +61,8 @@ const TEST_HELP = {
   identify: "The whole run blinks. Is it the run you expect?",
   ruler: "Light 1 is red, the last light blue, every 10th light white. If the blue light isn't the very last light, the count is wrong.",
   chase: "A white dot runs from light 1 (red) to the last light (blue).",
-  rgb: "Red, green and blue thirds. If the colours look wrong, this controller may need a fix: please report it.",
-  segments: "Orange and blue groups: each group is one segment. Static themes are sent one colour per segment.",
+  rgb: "Red, green and blue thirds. If the colors look wrong, this controller may need a fix: please report it.",
+  segments: "Orange and blue groups: each group is one segment. Static themes are sent one color per segment.",
 };
 const RESTORE_NOTE = {
   auto: "When a test stops, the lights go back to what they showed before.",
@@ -102,7 +102,7 @@ const sameSpot = (a, b) => a.type === b.type && a.ip === b.ip && (a.zone || "") 
 const spotKey = d => `${d.type}|${d.ip}|${d.zone || ""}`;
 const hasLights = r => Number(r.lights) >= 1;
 const lpsOf = c => modelInfo(c.type, c.model)?.lights_per_segment ?? drv(c.type).lights_per_segment?.[c.model] ?? 0;
-const segCount = c => testsOf(c).includes("seg4");            // Govee: count with segment colours
+const segCount = c => testsOf(c).includes("seg4");            // Govee: count with segment colors
 const canCount = c => segCount(c) || (testsOf(c).includes("markers") && lpsOf(c) > 0);   // or segment markers
 const canCheck = c => testsOf(c).includes("check") || testsOf(c).includes("ends");   // light 1 can be shown
 const ipNum = ip => ip.split(".").reduce((a, n) => a * 256 + Number(n), 0);
@@ -568,7 +568,7 @@ async function nextController() {
 const q = (text, cls = "tq") => el("p", cls, text);
 const answers = (...btns) => { const row = el("div", "row answers"); row.append(...btns.filter(Boolean)); return row; };
 
-// A. Count. Govee: segment colours, then the last segment red. Others: markers, or type it.
+// A. Count. Govee: segment colors, then the last segment red. Others: markers, or type it.
 function drawCountPhase(c, r, body) {
   const lps = W.lps[c.id] || lpsOf(c) || 5, max = maxLights(c);
   if (hasLights(r) && !W.t.recount) {
@@ -627,23 +627,23 @@ function lastGroup(c, r, lps, groups, title) {
   };
   return [q(title), answers(el("span", "lbl", "How many red lights at the end?"), red), sum, answers(use)];
 }
-// Govee: A) every group of lps lights a colour in turn: green, white, red, yellow. The last
-// colour and how many blocks of it give the groups. B) all white, the last group red.
-const SEG_COLOURS = [["green", "#3a3"], ["white", "#ddd"], ["red", "#e33"], ["yellow", "#fb0"]];
+// Govee: A) every group of lps lights a color in turn: green, white, red, yellow. The last
+// color and how many blocks of it give the groups. B) all white, the last group red.
+const SEG_COLORS = [["green", "#3a3"], ["white", "#ddd"], ["red", "#e33"], ["yellow", "#fb0"]];
 function drawCountSegments(c, r, body, lps) {
   const maxGroups = Math.ceil(maxLights(c) / lps);
   if (!W.t.started) { W.t.started = true; runTest(c, "seg4").then(drawTest).catch(e => err(e.message)); }
-  body.append(q(`A · Every ${lps} lights change colour: green, white, red, yellow, then again.`),
-    answers(testBtn(c, "seg4", "Colour pattern", null, () => { W.t.cnt = Math.min(W.t.cnt, 1); W.t.segs = null; drawTest(); })),
+  body.append(q(`A · Every ${lps} lights change color: green, white, red, yellow, then again.`),
+    answers(testBtn(c, "seg4", "Color pattern", null, () => { W.t.cnt = Math.min(W.t.cnt, 1); W.t.segs = null; drawTest(); })),
     el("p", "note", "It's on the lights by itself; press it to send it again."),
-    el("p", "note", "What colour is the last block at the far end? A single light past it that never changes isn't driven by the controller: leave it out."));
-  body.append(answers(...SEG_COLOURS.map(([name, hex], k) => {
+    el("p", "note", "What color is the last block at the far end? A single light past it that never changes isn't driven by the controller: leave it out."));
+  body.append(answers(...SEG_COLORS.map(([name, hex], k) => {
     const b = button(name[0].toUpperCase() + name.slice(1), () => { W.t.last = k; drawTest(); }, "swatch" + (W.t.last === k ? " on" : ""));
     b.style.setProperty("--sw", hex);
     return b;
   })));
   if (W.t.last != null) {
-    const name = SEG_COLOURS[W.t.last][0];
+    const name = SEG_COLORS[W.t.last][0];
     const m = el("input"); m.type = "number"; m.min = 1; m.max = Math.ceil(maxGroups / 4); m.style.width = "5em";
     if (W.t.blocks) m.value = W.t.blocks;
     const sum = el("span", "tsum");
@@ -664,8 +664,8 @@ function drawCountSegments(c, r, body, lps) {
     const part = lastGroup(c, r, lps, segs, "B · Now every group is white and only the last one is red.");
     part.splice(1, 0, answers(testBtn(c, "seglast", "Last group pattern", () => ({markers: segs, lights: Math.min(maxLights(c), segs * lps)}))));
     body.append(...part,
-      el("p", "note", "Blue after the red? Then the colours were miscounted."),
-      answers(button("Count the colours again", async () => { W.t.cnt = 1; W.t.segs = null; await runTest(c, "seg4"); drawTest(); })));
+      el("p", "note", "Blue after the red? Then the colors were miscounted."),
+      answers(button("Count the colors again", async () => { W.t.cnt = 1; W.t.segs = null; await runTest(c, "seg4"); drawTest(); })));
   }
   body.append(answers(button("Type the number from the Govee app", () => { W.t.typed = true; drawTest(); })));
 }
@@ -688,7 +688,7 @@ function drawCheck(c, r, body) {
       button("Still can't tell", () => set1(""))));
   }
   if (!W.t.q1 || W.t.q1 === "dot") return;
-  body.append(q("Do you see any other colour, like orange, after the blue?"), answers(
+  body.append(q("Do you see any other color, like orange, after the blue?"), answers(
     button("No, blue is the last light", () => setPhase("done"), "primary"),
     button("Yes, orange after the blue", () => { W.t.q2 = "orange"; drawTest(); }, W.t.q2 === "orange" ? "on" : ""),
     button("I don't see blue at all", () => { W.t.q2 = "noblue"; drawTest(); }, W.t.q2 === "noblue" ? "on" : "")));
@@ -773,7 +773,7 @@ function sweep(r) {
   return wrap;
 }
 
-// More tests: the extra patterns (colours, segment groups, ruler, dot from light 1)
+// More tests: the extra patterns (colors, segment groups, ruler, dot from light 1)
 const COUNT_TESTS = ["markers", "tail", "seg4", "seglast", "ends", "check"];
 function drawMore(c) {
   const box = $("#t-more-btns");

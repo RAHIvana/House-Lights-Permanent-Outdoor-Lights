@@ -296,16 +296,16 @@ check("govee stream: stop sent 5x at the end", sent[-5:] == [off] * 5 and sent.c
 check("govee stream: frames in between", len(sent) - 8 >= 5)
 check("test start is guarded by a lock", isinstance(setup.TEST_LOCK, type(_th.Lock())))
 
-# --- Govee counting: segment colours, the last segment red, then light 1 blue / last red ---
+# --- Govee counting: segment colors, the last segment red, then light 1 blue / last red ---
 from houselights import drivers as _drv  # noqa: E402
 
 full = setup.allowed_tests(_drv.model_caps("govee", "H806A"))
-check("Govee H806A counts with segment colours, not markers or orange",
+check("Govee H806A counts with segment colors, not markers or orange",
       {"seg4", "seglast", "ends"} <= set(full) and not {"markers", "tail", "check"} & set(full))
 check("WLED keeps markers / check, no Govee counting",
       "ends" not in setup.allowed_tests({"stream": True, "count": "manual", "pick": True})
       and "check" in setup.allowed_tests({"stream": True, "count": "manual", "pick": True}))
-g, w, r_, y = setup.SEG_COLOURS
+g, w, r_, y = setup.SEG_COLORS
 s4 = setup._seg4(23, 0, 5)
 check("seg4: green, white, red, yellow per 5 lights, then again",
       s4[:5] == [g] * 5 and s4[5:10] == [w] * 5 and s4[10:15] == [r_] * 5 and s4[15:20] == [y] * 5 and s4[20:] == [g] * 3)
@@ -315,7 +315,7 @@ check("seglast: segments before the last white, the last red, past it blue",
 en = setup._ends(73, 0)
 check("ends: light 1 red, the last blue, the rest white", en[0] == setup.RED and en[-1] == setup.BLUE
       and en[1:-1] == [setup.WHITE] * 71 and len(en) == 73)
-check("segment counting: the last colour and its blocks give the segments",
+check("segment counting: the last color and its blocks give the segments",
       all(4 * (blocks - 1) + place == segs for segs, place, blocks in
           [(24, 4, 6), (10, 2, 3), (15, 3, 4), (1, 1, 1)]))
 
@@ -336,7 +336,7 @@ class SegKit:
 sk = SegKit()
 setup.SegmentTest(sk, 5, 255, "seg4").show()
 cover = sorted(s for segs, _, _ in sk.sent[::2] for s in segs)
-check(f"seg4 sets every segment the model can have, once per colour, each sent twice ({len(sk.sent)} sends)",
+check(f"seg4 sets every segment the model can have, once per color, each sent twice ({len(sk.sent)} sends)",
       cover == list(range(51)) and len(sk.sent) == 8 and sk.sent[0] == sk.sent[1] and sk.sent[0][2] == 51)
 sk = setup.SegmentTest(SegKit(), 5, 255, "seglast", 24)
 grp = dict((rgb, segs) for segs, rgb in sk.groups())

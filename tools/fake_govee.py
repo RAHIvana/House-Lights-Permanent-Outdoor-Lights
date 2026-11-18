@@ -4,12 +4,12 @@
 
 Starts devices at 127.0.0.11, 127.0.0.12, ... (Linux and Windows: every 127.x address works;
 on macOS use --base 127.0.0.1 --count 1). They answer unicast "scan" and "devStatus", and keep
-the power, brightness and colour they are sent (turn, brightness, colorwc). In the setup
+the power, brightness and color they are sent (turn, brightness, colorwc). In the setup
 wizard, scan "127.0.0.11-13" by typing the addresses, e.g. 127.0.0.11, 127.0.0.12, 127.0.0.13
 (or 127.0.0.8/29).
 
 --model takes any Govee SKU (e.g. H806A, H706B, H7060). --no-razer simulates a model that
-ignores the undocumented commands: per-light streaming ("razer") and segment colours
+ignores the undocumented commands: per-light streaming ("razer") and segment colors
 ("ptReal") are counted as ignored and change nothing.
 
 Real devices use ports 4001 (scan), 4002 (replies) and 4003 (commands). To run beside real
@@ -145,7 +145,7 @@ def main():
     ap.add_argument("--model", default="H806A", help="the Govee SKU it reports, e.g. H806A, H706B, H7060")
     ap.add_argument("--lights", default="60", help="lights on each device, e.g. 50,120,73 (a longer frame shows only these)")
     ap.add_argument("--no-razer", action="store_true",
-                    help="ignore per-light streaming and segment colours, like a model without them")
+                    help="ignore per-light streaming and segment colors, like a model without them")
     ap.add_argument("--state", help="write every device's state to this JSON file after each change")
     a = ap.parse_args()
     try:

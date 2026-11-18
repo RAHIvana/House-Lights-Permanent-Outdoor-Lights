@@ -522,15 +522,15 @@ const WARM_TILE = {id: "warm", label: "Warm white", animated: false, categories:
 // shows once for people who had already picked a category.
 const DEFAULT_CAT = "Christmas", CAT_KEY = "hl-cat-2";
 let CAT = "All";
-// Favourites first (starred in the Themes tab), then your own themes, then the built-ins in
+// Favorites first (starred in the Themes tab), then your own themes, then the built-ins in
 // category order. Built-in groups hidden in the Themes tab are left out (unless starred).
-const themePrefs = () => CONFIG.theme_prefs || {favourites: [], hidden_groups: []};
+const themePrefs = () => CONFIG.theme_prefs || {favorites: [], hidden_groups: []};
 function tileList() {
-  const order = CONFIG.categories || [], {favourites, hidden_groups} = themePrefs();
-  const fav = id => { const k = favourites.indexOf(id); return k < 0 ? 1e6 : k; };
-  const list = CONFIG.patterns.filter(p => p.tile && (favourites.includes(p.id) || p.custom
+  const order = CONFIG.categories || [], {favorites, hidden_groups} = themePrefs();
+  const fav = id => { const k = favorites.indexOf(id); return k < 0 ? 1e6 : k; };
+  const list = CONFIG.patterns.filter(p => p.tile && (favorites.includes(p.id) || p.custom
     || !p.categories.some(c => hidden_groups.includes(c))));
-  return [WARM_TILE, ...list.map(p => favourites.includes(p.id) ? {...p, categories: ["Favourites", ...p.categories]} : p)]
+  return [WARM_TILE, ...list.map(p => favorites.includes(p.id) ? {...p, categories: ["Favorites", ...p.categories]} : p)]
     .sort((a, b) => fav(a.id) - fav(b.id) || order.indexOf(a.group) - order.indexOf(b.group));
 }
 // Two stops at least: a one-color face would be an invalid gradient.
@@ -545,16 +545,16 @@ function buildTiles() {
     b.className = "tile"; b.dataset.p = pat.id; b.dataset.cats = pat.categories.join("|");
     b.style.setProperty("--g", faceGradient(pat.face));
     b.innerHTML = `<span class="tile-face"></span><span class="tile-label"></span><span class="tile-st"></span>`;
-    b.querySelector(".tile-label").textContent = (themePrefs().favourites.includes(pat.id) ? "★ " : "") + pat.label;
+    b.querySelector(".tile-label").textContent = (themePrefs().favorites.includes(pat.id) ? "★ " : "") + pat.label;
     b.title = pat.describe || pat.label;
     b.onclick = () => quickTheme(pat.id);
     box.appendChild(b);
   }
-  // category pull-down: All, Favourites, then each category that has tiles
+  // category pull-down: All, Favorites, then each category that has tiles
   const cat = $("#cat"), used = new Set(tiles.flatMap(t => t.categories));
   cat.innerHTML = "";
   cat.appendChild(new Option(`All (${tiles.length})`, "All"));
-  for (const c of ["Favourites", ...(CONFIG.categories || [])]) if (used.has(c))
+  for (const c of ["Favorites", ...(CONFIG.categories || [])]) if (used.has(c))
     cat.appendChild(new Option(`${c} (${tiles.filter(t => t.categories.includes(c)).length})`, c));
   const has = v => [...cat.options].some(o => o.value === v);
   const saved = store.get(CAT_KEY);

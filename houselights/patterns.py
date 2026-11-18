@@ -1,10 +1,10 @@
-"""Patterns render one colour per *light*.
+"""Patterns render one color per *light*.
 
-Static patterns are applied as segment colours (quantise(); 5 lights per segment on
+Static patterns are applied as segment colors (quantise(); 5 lights per segment on
 Govee H806A) or streamed per light. Animated patterns are functions of time t (seconds)
-and are only sent by streaming one colour per light.
+and are only sent by streaming one color per light.
 
-Every animated pattern is stateless: colour(i, t) depends only on its inputs, so the
+Every animated pattern is stateless: color(i, t) depends only on its inputs, so the
 browser preview (frames computed here) and the live stream look the same.
 """
 import colorsys
@@ -18,7 +18,7 @@ RGB = tuple  # (r, g, b)
 def hex_to_rgb(h):
     h = h.strip().lstrip("#")
     if len(h) != 6:
-        raise ValueError(f"bad colour {h!r}")
+        raise ValueError(f"bad color {h!r}")
     return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
 
 
@@ -108,7 +108,7 @@ def _diya_glow(n, t, p):
 
 
 def _rangoli_chase(n, t, p):
-    """Rangoli colours in bands sliding along the roofline with soft edges."""
+    """Rangoli colors in bands sliding along the roofline with soft edges."""
     pal, width, speed = _colors(p["colors"]), max(1, p["width"]), p["speed"]
     out = []
     for i in range(n):
@@ -122,7 +122,7 @@ def _rangoli_chase(n, t, p):
 
 
 def _anar_fireworks(n, t, p):
-    """Anar / sky-shot bursts: a white flash, then a coloured ring racing outwards and fading."""
+    """Anar / sky-shot bursts: a white flash, then a colored ring racing outwards and fading."""
     pal = _colors(p["colors"])
     every, life, speed = 1.0 / max(0.1, p["rate"]), 1.8, 14.0
     bg = (26, 8, 0)
@@ -208,7 +208,7 @@ def _twinkle_tree(n, t, p):
 
 
 def _tiranga_wave(n, t, p):
-    """Tricolour (saffron, white, green) with a waving-flag ripple."""
+    """Tricolor (saffron, white, green) with a waving-flag ripple."""
     out = []
     for i in range(n):
         c = SAFFRON if i < n / 3 else INDIA_WHITE if i < 2 * n / 3 else INDIA_GREEN
@@ -217,14 +217,14 @@ def _tiranga_wave(n, t, p):
 
 
 def _breathe(n, t, p):
-    """One colour slowly breathing in and out."""
+    """One color slowly breathing in and out."""
     c = hex_to_rgb(p["color"])
     return [_scale(c, 0.15 + 0.85 * (0.5 - 0.5 * math.cos(2 * math.pi * t * 0.25 * p["speed"])))] * n
 
 
-# --- shared effects: most holiday themes are one of these with its own colours
+# --- shared effects: most holiday themes are one of these with its own colors
 def _twinkle(n, t, p):
-    """Base colours in segment-wide bands; some lights rise to an accent colour and fade back."""
+    """Base colors in segment-wide bands; some lights rise to an accent color and fade back."""
     base, acc, dens, speed, level = _colors(p["colors"]), _colors(p["accents"]), p["density"], p["speed"], p["level"]
     thr = 1 - max(0.02, min(0.9, dens))
     out = []
@@ -289,7 +289,7 @@ _FIRE = [(0.0, (20, 0, 0)), (0.35, (170, 20, 0)), (0.6, (255, 80, 0)), (0.85, (2
 
 
 def _fire(n, t, p):
-    """Flames: heat from fast and slow noise, coloured dark red -> orange -> yellow."""
+    """Flames: heat from fast and slow noise, colored dark red -> orange -> yellow."""
     out = []
     for i in range(n):
         h = 0.55 * _smooth(i, t, 7 * p["speed"], 75) + 0.45 * _smooth(i // 4, t, 1.6 * p["speed"], 76)
@@ -302,7 +302,7 @@ def _fire(n, t, p):
 
 
 def _swirl(n, t, p):
-    """Colours from a palette blending slowly into each other along the run."""
+    """Colors from a palette blending slowly into each other along the run."""
     pal, speed = _colors(p["colors"]), p["speed"]
     out = []
     for i in range(n):
@@ -314,7 +314,7 @@ def _swirl(n, t, p):
 
 
 def _steps(n, t, p):
-    """The whole run steps through a palette, holding each colour, with a soft cross-fade."""
+    """The whole run steps through a palette, holding each color, with a soft cross-fade."""
     pal, hold = _colors(p["colors"]), max(0.5, p["hold"])
     k = math.floor(t / hold)
     f = (t / hold - k)
@@ -326,7 +326,7 @@ def _steps(n, t, p):
 def _glide(n, t, p):
     """Bands of `width` lights in palette order, sliding along the run at `speed` lights/s
     (negative = the other way). `soft` (0-1) is how much of each band blends into the next:
-    small widths give soft stripes, large widths give slow waves of colour. `blink` (0-1): coloured lights flicker like diya
+    small widths give soft stripes, large widths give slow waves of color. `blink` (0-1): colored lights flicker like diya
     flames, white lights shimmer slowly like light on water."""
     pal, w, speed = _colors(p["colors"]), max(0.5, p["width"]), p["speed"]
     soft, blink = max(0.0, min(1.0, p["soft"])), max(0.0, min(1.0, p["blink"]))
@@ -354,7 +354,7 @@ def _glide(n, t, p):
 # checks that no theme flashes the whole house more than 3 times a second.
 def _marquee(n, t, p):
     """Theatre marquee: every `gap`-th light is lit and the lit lights run along the house at
-    `speed` lights a second, each keeping its colour; the lights in between glow dimly."""
+    `speed` lights a second, each keeping its color; the lights in between glow dimly."""
     pal, gap, shift = _colors(p["colors"]), max(2, int(p["gap"])), t * p["speed"]
     out = []
     for i in range(n):
@@ -384,7 +384,7 @@ def _racers(n, t, p):
 
 
 def _wipe(n, t, p):
-    """Colour wipes: every `hold` seconds the next colour sweeps over the last one from end to
+    """Color wipes: every `hold` seconds the next color sweeps over the last one from end to
     end behind a bright edge. With `bounce`, every second sweep comes back the other way."""
     pal, hold = _colors(p["colors"]), max(0.3, p["hold"])
     k = math.floor(t / hold)
@@ -400,7 +400,7 @@ def _wipe(n, t, p):
 
 
 def _bounce(n, t, p):
-    """A bright bar bouncing from end to end with a fading tail, a new colour at each end."""
+    """A bright bar bouncing from end to end with a fading tail, a new color at each end."""
     pal, bg = _colors(p["colors"]), hex_to_rgb(p["bg"])
     size, trail, speed = max(1.0, p["size"]), max(0, int(p["trail"])), max(1.0, abs(p["speed"]))
     length = max(1.0, n - size)
@@ -420,7 +420,7 @@ def _bounce(n, t, p):
 
 
 def _rhythm(n, t, p):
-    """Dance beat: on every beat the colours step one group along and flash, then ease off."""
+    """Dance beat: on every beat the colors step one group along and flash, then ease off."""
     pal, width, bpm = _colors(p["colors"]), max(1, p["width"]), max(30.0, p["bpm"])
     beat = t * bpm / 60
     k, ph = math.floor(beat), beat - math.floor(beat)
@@ -429,7 +429,7 @@ def _rhythm(n, t, p):
 
 
 def _heartbeat(n, t, p):
-    """A double pulse (lub-dub) from a soft base colour to a strong one."""
+    """A double pulse (lub-dub) from a soft base color to a strong one."""
     base, beat_c = hex_to_rgb(p["color"]), hex_to_rgb(p["beat"])
     ph = (t * p["bpm"] / 60) % 1
     env = math.exp(-(ph / 0.07) ** 2) + 0.75 * math.exp(-((ph - 0.22) / 0.07) ** 2)
@@ -437,7 +437,7 @@ def _heartbeat(n, t, p):
 
 
 def _storm(n, t, p):
-    """Dim stormy colour; now and then lightning flashes white over part of the house."""
+    """Dim stormy color; now and then lightning flashes white over part of the house."""
     base, rate = hex_to_rgb(p["color"]), max(0.05, p["rate"])
     out = [_scale(base, 0.3 + 0.15 * _smooth(i // 3, t, 0.6, 90)) for i in range(n)]
     slot = math.floor(t * rate)
@@ -456,7 +456,7 @@ def _storm(n, t, p):
 
 
 def _haunted(n, t, p):
-    """A failing bulb: the colour flickers, groups stutter and black out, sometimes all of it."""
+    """A failing bulb: the color flickers, groups stutter and black out, sometimes all of it."""
     c, k = hex_to_rgb(p["color"]), math.floor(t * 7)
     dip = 0.25 if _h(0, math.floor(t * 2), 95) > 0.93 else 1.0          # rare whole-house brown-out
     out = []
@@ -469,7 +469,7 @@ def _haunted(n, t, p):
 
 def _candles(n, t, p):
     """Birthday: one candle flame per year (spread along the run, up to one per light), over
-    slowly twinkling party colours. Every ~15 s they're blown out, confetti, and relit."""
+    slowly twinkling party colors. Every ~15 s they're blown out, confetti, and relit."""
     pal, age = _colors(p["colors"]), max(1, min(n, int(p["age"])))
     flame = (255, 150, 40)
     cyc = t % 15
@@ -489,7 +489,7 @@ def _candles(n, t, p):
 
 
 def _gameday(n, t, p):
-    """Team colours chasing along the house with white sparkles."""
+    """Team colors chasing along the house with white sparkles."""
     pal, width, speed = _colors(p["colors"]), max(1, p["width"]), p["speed"]
     out = []
     for i in range(n):
@@ -501,7 +501,7 @@ def _gameday(n, t, p):
 
 
 def _chakra(n, t, p):
-    """Tricolour, with a navy-blue chakra pulse travelling through the white band."""
+    """Tricolor, with a navy-blue chakra pulse traveling through the white band."""
     out = []
     lo, hi = n / 3, 2 * n / 3
     pos = lo + (hi - lo) * (0.5 + 0.5 * math.sin(t * 0.8 * p["speed"]))
@@ -553,7 +553,7 @@ def _bands_fn(n, w, p):
 
 
 def S(label, cats, colors, describe="", tile=True):
-    """Static theme: colour bands, one segment (5 lights) each unless width is set."""
+    """Static theme: color bands, one segment (5 lights) each unless width is set."""
     return dict(label=label, cats=cats, params={"colors": ("colors", colors), "width": ("int", 0)},
                 fn=_bands_fn, face=colors, describe=describe, tile=tile)
 
@@ -617,13 +617,13 @@ HARVEST = _hx(MAPLE, PUMPKIN, CORN, RUST)
 NEON = _hx((255, 0, 200), (0, 230, 255), (120, 255, 0), (255, 230, 0), (150, 60, 255))
 
 
-# LED-friendly school colours: very dark shades (maroon) are lifted so they read as colour.
+# LED-friendly school colors: very dark shades (maroon) are lifted so they read as color.
 UT_ORANGE, AGGIE_MAROON, UTD_ORANGE, UTD_GREEN = (204, 85, 0), (150, 0, 25), (232, 117, 0), (0, 120, 55)
 ASU_MAROON, ASU_GOLD = (150, 20, 65), (255, 198, 39)
 
 # id -> dict(label, cats, animated, params {name: (type, default)}, fn, face, describe, tile)
-# describe: text for Govee's AI mode. face: tile colours. tile=False: in the theme lists
-# but not a Quick Settings tile (tools that need you to pick colours first).
+# describe: text for Govee's AI mode. face: tile colors. tile=False: in the theme lists
+# but not a Quick Settings tile (tools that need you to pick colors first).
 PATTERNS = {
     # --- Everyday ---
     "warm_gold": dict(label="Warm gold", cats=["Everyday", "Diwali"], params={}, face="#ffb040,#ffb040",
@@ -941,7 +941,7 @@ PATTERNS = {
 #   {id: "my_<slug>", name, group, layers: [{movement, params, blend}], direction, mirror, span,
 #    sequence: [{theme, seconds}], fade}
 # Each layer is one movement (below) or "builtin:<id>" (a built-in theme with its settings).
-# Layers are combined light by light; every movement is a stateless colour(i, t), so the
+# Layers are combined light by light; every movement is a stateless color(i, t), so the
 # page's preview (rendered here) and the live stream match exactly.
 def _m_gradient(n, t, p, w):
     pal = _colors(p["colors"])
@@ -956,7 +956,7 @@ def _m_gradient(n, t, p, w):
 
 
 def _m_breathe(n, t, p, w):
-    """Breathing in and out; with several colours, each breath is the next colour."""
+    """Breathing in and out; with several colors, each breath is the next color."""
     pal, ph = _colors(p["colors"]), t * 0.25 * p["speed"]
     c = pal[math.floor(ph) % len(pal)]
     return [_scale(c, 0.15 + 0.85 * (0.5 - 0.5 * math.cos(2 * math.pi * ph)))] * n
@@ -1026,45 +1026,45 @@ def _M(label, kind, describe, fn, params):
 _WARM = "#ff8a1c,#ffc850,#ff4500"
 # kind: "still" (no time), "moving", "layer" (made to go over another theme: black = see-through)
 MOVEMENTS = {
-    "bands": _M("Bands", "still", "Colour bands side by side, repeating along the run.",
+    "bands": _M("Bands", "still", "Color bands side by side, repeating along the run.",
                 lambda n, t, p, w: _bands(n, _colors(p["colors"]), p["width"] or w),
                 {"colors": ("colors", RANGOLI), "width": ("int", 0)}),
-    "gradient": _M("Gradient", "still", "Colours blending smoothly from one end to the other.", _m_gradient,
+    "gradient": _M("Gradient", "still", "Colors blending smoothly from one end to the other.", _m_gradient,
                    {"colors": ("colors", "#ff0000,#ffd000,#0000ff")}),
-    "solid": _M("Solid", "still", "One colour on every light.",
+    "solid": _M("Solid", "still", "One color on every light.",
                 lambda n, t, p, w: [_colors(p["colors"])[0]] * n, {"colors": ("colors", "#ffb347")}),
-    "random": _M("Random", "still", "Colours picked at random from the list, in groups.",
+    "random": _M("Random", "still", "Colors picked at random from the list, in groups.",
                  lambda n, t, p, w: _random(n, _colors(p["colors"]), p["width"] or w, p["seed"]),
                  {"colors": ("colors", "#ff0000,#00a000,#ffffff,#ffb000"), "width": ("int", 0), "seed": ("int", 1)}),
     "painted": _M("Painted by hand", "still", "Colors you painted segment by segment; repeats if the run is longer.",
                   lambda n, t, p, w: _bands(n, _colors(p["cells"]), p["width"] or w),
                   {"cells": ("colors", "#ff8a1c,#ffffff"), "width": ("int", 5)}),
-    "chase": _M("Chase", "moving", "Bands of colour sliding along the run with soft edges.", _wrap(_rangoli_chase),
+    "chase": _M("Chase", "moving", "Bands of color sliding along the run with soft edges.", _wrap(_rangoli_chase),
                 {"colors": ("colors", RANGOLI), "width": ("int", 5), "speed": ("float", 6.0)}),
-    "twinkle": _M("Twinkle", "moving", "Base colours; some lights glow up to an accent colour and fade back.",
+    "twinkle": _M("Twinkle", "moving", "Base colors; some lights glow up to an accent color and fade back.",
                   _wrap(_twinkle), TW("#ff963c", "#ffc878,#ffffff", 0.25, 1.0, 0.6)),
     "drift": _M("Drift", "moving", "Things floating along over a background: snow, leaves, lanterns, a comet.",
                 _wrap(_drift), DR("#ffffff,#c8e6ff", "#001e46", 6, 3.0, 1.0, 0, 1.5)),
     "fireworks": _M("Fireworks", "moving", "Bursts at random spots: a flash, then a ring spreading out and fading.",
                     _wrap(_bursts), BU(FIREWORK, "#0a0500", 1.2)),
-    "swirl": _M("Swirl", "moving", "Colours blending slowly into each other, drifting about.", _wrap(_swirl),
+    "swirl": _M("Swirl", "moving", "Colors blending slowly into each other, drifting about.", _wrap(_swirl),
                 SWP("#0032c8,#00aa96,#6400b4", 0.6)),
-    "flow": _M("Flow", "moving", "Bands gliding along; soft blends them, blink makes colours flicker like flames.",
+    "flow": _M("Flow", "moving", "Bands gliding along; soft blends them, blink makes colors flicker like flames.",
                _wrap(_glide), GL(_WARM, 6, 2.0, 0.5, 0.0)),
-    "steps": _M("Steps", "moving", "The whole run holds one colour, then cross-fades to the next.", _wrap(_steps),
+    "steps": _M("Steps", "moving", "The whole run holds one color, then cross-fades to the next.", _wrap(_steps),
                 {"colors": ("colors", RANGOLI), "hold": ("float", 4.0)}),
-    "beat": _M("Beat", "moving", "Colours step one group along and flash on every beat.", _wrap(_rhythm),
+    "beat": _M("Beat", "moving", "Colors step one group along and flash on every beat.", _wrap(_rhythm),
                {"colors": ("colors", RANGOLI), "width": ("int", 3), "bpm": ("float", 116.0)}),
-    "breathe": _M("Breathe", "moving", "Slowly brightening and dimming; each breath the next colour.", _m_breathe,
+    "breathe": _M("Breathe", "moving", "Slowly brightening and dimming; each breath the next color.", _m_breathe,
                   {"colors": ("colors", "#ff8a1c"), "speed": ("float", 1.0)}),
-    "heartbeat": _M("Heartbeat", "moving", "A double pulse (lub-dub) from the first colour to the second.",
+    "heartbeat": _M("Heartbeat", "moving", "A double pulse (lub-dub) from the first color to the second.",
                     _m_heartbeat, {"colors": ("colors", "#ff4f9a,#ff0020"), "bpm": ("float", 66.0)}),
     "flicker": _M("Flicker", "moving", "Candle or diya flames, a failing bulb, lightning, or fire.", _m_flicker,
                   {"colors": ("colors", "#ff8a1c"), "style": ("choice", "candle", ["candle", "failing bulb", "lightning", "fire"]),
                    "speed": ("float", 1.0), "rate": ("float", 0.35)}),
-    "candles": _M("Candles", "moving", "One flame per year over party colours; blown out and relit every 15 s.",
+    "candles": _M("Candles", "moving", "One flame per year over party colors; blown out and relit every 15 s.",
                   _wrap(_candles), CAND(30, "#ff0078,#00a0ff,#ffc800,#8c00ff")),
-    "gameday": _M("Game day", "moving", "Team colours chasing along with white sparkles.", _wrap(_gameday),
+    "gameday": _M("Game day", "moving", "Team colors chasing along with white sparkles.", _wrap(_gameday),
                   {"colors": ("colors", "#ff0000,#ffffff"), "width": ("int", 4), "speed": ("float", 4.0)}),
     "sparkle": _M("Sparkle", "layer", "Sparks popping all over (good as a layer on top).", _m_sparkle,
                   {"colors": ("colors", "#ffffff,#ffc850"), "density": ("float", 0.04), "speed": ("float", 1.0)}),
@@ -1108,7 +1108,7 @@ def _check_param(name, typ, v, spec):
         cols = [c.strip() for c in str(v).split(",") if c.strip()]
         most = MAX_CELLS if name == "cells" else MAX_COLORS
         if len(cols) > most:
-            raise ValueError(f"{name}: at most {most} colours")
+            raise ValueError(f"{name}: at most {most} colors")
         return ",".join(rgb_to_hex(hex_to_rgb(c)) for c in cols)
     elif typ == "color":
         return rgb_to_hex(hex_to_rgb(v))
@@ -1241,7 +1241,7 @@ BOUNCE_S = 8.0                # back-and-forth: forwards this long, then backwar
 
 
 def render_theme(th, n, t=0.0, seg_width=5):
-    """One colour per light for a theme of your own (shape applied: direction, mirror)."""
+    """One color per light for a theme of your own (shape applied: direction, mirror)."""
     d = th["direction"]
     if d == "bounce":
         ph = t % (2 * BOUNCE_S)
@@ -1312,7 +1312,7 @@ def lookup(name, params=None):
     raise ValueError(f"unknown pattern {name!r}")
 
 
-def catalogue():
+def catalog():
     out = [{"id": k, "label": v["label"], "group": v["cats"][0], "categories": v["cats"],
             "animated": bool(v.get("animated")), "describe": v.get("describe", ""), "face": v.get("face", ""),
             "tile": v.get("tile", True),
@@ -1373,7 +1373,7 @@ def _coerce(spec, params):
             hex_to_rgb(str(v))
         elif typ == "colors":
             if not _colors(v):
-                raise ValueError(f"{name}: need at least one colour")
+                raise ValueError(f"{name}: need at least one color")
         elif typ == "choice":
             v = str(v)
         out[name] = v
@@ -1394,7 +1394,7 @@ def span_of(name, params=None):
 
 
 def frame(name, lights, params, t=0.0, reverse=False, seg_width=5):
-    """One colour per light at time t (static patterns ignore t)."""
+    """One color per light at time t (static patterns ignore t)."""
     pat, params = lookup(name, params)
     if pat.get("theme"):
         colors = render_theme(pat["theme"], lights, t, seg_width)
@@ -1431,8 +1431,8 @@ def render(name, lights, segments, params, reverse=False, lps=0):
 
 
 def quantise(colors, segments, lps=0):
-    """Per-light colours -> (per-segment colour, mixed flags). Most common colour wins;
-    on a tie, the colour of the middle light of that segment."""
+    """Per-light colors -> (per-segment color, mixed flags). Most common color wins;
+    on a tie, the color of the middle light of that segment."""
     n = len(colors)
     out, mixed = [], []
     for s in range(segments):
@@ -1450,7 +1450,7 @@ def quantise(colors, segments, lps=0):
 
 
 def plan_calls(seg_colors):
-    """Group segments by colour: one call per distinct colour."""
+    """Group segments by color: one call per distinct color."""
     groups = {}
     for s, c in enumerate(seg_colors):
         groups.setdefault(tuple(c), []).append(s)

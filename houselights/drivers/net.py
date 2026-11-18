@@ -182,7 +182,7 @@ def probe_many(fn, ips, workers=64):
 
 
 def kelvin_to_rgb(k):
-    """Rough colour of white light at k kelvin, for controllers without a white channel."""
+    """Rough color of white light at k kelvin, for controllers without a white channel."""
     import math
     t = max(1000, min(40000, int(k))) / 100
     r = 255 if t <= 66 else 329.698727446 * (t - 60) ** -0.1332047592

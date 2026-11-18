@@ -5,7 +5,7 @@
   discover(targets, deep, expect, known) -> [device rows]   find controllers on the network
                                        (deep: try harder; stop at `expect` with `known` addresses)
   probe(info) -> [device rows]         check one controller added by address
-  read_status(kits) -> {id: status}    power, brightness, colour (or None)
+  read_status(kits) -> {id: status}    power, brightness, color (or None)
   Kit                                  commands; Kit.CAPS says what it can do (see base.py)
 Optional, when models of one driver differ (Govee):
   model_info(model) -> info or None    {model, label, tier, caps, max_lights, lights_per_segment, note}

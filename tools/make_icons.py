@@ -2,7 +2,7 @@
 
     python tools/make_icons.py            # writes icon-192.png and icon-512.png next to icon.svg
 
-The logo: the bulb of the Tabler "bulb" icon (MIT licence, tabler.io/icons), amber strokes on a
+The logo: the bulb of the Tabler "bulb" icon (MIT license, tabler.io/icons), amber strokes on a
 night-blue rounded square. The shapes here are the same as in icon.svg; keep the two in step.
 """
 import math

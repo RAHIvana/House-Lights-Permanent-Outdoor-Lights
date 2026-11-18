@@ -1,4 +1,4 @@
-/* Themes tab (themes.js). Uses the colour variables from style.css, so light and dark both work. */
+/* Themes tab (themes.js). Uses the color variables from style.css, so light and dark both work. */
 #themes { display: grid; gap: 12px; }
 .th-layout { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 16px; align-items: start; }
 

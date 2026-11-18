@@ -74,8 +74,8 @@ class Device:
                     self._individual(seg["i"])
 
     def _individual(self, arr):
-        """WLED "i": colours from LED 0; a number sets where the next colour goes; two numbers
-        and a colour fill a range [start, stop)."""
+        """WLED "i": colors from LED 0; a number sets where the next color goes; two numbers
+        and a color fill a range [start, stop)."""
         k, pos = 0, 0
         while k < len(arr):
             e = arr[k]

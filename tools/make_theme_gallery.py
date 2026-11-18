@@ -41,7 +41,7 @@ def scanlines(colors):
 
 
 def png(frames, delay):
-    """A PNG from frames of one colour per light: animated (APNG, looping) if there are several."""
+    """A PNG from frames of one color per light: animated (APNG, looping) if there are several."""
     out = [b"\x89PNG\r\n\x1a\n", chunk(b"IHDR", struct.pack(">IIBBBBB", WIDTH, HEIGHT, 8, 2, 0, 0, 0))]
     if len(frames) > 1:
         out.append(chunk(b"acTL", struct.pack(">II", len(frames), 0)))

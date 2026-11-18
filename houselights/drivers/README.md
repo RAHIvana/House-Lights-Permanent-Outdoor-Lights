@@ -9,7 +9,7 @@ driver only has to find controllers, say what they can do, and carry out a handf
 | `govee.py` | Govee Wi-Fi lights with LAN Control | UDP: scan on 4001, replies on 4002, commands on 4003 | Yes (H806A) |
 | `wled.py` | Controllers running WLED | HTTP JSON API, and UDP realtime (DNRGB) for animation | Simulator only |
 | `jellyfish.py` | JellyFish Lighting | WebSocket on port 9000 | Simulator only |
-| `tuya.py` | Tuya / Smart Life | the `tinytuya` package, one colour at a time | Stand-in only |
+| `tuya.py` | Tuya / Smart Life | the `tinytuya` package, one color at a time | Stand-in only |
 
 `base.py` holds the `Kit` base class and the capability keys, `net.py` the shared network helpers,
 and `__init__.py` the registry. How the setup wizard uses a driver is in
@@ -78,7 +78,7 @@ answered at ...") when nothing of your kind is there. Other fields the user type
 | `device_tail` | The last five characters of an id or MAC, so people can tell identical boxes apart |
 | `zone` | When one address has several lights (JellyFish zones): one row per zone |
 | `tier` | For kinds with tiers, the model's tier |
-| `warning` | Optional: a sentence the wizard shows under the row (WLED: its segment layout would make static colours and animations differ). Read-only: it must come from reading, never from changing anything |
+| `warning` | Optional: a sentence the wizard shows under the row (WLED: its segment layout would make static colors and animations differ). Read-only: it must come from reading, never from changing anything |
 | *driver specific* | `device_id`, `version`, `needs_key` for Tuya, and so on |
 
 ### Status
@@ -90,7 +90,7 @@ answered at ...") when nothing of your kind is there. Other fields the user type
 ```
 
 `onOff` is 0 or 1, `brightness` is 1 to 100 (or `None` when the light doesn't say, never a made-up 100;
-the page shows a dash), `colorTemInKelvin` is 0 when the light shows a colour.
+the page shows a dash), `colorTemInKelvin` is 0 when the light shows a color.
 Use `None` for a controller that did not answer. The dashboard asks every 15 seconds, so ask all
 controllers **at once** (`net.probe_many`) and keep the timeout short. A driver that cannot report
 state sets `status: False` in its caps and returns `None` for everything.
@@ -105,11 +105,11 @@ is `False` in practice mode (`--dry`).
 |---|---|---|
 | `power(on)` | On, Off, schedules, before streaming | Take `self.lock` |
 | `brightness(value)` | The brightness slider | A percentage, 1 to 100 |
-| `color(rgb)` | One colour on the whole controller | `rgb` is `(r, g, b)`, 0 to 255 |
+| `color(rgb)` | One color on the whole controller | `rgb` is `(r, g, b)`, 0 to 255 |
 | `kelvin(k)` | White by temperature, like 2200 K | Without a white channel use `net.kelvin_to_rgb(k)` |
-| `segments(segs, rgb, nseg)` | A static theme, one call per colour | Segment numbers start at 0; `nseg` is the run's segment count. **The caller holds `self.lock`.** Raise `ValueError` if segments are not supported. |
-| `show_lights(colors)` | A static theme on a controller that takes a whole frame (`static` "lights" or "palette") | One colour per light. **The caller holds `self.lock`.** |
-| `preview_static(colors)` | The page's picture of what `show_lights` will show | Return `colors` unchanged unless you approximate (JellyFish: 30 colour blocks) |
+| `segments(segs, rgb, nseg)` | A static theme, one call per color | Segment numbers start at 0; `nseg` is the run's segment count. **The caller holds `self.lock`.** Raise `ValueError` if segments are not supported. |
+| `show_lights(colors)` | A static theme on a controller that takes a whole frame (`static` "lights" or "palette") | One color per light. **The caller holds `self.lock`.** |
+| `preview_static(colors)` | The page's picture of what `show_lights` will show | Return `colors` unchanged unless you approximate (JellyFish: 30 color blocks) |
 | `stream_begin()` / `stream_frame(colors)` / `stream_end()` | Animated themes (see below) | Called from the streaming thread |
 | `snapshot()` / `restore(snap)` | Around wizard tests, when `restore` is `"snapshot"` | Save what the controller shows; put it back |
 
@@ -131,16 +131,16 @@ do. Ask `drivers.model_caps(kind, model)` or `kit.caps` for one controller, not 
 
 | Key | Values | What changes |
 |---|---|---|
-| `stream` | `True` / `False` | **Per-light frames many times a second.** `True`: animated themes and "Play live" work, and the wizard can show single lights. `False`: animated themes show as a still picture (or the theme's main colour). |
-| `static` | `"segments"`, `"lights"`, `"palette"` | **How a static theme is sent.** `"segments"`: rounded to one colour per segment, then one `segments()` call per colour. `"lights"`: one `show_lights()` call with a colour for every light. `"palette"`: like `"lights"` but approximate (limited colour blocks); implement `preview_static`. |
-| `pick` | `True` / `False` | Segments can be picked and coloured one by one on the page |
-| `status` | `True` / `False` | The controller reports power, brightness and colour |
+| `stream` | `True` / `False` | **Per-light frames many times a second.** `True`: animated themes and "Play live" work, and the wizard can show single lights. `False`: animated themes show as a still picture (or the theme's main color). |
+| `static` | `"segments"`, `"lights"`, `"palette"` | **How a static theme is sent.** `"segments"`: rounded to one color per segment, then one `segments()` call per color. `"lights"`: one `show_lights()` call with a color for every light. `"palette"`: like `"lights"` but approximate (limited color blocks); implement `preview_static`. |
+| `pick` | `True` / `False` | Segments can be picked and colored one by one on the page |
+| `status` | `True` / `False` | The controller reports power, brightness and color |
 | `count` | `"manual"`, `"reported"`, `"display"` | Where the light count comes from: the wizard counts with test patterns / the controller says / it is typed and only used to draw the run |
 | `restore` | `"auto"`, `"snapshot"`, `"none"` | After a wizard test: the controller goes back by itself / we save and restore it with `snapshot()` and `restore()` / it cannot (the wizard says so) |
 | `stream_untested` | optional `True` | Streaming is allowed but not yet seen working on this model: the page says "try it" |
-| `frame` | optional `"stretch"` | A frame of N colours is spread over the whole run in N equal parts (Govee). The wizard then counts with segment colours instead of frames. |
+| `frame` | optional `"stretch"` | A frame of N colors is spread over the whole run in N equal parts (Govee). The wizard then counts with segment colors instead of frames. |
 
-Two ready-made sets in `base.py`: `ONE_COLOUR_CAPS` (one colour at a time, state reported, saved and
+Two ready-made sets in `base.py`: `ONE_COLOR_CAPS` (one color at a time, state reported, saved and
 restored; Tuya and basic Govee models) and the default `Kit.CAPS`.
 
 Which wizard tests a controller gets follows from its caps (`allowed_tests` in `setup.py`):
@@ -156,9 +156,9 @@ Which wizard tests a controller gets follows from its caps (`allowed_tests` in `
 
 ## Models and tiers
 
-`MODELS` lists the models by name. `lights_per_segment` is how many lights one segment colours,
+`MODELS` lists the models by name. `lights_per_segment` is how many lights one segment colors,
 counted from light 1 (`5` on Govee H806A, `1` when every light is its own, `0` when the whole run is
-one colour). `max_lights` is the most a run can have (a streaming frame carries at most
+one color). `max_lights` is the most a run can have (a streaming frame carries at most
 `Kit.max_stream_lights`, 255 by default). `drivers.model_info(kind, model)` turns an entry into
 `{model, label, tier, caps, max_lights, lights_per_segment, note}`; without tiers the tier is `None`
 and the caps are `Kit.CAPS`.
@@ -168,18 +168,18 @@ kit a `caps` property that returns the model's caps. Govee has three tiers:
 
 | Tier | Models | What works |
 |---|---|---|
-| `full` | H806A | Everything: light by light, segment colours. Tested on real controllers. |
-| `try` | H705, H706, H707, H805, H3A5x families | On, off, brightness, colours, schedules; light by light is allowed but untested |
-| `basic` | Any other SKU-shaped model | One colour at a time |
+| `full` | H806A | Everything: light by light, segment colors. Tested on real controllers. |
+| `try` | H705, H706, H707, H805, H3A5x families | On, off, brightness, colors, schedules; light by light is allowed but untested |
+| `basic` | Any other SKU-shaped model | One color at a time |
 
 Add `MODELS_NOTE` (which models are in which tier) and `TIERS` (label, note, caps per tier) and the
 wizard shows them.
 
 ## What the app does with your driver
 
-- **Applying a static theme.** The theme is rendered to one colour per light. With one colour
-  everywhere the app calls `color()`. Otherwise, `static: "segments"` rounds it to one colour per
-  segment (the most common colour of the segment's lights) and calls `segments()` once per colour while
+- **Applying a static theme.** The theme is rendered to one color per light. With one color
+  everywhere the app calls `color()`. Otherwise, `static: "segments"` rounds it to one color per
+  segment (the most common color of the segment's lights) and calls `segments()` once per color while
   holding `kit.lock`; `"lights"` and `"palette"` call `preview_static()` then `show_lights()` once.
 - **Playing an animated theme** (`stream: True`). Power on, then a thread: `stream_begin()`, a 0.3
   second pause, then `stream_frame(colors)` at `stream_fps` frames a second (15 by default), then
@@ -187,11 +187,11 @@ wizard shows them.
   scaled by the brightness level. Asking for more lights than `max_stream_lights` is refused. There is one worker per controller: stopping
   waits up to 3 seconds for it, and a new start is refused ("still stopping") until the old worker has really
   ended, so `stream_frame()` and `stream_end()` must not block for long. Any direct
-  command (colour, power) takes the controller out of streaming first, so `stream_end()` must leave it
+  command (color, power) takes the controller out of streaming first, so `stream_end()` must leave it
   in a normal state.
 - **Status.** `read_status` every 15 seconds while the page is open.
 - **Wizard tests.** Streaming controllers get test frames through the same `stream_*` methods.
-  Controllers that cannot stream get the frames as `show_lights()` (or the main colour with `color()`)
+  Controllers that cannot stream get the frames as `show_lights()` (or the main color with `color()`)
   at most `slow_fps` times a second; when `restore` is `"snapshot"`, `snapshot()` is called before and
   `restore()` after.
 
@@ -204,12 +204,12 @@ wizard shows them.
 | `probe_many(fn, ips, workers=64)` | Runs `fn(ip)` for every address at once; returns `{ip: result}` for those that did not raise and did not return `None` |
 | `local_networks()` | This computer's own /24 network, for scans with nothing typed |
 | `is_home_address(ip)`, `HOME_ADDRESSES` | Whether an address is on your own network (192.168.x.x, 10.x.x.x, 172.16 to 172.31.x.x, loopback, link-local) |
-| `kelvin_to_rgb(k)` | A rough colour for white at `k` kelvin |
+| `kelvin_to_rgb(k)` | A rough color for white at `k` kelvin |
 | `govee.expand_targets(text, limit=1024)` | Typed targets to a list of addresses, home addresses only |
 
 ## A minimal driver
 
-A made-up HTTP controller that shows one colour at a time. Enough to see the shape; real ones need more
+A made-up HTTP controller that shows one color at a time. Enough to see the shape; real ones need more
 care around timeouts and errors.
 
 ```python
@@ -218,11 +218,11 @@ import logging
 import socket
 
 from . import net
-from .base import ONE_COLOUR_CAPS, Kit as BaseKit
+from .base import ONE_COLOR_CAPS, Kit as BaseKit
 
 log = logging.getLogger("houselights")
 
-LABEL = "Acme lights (one colour at a time)"
+LABEL = "Acme lights (one color at a time)"
 NOTE = "Switch on the local API in the Acme app first."
 TESTED = False                                  # True only after it worked on real hardware
 MODELS = {"Acme strip": {"label": "Acme light strip", "lights_per_segment": 0, "max_lights": 2000}}
@@ -274,7 +274,7 @@ def read_status(kits):
 
 
 class Kit(BaseKit):
-    CAPS = dict(ONE_COLOUR_CAPS)                # one colour at a time, state reported, saved and put back
+    CAPS = dict(ONE_COLOR_CAPS)                # one color at a time, state reported, saved and put back
 
     def _send(self, body, what):
         self.guard()                            # a disabled controller gets nothing
@@ -292,7 +292,7 @@ class Kit(BaseKit):
 
     def color(self, rgb):
         with self.lock:
-            self._send({"on": True, "rgb": list(rgb[:3])}, f"colour {tuple(rgb[:3])}")
+            self._send({"on": True, "rgb": list(rgb[:3])}, f"color {tuple(rgb[:3])}")
 
     def kelvin(self, k):
         self.color(net.kelvin_to_rgb(k))
@@ -315,8 +315,8 @@ class Kit(BaseKit):
 2. **Register it** in `drivers/__init__.py`: import the module and add it to `DRIVERS`.
 3. **Teach the wizard its name.** In `houselights/setup.py` add the kind to `IDENTIFY` (the **Add by
    address** check: `"<kind>": _ask("<kind>")`) and to `_what()` (the sentence "192.168.2.50 is a ..."). In
-   `houselights/static/setup.js` add it to `KINDS`, `KIND_NAME` and `HELP` (how to recognise the kind and
-   how to get it ready), and give its badge a colour (`.badge.k-<kind>`) in `static/setup.css`.
+   `houselights/static/setup.js` add it to `KINDS`, `KIND_NAME` and `HELP` (how to recognize the kind and
+   how to get it ready), and give its badge a color (`.badge.k-<kind>`) in `static/setup.css`.
 4. **Write a simulator** in `tools/fake_<kind>.py` that answers like the real controller, on
    `127.0.0.x` addresses. Let the driver move its ports with an environment variable
    (`HOUSELIGHTS_GOVEE_PORTS`, `HOUSELIGHTS_WLED_PORTS`, `HOUSELIGHTS_JELLYFISH_PORT` are the examples) so a
@@ -336,28 +336,28 @@ class Kit(BaseKit):
 
 - **Govee drops UDP messages.** Send what matters twice, and scan by asking again (only the addresses
   that have not answered). Sending "start streaming" again in the middle of a stream makes the lights
-  flash, so send it only at the start. A stream frame of N colours is stretched over the whole run, so
+  flash, so send it only at the start. A stream frame of N colors is stretched over the whole run, so
   count with segment commands, not frames ([govee-lan-notes.md](../../docs/govee-lan-notes.md)).
-- **WLED ignores per-light colours that arrive together with `"on"`**: turn it on first, then send
-  the colours. Its realtime mode ends by itself about 2 seconds after the last frame; `stream_end()`
+- **WLED ignores per-light colors that arrive together with `"on"`**: turn it on first, then send
+  the colors. Its realtime mode ends by itself about 2 seconds after the last frame; `stream_end()`
   sends a packet with timeout 0 so it ends at once (the 2 seconds stay as the fallback if the server dies).
   It receives on the port it lists as `udpport` in `/json/info`, and it **ignores a DNRGB packet of exactly
   one light** (a lone light goes as DRGB; a lone light at the end of a long frame moves into the packet
   before it). Static commands go to segment 0 and count from its own first LED, while live data lights every
   LED whatever the segments are, so a scan row carries a `warning` when segment 0 isn't the plain whole strip.
 - **Tuya devices take one connection at a time**, so close the Smart Life app while testing.
-- **Tuya brightness** is that of the mode the light is in: the white level in white mode, the colour's value
-  (V) in colour mode, both on TinyTuya's own scale (type A 25 to 255, type B 10 to 1000), so what is set is what
+- **Tuya brightness** is that of the mode the light is in: the white level in white mode, the color's value
+  (V) in color mode, both on TinyTuya's own scale (type A 25 to 255, type B 10 to 1000), so what is set is what
   is read back. TinyTuya **switches the light off** when asked for less than the model's minimum (10% on type A,
-  1% on type B), and it sends a bare colour at the colour's own value (full red is 100%). The driver therefore
+  1% on type B), and it sends a bare color at the color's own value (full red is 100%). The driver therefore
   never goes below the minimum, keeps the brightness set on the page (or the light's own, read once) for later
-  colours and whites, and shows colours in wizard tests at full brightness so they can be seen.
-- **A Tuya device is a light only if** it has a power data point, a text mode data point and a colour data
-  point (TinyTuya's own tell, plus colour). A plug (power only), a dimmer switch (a number in data point 2), a
+  colors and whites, and shows colors in wizard tests at full brightness so they can be seen.
+- **A Tuya device is a light only if** it has a power data point, a text mode data point and a color data
+  point (TinyTuya's own tell, plus color). A plug (power only), a dimmer switch (a number in data point 2), a
   multi-socket switch and a white-only bulb are refused when you add them by address with their key.
 - **JellyFish cannot report what a zone shows** (`status: False`, `restore: "none"`) and holds at most 30
-  colour blocks in a pattern, so its static themes are approximations: implement `preview_static`. Brightness
-  is a field of the pattern, so it needs a pattern the driver sent (otherwise it says to pick a colour or
+  color blocks in a pattern, so its static themes are approximations: implement `preview_static`. Brightness
+  is a field of the pattern, so it needs a pattern the driver sent (otherwise it says to pick a color or
   theme first), and a zone that was switched off stays off when the brightness changes.
 - **Windows and UDP ports.** Do not set `SO_REUSEADDR` on a listening UDP socket there: the bind then
   succeeds beside another program already on the port, and that program keeps getting every reply.

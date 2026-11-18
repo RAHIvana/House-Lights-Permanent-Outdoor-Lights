@@ -98,12 +98,12 @@ def _chase(n, t):
 
 
 def _rgb(n, t):
-    """First third red, middle green, last third blue: are the colours right?"""
+    """First third red, middle green, last third blue: are the colors right?"""
     return [RED if i < n / 3 else GREEN if i < 2 * n / 3 else BLUE for i in range(n)]
 
 
 def _segments(n, t, lps=5):
-    """Alternating colours per segment-sized group: shows how the run splits into segments."""
+    """Alternating colors per segment-sized group: shows how the run splits into segments."""
     return [((255, 120, 0) if (i // lps) % 2 == 0 else (0, 120, 255)) for i in range(n)]
 
 
@@ -131,14 +131,14 @@ def _tail(n, t, lps=5, markers=1):
 # Counting on controllers that stretch a stream frame over the whole run (caps frame "stretch",
 # Govee): the stream can't count, so the count uses the segment command (fixed groups of
 # lights_per_segment from light 1), like the Govee app. Seen working on three H806A.
-SEG_COLOURS = (GREEN, WHITE, RED, (255, 180, 0))       # green, white, red, yellow, again
+SEG_COLORS = (GREEN, WHITE, RED, (255, 180, 0))       # green, white, red, yellow, again
 SEG_NAMES = ("green", "white", "red", "yellow")
 
 
 def _seg4(n, t, lps=5):
-    """Count step A: segment k shows SEG_COLOURS[k % 4]. The last colour and how many blocks of
-    it give the segments: 4 x (blocks - 1) + place of the colour (green 1 ... yellow 4)."""
-    return [SEG_COLOURS[(i // lps) % 4] for i in range(n)]
+    """Count step A: segment k shows SEG_COLORS[k % 4]. The last color and how many blocks of
+    it give the segments: 4 x (blocks - 1) + place of the color (green 1 ... yellow 4)."""
+    return [SEG_COLORS[(i // lps) % 4] for i in range(n)]
 
 
 def _seglast(n, t, lps=5, segments=1):
@@ -148,7 +148,7 @@ def _seglast(n, t, lps=5, segments=1):
 
 
 def _ends(n, t):
-    """Count step C (one colour per light only when n is the real count): light 1 red, the
+    """Count step C (one color per light only when n is the real count): light 1 red, the
     last light blue, the rest white. Each a single light: the count is right; red is light 1,
     which tells whether the run is drawn reversed. (Nothing past the count can be shown: the
     controller spreads a frame over the lights it drives.)"""
@@ -165,13 +165,13 @@ PHYSICAL = COUNTING | SEGMENT_TESTS | {"check", "ends"}
 PATTERNS = {"identify": ("Blink the whole run", _identify, True),
             "markers": ("Count: segment markers", _markers, False),
             "tail": ("Count: last segment", _tail, False),
-            "seg4": ("Count: segment colours", _seg4, False),
+            "seg4": ("Count: segment colors", _seg4, False),
             "seglast": ("Count: last segment red", _seglast, False),
             "ends": ("Check: light 1 red, last light blue", _ends, False),
             "check": ("Check the count and light 1", _check, False),
             "ruler": ("Check the count", _ruler, False),
             "chase": ("Direction: dot from light 1", _chase, True),
-            "rgb": ("Colours: red, green, blue", _rgb, False),
+            "rgb": ("Colors: red, green, blue", _rgb, False),
             "segments": ("Segment groups", _segments, False)}
 
 
@@ -184,7 +184,7 @@ def allowed_tests(caps):
     else:
         names = ["identify"]
     stretch = caps.get("frame") == "stretch"
-    if stretch:                                  # markers and orange past the end need one colour per light
+    if stretch:                                  # markers and orange past the end need one color per light
         names = [n for n in names if n not in COUNTING | {"check"}]
     else:
         names = [n for n in names if n != "ends"]
@@ -622,7 +622,7 @@ def test(body: dict):
 
 class SegmentTest:
     """A counting test shown with the segment command (seg4, seglast): every segment the model
-    can have is set, so no colour from an earlier test is left over. It stays on the lights
+    can have is set, so no color from an earlier test is left over. It stays on the lights
     until the next test or a theme; stop() has nothing to stop."""
 
     def __init__(self, kit, lps, max_lights, name, segments=1):
@@ -631,10 +631,10 @@ class SegmentTest:
         self.nseg = -(-max_lights // self.lps)
 
     def groups(self):
-        """[(segments, rgb)]: which segments get which colour."""
+        """[(segments, rgb)]: which segments get which color."""
         every = range(self.nseg)
         if self.name == "seg4":
-            return [([s for s in every if s % 4 == k], rgb) for k, rgb in enumerate(SEG_COLOURS)]
+            return [([s for s in every if s % 4 == k], rgb) for k, rgb in enumerate(SEG_COLORS)]
         last = min(self.segments, self.nseg) - 1
         return [(list(range(last)), WHITE), ([last], RED), (list(range(last + 1, self.nseg)), BLUE)]
 

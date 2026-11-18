@@ -127,12 +127,12 @@
 .slots button.slot.on { border: 1.5px solid var(--amber); background: var(--tab-on); color: var(--tab-on-ink); font-weight: 600; }
 #n-nav { display: flex; gap: 8px; align-items: center; border-top: 1px solid var(--line); padding-top: 8px; flex-wrap: wrap; }
 
-/* step 3 (Tally): colour answer buttons */
+/* step 3 (Tally): color answer buttons */
 button.swatch::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px;
   vertical-align: -1px; background: var(--sw); border: 1px solid var(--line); }
 .n-fields { display: grid; gap: 10px 14px; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); align-items: end; }
 @media (max-width: 700px) { .n-fields { grid-template-columns: minmax(0, 1fr); } }
-/* inputs inside the grey test box: a shade lighter, so they show */
+/* inputs inside the gray test box: a shade lighter, so they show */
 .testrun input[type=number], .testrun input[type=text], .testrun select { background: var(--panel); border-color: var(--muted); }
 
 /* step 4 (Sun clock): one card each for the time zone, sunrise and sunset, and the mode */

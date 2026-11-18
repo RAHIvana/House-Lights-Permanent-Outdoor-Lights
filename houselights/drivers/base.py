@@ -3,20 +3,20 @@
 - in dry (practice) mode nothing that changes a light is sent; it is only logged.
 
 Capabilities (CAPS) tell the dashboard and the setup wizard what a controller can do:
-  stream   per-light colours many times a second: animated themes and "Play live"
+  stream   per-light colors many times a second: animated themes and "Play live"
   static   how a static theme is shown:
-             "segments"  one packet per colour group of fixed-size segments (lights_per_segment)
-             "lights"    every light its own colour, in one call (show_lights)
-             "palette"   an approximation with a limited number of colour blocks (show_lights)
-  pick     segments can be picked and coloured one by one on the page
-  status   the controller reports power, brightness and colour
+             "segments"  one packet per color group of fixed-size segments (lights_per_segment)
+             "lights"    every light its own color, in one call (show_lights)
+             "palette"   an approximation with a limited number of color blocks (show_lights)
+  pick     segments can be picked and colored one by one on the page
+  status   the controller reports power, brightness and color
   count    where the light count comes from: "manual" (the wizard counts with test patterns),
            "reported" (the controller says), "display" (only used to draw the run)
   restore  after a test: "auto" (controller goes back by itself), "snapshot" (we save and
            put back its state), "none" (can't: the wizard says so)
   stream_untested  (optional) streaming is allowed but not yet seen working on this model:
            the page and the wizard say "try it"
-  frame    (optional) "stretch": a stream frame of N colours is spread over the whole run, in N
+  frame    (optional) "stretch": a stream frame of N colors is spread over the whole run, in N
            equal parts (Govee). The wizard counts such runs with "blocks" and "alternate".
 
 CAPS can differ per model of one driver (e.g. Govee): ask drivers.model_caps(kind, model) or
@@ -32,9 +32,9 @@ class NotAllowed(Exception):
     pass
 
 
-# A controller that shows one colour at a time (one "segment": the whole run), reports its
-# state, and is saved and put back after a wizard test. Static themes show their main colour.
-ONE_COLOUR_CAPS = {"stream": False, "static": "segments", "pick": False, "status": True, "count": "display",
+# A controller that shows one color at a time (one "segment": the whole run), reports its
+# state, and is saved and put back after a wizard test. Static themes show their main color.
+ONE_COLOR_CAPS = {"stream": False, "static": "segments", "pick": False, "status": True, "count": "display",
                    "restore": "snapshot"}
 
 
@@ -82,13 +82,13 @@ class Kit:
         raise NotImplementedError
 
     def segments(self, segs, rgb, nseg):
-        """These segments to one colour. Caller holds self.lock."""
-        raise ValueError("this controller can't colour segments one by one")
+        """These segments to one color. Caller holds self.lock."""
+        raise ValueError("this controller can't color segments one by one")
 
     def show_lights(self, colors):
-        """A whole static frame, one colour per light (static "lights" / "palette").
+        """A whole static frame, one color per light (static "lights" / "palette").
         Caller holds self.lock."""
-        raise ValueError("this controller can't show a different colour on each light")
+        raise ValueError("this controller can't show a different color on each light")
 
     def preview_static(self, colors):
         """What show_lights() will really display (the same, unless it approximates)."""

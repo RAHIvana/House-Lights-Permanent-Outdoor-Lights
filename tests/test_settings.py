@@ -189,7 +189,7 @@ for name, (label, fn, animated) in setup.PATTERNS.items():
         for t in (0.0, 0.7, 9.3):
             f = fn(n, t)
             assert len(f) == n and all(len(px) == 3 and all(0 <= v <= 255 for v in px) for px in f), (name, n, t)
-check("test patterns give one colour per light", True)
+check("test patterns give one color per light", True)
 r = setup._ruler(50, 0)
 check("ruler: light 1 red, last blue, 10th white", r[0] == setup.RED and r[-1] == setup.BLUE and r[9] == setup.WHITE)
 check("chase: dot moves", setup._chase(50, 0.0) != setup._chase(50, 1.0))

@@ -1,9 +1,9 @@
-/* Light = warm beige, dark = graphite grey; no pure black. Amber means "changes the real lights". */
+/* Light = warm beige, dark = graphite gray; no pure black. Amber means "changes the real lights". */
 :root {
   --bg: #e6e0d4; --panel: #f3efe7; --panel2: #ebe5da; --line: #d2c9b9; --fg: #2b2720; --muted: #6c6457;
   --amber: #e9992a; --amber-ink: #8a4f00; --amber-fill-ink: #23170a; --red: #b83a32; --red-bg: #f6e2dc;
   --green: #2c7f4f; --focus: #2f6fde;
-  /* light strips (Your house, wizard, run panels): almost white here, so colours look natural; night grey on the dark page */
+  /* light strips (Your house, wizard, run panels): almost white here, so colors look natural; night gray on the dark page */
   --night: #fcfbf8; --night-fg: #5a5347; --night-ink: #2b2720; --night-chip: #ece7dd; --night-line: #cfc7b8; --dot-off: #e4dfd5; --dot-edge: rgba(0, 0, 0, .18);
   --dry: #b7791f; --toast: #2b2720; --toast-fg: #f3efe7; --err-bg: #8f2f28;
   --band: #1c2541; --band-fg: #f7e7c6; --tab-on: #fbe7be; --tab-on-ink: #5a3a06; --tab-done: #e2edd6; --tab-done-ink: #2f5410;
@@ -62,7 +62,7 @@ h2 { font-size: 18px; margin: 0; }
 .key span { display: inline-flex; align-items: center; gap: 6px; }
 .key button { pointer-events: none; }
 
-/* buttons: grey = screen only, amber = changes lights, filled amber = on the lights now, red = stop */
+/* buttons: gray = screen only, amber = changes lights, filled amber = on the lights now, red = stop */
 button, select, input[type=text], input[type=number], input[type=date], input[type=time] {
   font: inherit; color: var(--fg); background: var(--panel2); border: 1px solid var(--line);
   border-radius: 8px; padding: 6px 12px; }
@@ -129,7 +129,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .tile-st { font-size: 11px; color: var(--muted); padding: 0 9px 7px; }
 /* Quick Settings: a tile or button that's on keeps its look and gets a thick amber border */
 .tile.on { position: relative; background: var(--panel2); color: var(--fg); border-color: var(--line); }
-/* the theme that's on: a 4 px border on top of its colours and a tick badge, charcoal (dark page: bright yellow) */
+/* the theme that's on: a 4 px border on top of its colors and a tick badge, charcoal (dark page: bright yellow) */
 .tile.on::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
   box-shadow: inset 0 0 0 4px var(--pick); }
 .tile.on::before { content: "\2713"; position: absolute; top: 6px; right: 6px; z-index: 1; width: 18px; height: 18px;

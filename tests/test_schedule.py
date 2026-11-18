@@ -100,7 +100,7 @@ try:
 except ValueError:
     check("sunset without location rejected", True)
 
-# --- scheduler behaviour -------------------------------------------------------------
+# --- scheduler behavior -------------------------------------------------------------
 with tempfile.TemporaryDirectory() as tmp:
     sch, k = make(tmp)
     sch.save(sched(name="evening", sections=["run_a", "run_c"]))
