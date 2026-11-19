@@ -343,5 +343,36 @@ grp = dict((rgb, segs) for segs, rgb in sk.groups())
 check("seglast: 23 white, segment 24 red, 25-51 blue", grp[setup.WHITE] == list(range(23))
       and grp[setup.RED] == [23] and grp[setup.BLUE] == list(range(24, 51)))
 
+# --- Tuya: the wizard links to the local-key guide, and the guide is in the repository ------------
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def text(*parts):
+    with open(os.path.join(ROOT, *parts), encoding="utf-8") as f:
+        return f.read()
+
+
+import re  # noqa: E402
+
+js, html, readme = text("houselights", "static", "setup.js"), text("houselights", "static", "setup.html"), text("README.md")
+guide_path = os.path.join(ROOT, "docs", "tuya-local-key.md")
+m = re.search(r'const TUYA_GUIDE = "([^"]+)"', js)
+check("setup.js: TUYA_GUIDE points at docs/tuya-local-key.md on GitHub's main branch",
+      bool(m) and m.group(1) == "https://github.com/RAHIvana/House-Lights-Permanent-Outdoor-Lights/blob/main/docs/tuya-local-key.md")
+check("docs/tuya-local-key.md exists (the wizard's link target)", os.path.exists(guide_path))
+guide = text("docs", "tuya-local-key.md") if os.path.exists(guide_path) else ""
+check("guide: covers brand apps, moving to Smart Life, WLED, the tinytuya wizard and new keys after re-pairing",
+      all(w in guide for w in ("ASAHOM", "Smart Life", "WLED", "python -m tinytuya wizard", "new local key", "Remove device")))
+check("guide: says Tuya isn't hardware-tested yet", "not yet with real Tuya lights" in guide)
+check("setup.js: guide links open in a new tab without a referrer",
+      'a.target = "_blank"' in js and 'a.rel = "noopener noreferrer"' in js)
+check("setup.js: unticked Tuya rows, the key field, the only-Smart-Life box and the Tuya card all link to the guide",
+      js.count("guideLink(") >= 5 and "How to get the key\")" in js and "Where do I get the key?" in js
+      and "How to get the key, step by step" in js and "Step-by-step guide" in js)
+check("setup.js: the Tuya card says to move brand-app lights to Smart Life before getting keys",
+      "Move them to Smart Life first" in js)
+check("setup.html: has the only-Smart-Life box", 'id="tuya-hint"' in html)
+check("README: links the guide", readme.count("docs/tuya-local-key.md") >= 2)
+
 print(f"\n{'ALL OK' if not FAILS else f'{len(FAILS)} FAILED'}")
 sys.exit(1 if FAILS else 0)

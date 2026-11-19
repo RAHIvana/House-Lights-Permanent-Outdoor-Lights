@@ -36,6 +36,9 @@ const KIND_NAME = {govee: "Govee", wled: "WLED", jellyfish: "JellyFish", tuya: "
 const TIER_NOTE = {try: "Basic control; light-by-light animation untested on this model: try it in the Check test",
                    basic: "One color at a time"};
 const INSTALL_TUYA = {win: "venv\\Scripts\\pip install tinytuya", nix: "venv/bin/pip install tinytuya"};
+// How to get a Tuya local key (and move lights out of a brand app such as ASAHOM): a page in
+// the repository, opened in a new tab. The link carries nothing about the lights or the network.
+const TUYA_GUIDE = "https://github.com/RAHIvana/House-Lights-Permanent-Outdoor-Lights/blob/main/docs/tuya-local-key.md";
 // "Not finding yours?": how to recognize each kind, and how to get it ready.
 const HELP = {
   govee: {know: "Any Govee light that has LAN Control in the Govee Home app.",
@@ -54,7 +57,9 @@ const HELP = {
       + "A simple test: if the Smart Life app can find and control your lights, they're Tuya, and House Lights can use them. "
       + "Plugs, bulbs and other smart-home gadgets use Smart Life too, so the scan may list devices that aren't lights: tick only your lights.",
     steps: ["Install tinytuya: on Windows run INSTALL_WIN, on Linux or a Raspberry Pi INSTALL_NIX, then start House Lights again.",
-            "Get each light's local key once: link the Smart Life app to a free iot.tuya.com cloud project, then run python -m tinytuya wizard (see the README).",
+            "Get each light's local key once: link the Smart Life app to a free iot.tuya.com cloud project, then run python -m tinytuya wizard. GUIDE",
+            "Lights in the ASAHOM or another brand app? Move them to Smart Life first: brand apps can't give out keys. "
+              + "Do this before getting the keys: moving a light later gives it a new key.",
             "Close the Smart Life app while testing: these lights take one connection at a time."]},
 };
 const TEST_HELP = {
@@ -78,6 +83,11 @@ function button(label, fn, cls = "") {
   const b = el("button", cls, label);
   b.onclick = async () => { err(""); try { await fn(); } catch (e) { err(e.message); } };
   return b;
+}
+function guideLink(text) {
+  const a = el("a", "guide", text);
+  a.href = TUYA_GUIDE; a.target = "_blank"; a.rel = "noopener noreferrer";
+  return a;
 }
 
 // --- data helpers --------------------------------------------------------------------------
@@ -188,6 +198,7 @@ function drawFound() {
   const ul = $("#found");
   ul.innerHTML = "";
   const rows = allRows();
+  drawTuyaHint(rows);
   if (!rows.length) { ul.appendChild(el("li", "fempty muted", "Nothing found yet: press Find my lights.")); return; }
   for (const d of rows) {
     const li = el("li", "frow" + (d.supported ? "" : " off"));
@@ -212,6 +223,11 @@ function drawFound() {
     if (d.type === "tuya") main.append(el("small", "ftier", "Could be a plug, bulb or other smart-home device, not your lights: "
       + "tick it only if it's your lights. To check, open each device in the Smart Life app, tap the pencil, then "
       + `Device Information, and look for the address ${d.ip}.`));
+    if (d.type === "tuya" && !c) {
+      const help = el("small", "fhelp", "Needs a local key. Lights in the ASAHOM or another brand app? ");
+      help.append(guideLink("How to get the key"));
+      main.append(help);
+    }
     if (!d.supported) {
       const why = el("small", "freason", (d.reason || "Not supported yet") + (d.install ? ": " : "."));
       if (d.install) why.append(el("code", "", d.install));
@@ -229,6 +245,23 @@ function drawFound() {
     ul.appendChild(li);
   }
 }
+// Only Smart Life devices found: say what a key is, that brand apps can't give one out, and
+// that a kit with WLED needs none.
+function drawTuyaHint(rows) {
+  const box = $("#tuya-hint");
+  box.innerHTML = "";
+  box.hidden = !(rows.some(d => d.type === "tuya") && rows.every(d => d.type === "tuya"));
+  if (box.hidden) return;
+  const key = el("span");
+  key.append("Smart Life lights need a one-time ", el("b", "", "local key"), " for each light. If your lights are in a brand "
+    + "app (ASAHOM, TreatLife and others), move them to the Smart Life app first: brand apps can't give out keys.");
+  const wled = el("span");
+  wled.append("Does your kit's box or app mention ", el("b", "", "WLED"), "? Set it up in the WLED app instead, then "
+    + "press Find my lights again: no key needed, and it does more.");
+  const link = el("span");
+  link.append(guideLink("How to get the key, step by step"));
+  box.append(el("b", "", "Only Smart Life devices found"), key, wled, link);
+}
 // A chosen Tuya light needs its device id (if the scan didn't hear it), local key and version.
 function tuyaFields(c) {
   const box = el("div", "row ftuya");
@@ -245,7 +278,9 @@ function tuyaFields(c) {
   ver.setAttribute("aria-label", "Tuya protocol version");
   for (const v of ["3.1", "3.2", "3.3", "3.4", "3.5"]) ver.appendChild(new Option(v, v));
   ver.value = c.version || "3.3"; ver.onchange = () => { c.version = ver.value; };
-  box.append(key, ver);
+  const help = el("span", "keyhelp");
+  help.append(guideLink("Where do I get the key?"));
+  box.append(key, ver, help);
   return box;
 }
 
@@ -352,6 +387,8 @@ function drawKinds() {
       if (s.includes("INSTALL_WIN")) {
         li.append("Install tinytuya: on Windows run ", el("code", "", INSTALL_TUYA.win), ", on Linux or a Raspberry Pi ",
           el("code", "", INSTALL_TUYA.nix), ", then start House Lights again.");
+      } else if (s.endsWith(" GUIDE")) {
+        li.append(s.slice(0, -" GUIDE".length) + " ", guideLink("Step-by-step guide"));
       } else li.textContent = s;
       ol.appendChild(li);
     }

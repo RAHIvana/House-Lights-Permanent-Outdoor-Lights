@@ -119,9 +119,9 @@ Look at the app your lights use:
 
 The app is the clue, not the brand: many brands rebuild the Smart Life app under their own
 name. If your box or manual says "Smart Life" or "Tuya", or the brand's Alexa / Google Home
-setup goes through Smart Life, pick Tuya / Smart Life. With a brand's own app, getting the
-local key (see [Getting each kind of controller ready](#getting-each-kind-of-controller-ready))
-may only work after you add the controller to the Smart Life app itself.
+setup goes through Smart Life, pick Tuya / Smart Life. With a brand's own app (ASAHOM and
+others), the local key can only be looked up once the lights are in the Smart Life app itself:
+[Getting the local key](docs/tuya-local-key.md) shows how to move them.
 
 ### Not supported
 
@@ -343,7 +343,9 @@ Tuya's cloud once. Install tinytuya (above), pair the lights in the Smart Life a
 free developer account at iot.tuya.com with a cloud project linked to your app account, then
 run `venv/bin/python -m tinytuya wizard` (Windows: `venv\Scripts\python -m tinytuya wizard`).
 It lists every device with its id and local key.
-The tinytuya README has the step-by-step guide. Tuya devices accept one connection at a time,
+[Getting the local key](docs/tuya-local-key.md) walks through it step by step, including
+moving lights out of a brand app such as ASAHOM's; the setup wizard links to it from every
+Tuya row. Tuya devices accept one connection at a time,
 so close the Smart Life app while testing. The key is stored in `data/secrets.json`, readable
 only by you, never in `config.json` and never sent to the web page.
 

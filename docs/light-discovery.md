@@ -76,7 +76,11 @@ Things worth knowing:
   The result reads like "192.168.2.50 is a WLED controller".
 - **Tuya needs more.** Its rows need the device id and the 16-character **local key** (from
   `python -m tinytuya wizard`), and the optional `tinytuya` package. Smart Life rows are never
-  ticked by themselves, because plugs, bulbs and other gadgets use Smart Life too.
+  ticked by themselves, because plugs, bulbs and other gadgets use Smart Life too. Each Tuya
+  row links to [Getting the local key](tuya-local-key.md), and when a scan finds only Smart
+  Life devices a box says that brand apps (ASAHOM and others) can't give out keys and that a
+  kit with WLED needs none. Nothing on the network says which app a light was paired with, so
+  the wizard can't tell a brand-app light from a Smart Life one.
 - **Govee LAN Control** must be switched on for each device in the Govee Home app, or it will
   not answer. Another program on UDP port 4002 (for example Home Assistant's Govee integration)
   takes the replies: stop it while scanning.
