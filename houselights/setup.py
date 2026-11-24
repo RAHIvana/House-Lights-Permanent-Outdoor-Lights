@@ -282,6 +282,8 @@ def state():
             "home": settings.home(),
             "server_timezone": _server_tz(),
             "deep_scan_seconds": DEEP_SECONDS,
+            "tuya_keys": tuya_public(),                # fetched from Tuya's cloud: names, no keys
+            "tuya_regions": TUYA_REGIONS,
             "running": bool(s and s.configured)}
 
 
@@ -343,7 +345,7 @@ def probe(body: dict):
         expand_targets(str(body.get("ip", "")))             # home addresses only
     except ValueError as e:
         raise HTTPException(400, str(e))
-    info = dict(body)
+    info = _tuya_key(dict(body))
     if not info.get("local_key") and info.get("id"):
         info["local_key"] = (settings.read_secrets().get(info["id"]) or {}).get("local_key", "")
     try:
@@ -468,6 +470,147 @@ def tuya_scan(targets="", deep=False, expect=0, known=(), listen=None, connect=N
     return sorted(rows.values(), key=lambda r: socket.inet_aton(r["ip"])), problem
 
 
+# --- Tuya / Smart Life: every local key from the owner's Tuya developer project -------------------
+# "Get keys from Tuya" in the wizard sends the Access ID and Secret of the owner's free project at
+# iot.tuya.com, and its data center. The server asks Tuya's cloud once, with tinytuya's own code
+# (what `python -m tinytuya wizard` does), and keeps the keys in memory by device id. The page
+# gets names, versions and "has a key", never a key; the Secret is used for that call only.
+# Probe, tests and save fill in the key of a Tuya light the page didn't type one for, so Go live
+# writes only the ticked lights' keys to secrets.json.
+TUYA_REGIONS = {"us": "Western America", "us-e": "Eastern America", "eu": "Central Europe",
+                "eu-w": "Western Europe", "in": "India", "sg": "Singapore", "cn": "China"}
+TUYA_CLOUD_SECONDS = 40            # longest wait for Tuya's cloud (tinytuya sets no timeout of its own)
+TUYA_CLOUD_IDS = 5                 # scanned device ids tried when the project lists no devices by itself
+TUYA_KEYS = {}                     # device id -> {"key", "name", "version"}: the last fetch, memory only
+_CREDENTIAL = re.compile(r"[A-Za-z0-9]{8,64}")
+_DEVICE_ID = re.compile(r"[A-Za-z0-9]{8,40}")
+NO_TUYA_CLOUD = "couldn't reach Tuya's cloud: check this computer's internet connection, then try again"
+
+
+def _tuya_cloud(region, access_id, secret):
+    """tinytuya's Cloud for the project. It asks Tuya for a token straight away."""
+    tuya = drivers.get("tuya")
+    tt = tuya._lib()
+    if not tt:
+        raise HTTPException(400, f"Needs the tinytuya package: {tuya.INSTALL}")
+    tlog = logging.getLogger("tinytuya")
+    if tlog.getEffectiveLevel() < logging.INFO:      # its debug lines show tokens and keys
+        tlog.setLevel(logging.INFO)
+    return tt.Cloud(apiRegion=region, apiKey=access_id, apiSecret=secret)
+
+
+def _tuya_said(cloud, result=None):
+    """Tuya's own words for a failed call, short ('' if it gave none). tinytuya wraps them, as in
+    "Cloud _gettoken() failed: 'sign invalid'": the quoted part is Tuya's."""
+    for src in (result, getattr(cloud, "getdevices_raw", None), getattr(cloud, "error", None)):
+        if isinstance(src, dict):
+            msg = str(src.get("msg") or src.get("Payload") or src.get("Error") or "")
+            if msg:
+                m = re.search(r"'([^']{1,100})'", msg)
+                return re.sub(r"[^\w .,:()/-]", "", m.group(1) if m else msg)[:100].strip()
+    return ""
+
+
+def _tuya_devices(cloud, device_ids):
+    """(devices, what Tuya said). First every device of the Smart Life accounts linked to the
+    project; if that comes back empty, the older way, one scanned device id at a time (what
+    `tinytuya wizard` asks for). An id that isn't in the account fails by itself, so each is tried
+    alone."""
+    devs = cloud.getdevices(False)
+    if isinstance(devs, list) and devs:
+        return devs, ""
+    said = _tuya_said(cloud, devs)
+    for dev in device_ids[:TUYA_CLOUD_IDS]:
+        cloud.apiDeviceID = dev
+        got = cloud.getdevices(False)
+        if isinstance(got, list) and got:
+            return got, ""
+        said = said or _tuya_said(cloud, got)
+    return [], said
+
+
+def tuya_public():
+    """What the page may know about the fetched devices: no keys."""
+    return [{"id": i, "name": k["name"], "version": k["version"], "has_key": bool(k["key"])} for i, k in TUYA_KEYS.items()]
+
+
+def tuya_cloud_keys(body, cloud=None):
+    """body: {access_id, access_secret, region, device_ids?}. Asks Tuya's cloud for every device of
+    the project and keeps their keys (TUYA_KEYS). Returns {"devices": [{id, name, version,
+    has_key}]}, never a key. cloud(region, access_id, secret): a stand-in for tinytuya's Cloud (tests)."""
+    access_id = str(body.get("access_id") or "").strip()
+    secret = str(body.get("access_secret") or "").strip()
+    region = str(body.get("region") or "").strip().lower()
+    if not _CREDENTIAL.fullmatch(access_id):
+        raise HTTPException(400, "copy the Access ID from your Tuya project's Overview page")
+    if not _CREDENTIAL.fullmatch(secret):
+        raise HTTPException(400, "copy the Access Secret from your Tuya project's Overview page")
+    if region not in TUYA_REGIONS:
+        raise HTTPException(400, "pick your Tuya project's data center")
+    ids = [str(d) for d in body.get("device_ids") or [] if _DEVICE_ID.fullmatch(str(d))]
+    done = {}
+
+    def ask():
+        try:
+            c = (cloud or _tuya_cloud)(region, access_id, secret)
+            if not getattr(c, "token", None):
+                done["refused"] = _tuya_said(c)
+            else:
+                done["devices"], done["said"] = _tuya_devices(c, ids)
+        except HTTPException as e:
+            done["http"] = e
+        except Exception as e:             # requests' errors (no internet) and anything else in tinytuya
+            done["failed"] = type(e).__name__
+
+    t = threading.Thread(target=ask, name="tuya-cloud", daemon=True)
+    t.start()
+    t.join(TUYA_CLOUD_SECONDS)
+    if t.is_alive():
+        raise HTTPException(504, "Tuya's cloud didn't answer in time: try again")
+    if "http" in done:
+        raise done["http"]
+    if "failed" in done:
+        log.info("setup tuya keys: no answer from Tuya's cloud (%s)", done["failed"])
+        raise HTTPException(502, NO_TUYA_CLOUD)
+    if "refused" in done:
+        said = done["refused"]
+        raise HTTPException(400, "Tuya didn't accept the Access ID and Secret" + (f" (Tuya said: {said})" if said else "")
+                            + ". Copy both again from the project's Overview page, and check the data center.")
+    devs = [d for d in done["devices"] if isinstance(d, dict) and _DEVICE_ID.fullmatch(str(d.get("id") or ""))]
+    if not devs:
+        said = done["said"]
+        raise HTTPException(400, "Tuya listed no devices for this project" + (f" (Tuya said: {said})" if said else "")
+                            + ". Usually the data center doesn't match your Smart Life account: pick another one here "
+                            "(and in the project), or check that Smart Life is linked to the project (step 5 of the guide).")
+    versions = drivers.get("tuya").VERSIONS
+    keys = {}
+    for d in devs:
+        key, ver = str(d.get("key") or ""), str(d.get("version") or "")
+        keys[str(d["id"])] = {"key": key if len(key) == 16 else "", "name": str(d.get("name") or "").strip()[:40],
+                              "version": ver if ver in versions else ""}
+    TUYA_KEYS.clear()
+    TUYA_KEYS.update(keys)
+    log.info("setup tuya keys: %d device(s) from Tuya's cloud (%s), %d with a key", len(keys), region,
+             sum(1 for k in keys.values() if k["key"]))
+    return {"devices": tuya_public()}
+
+
+@router.post("/tuya-keys")
+def tuya_keys(body: dict):
+    """Get keys from Tuya (the wizard's button): see tuya_cloud_keys."""
+    return tuya_cloud_keys(body)
+
+
+def _tuya_key(c):
+    """A controller from the page, with the key from Tuya's cloud when it's a Tuya light and no key
+    was typed. A typed key wins; a fetched key wins over a saved one (it's newer: moving a light
+    to another app gives it a new key)."""
+    if not isinstance(c, dict) or c.get("type") != "tuya" or str(c.get("local_key") or "").strip():
+        return c
+    k = TUYA_KEYS.get(str(c.get("device_id") or ""))
+    return dict(c, local_key=k["key"]) if k and k["key"] else c
+
+
 # --- add by address: which kind of controller is there? ---------------------------------------
 def _ask(kind):
     def fn(ip):
@@ -545,8 +688,9 @@ def identify_endpoint(body: dict):
 
 
 def _test_controller(c):
-    """A Controller for a test, from what the wizard posted (and a saved secret if the key
-    wasn't typed again)."""
+    """A Controller for a test, from what the wizard posted (and a key from Tuya's cloud, or a
+    saved secret, if the key wasn't typed)."""
+    c = _tuya_key(c)
     drv = drivers.get(c.get("type", "govee"))
     if not drv or not drivers.model_info(c.get("type", "govee"), c.get("model")):
         raise HTTPException(400, "pick a supported controller first")
@@ -690,9 +834,14 @@ def test_stop(body: dict):
 
 @router.post("/save")
 def save(body: dict):
-    """Validate and write config.json (and secrets.json), then restart with them."""
+    """Validate and write config.json (and secrets.json), then restart with them. Tuya lights
+    without a typed key get the one from Tuya's cloud: only the saved (ticked) lights' keys are
+    written."""
+    cfg = body.get("config") or {}
+    if isinstance(cfg, dict) and isinstance(cfg.get("controllers"), list):
+        cfg = dict(cfg, controllers=[_tuya_key(c) for c in cfg["controllers"]])
     try:
-        clean = settings.save(body.get("config") or {})
+        clean = settings.save(cfg)
     except ValueError as e:
         raise HTTPException(400, str(e))
     for st in list(TESTS.values()):

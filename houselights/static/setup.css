@@ -38,16 +38,23 @@
 .freason { color: var(--fg); }
 .freason code, .ksteps code { font-size: 12px; background: var(--panel2); border: 1px solid var(--line); border-radius: 4px;
   padding: 0 4px; overflow-wrap: anywhere; }
-.ftuya { margin-top: 4px; }
-.ftuya input { flex: 1 1 140px; min-width: 0; }
-/* Tuya: where to get the local key (a page on GitHub, opened in a new tab) */
-.fhelp { font-size: 12px; color: var(--muted); }
-.ftuya .keyhelp { font-size: 12px; align-self: center; }
+/* Tuya: links to the local-key guide (a page on GitHub, opened in a new tab) */
 a.guide { color: var(--focus); font-weight: 600; }
 a.guide::after { content: " \2197"; font-weight: 400; }
-.tuyahint { border: 1px solid var(--amber); border-radius: var(--radius); background: var(--panel);
-  padding: 10px 12px; font-size: 13px; display: grid; gap: 4px; }
-.tuyahint > b { font-size: 14px; }
+/* Tuya: one box for the keys (Get keys from Tuya), and what each row knows about its key */
+.tuyakeys { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel2);
+  padding: 10px 12px; font-size: 13px; display: grid; gap: 6px; }
+.tuyakeys > b { font-size: 14px; }
+.tuyakeys input[type=text], .tuyakeys input[type=password], .tuyakeys select { background: var(--panel); border-color: var(--muted); }
+.tkform { display: grid; gap: 8px 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; }
+@media (max-width: 700px) { .tkform { grid-template-columns: minmax(0, 1fr); } }
+.fname, .fnext { font-size: 12px; color: var(--muted); }
+.fkey { font-size: 12px; color: var(--green); }
+.fnotin { font-size: 12px; color: var(--amber-ink); font-weight: 600; margin: 0; }
+/* Spotlight: a Tuya light without its key yet */
+.keyneed { border: 1px dashed var(--amber); border-radius: 8px; background: var(--panel); padding: 10px 12px; display: grid; gap: 6px; }
+.keyneed .tq { margin: 0; }
+.keyneed input[type=password], .keyneed input[type=text] { flex: 1 1 160px; min-width: 0; }
 .fen { font-size: 12px; }
 .badge { font-size: 11px; font-weight: 700; letter-spacing: .03em; padding: 2px 7px; border-radius: 99px; margin-top: 1px;
   border: 1px solid var(--line); background: var(--panel2); color: var(--fg); white-space: nowrap; }

@@ -366,13 +366,146 @@ check("guide: covers brand apps, moving to Smart Life, WLED, the tinytuya wizard
 check("guide: says Tuya isn't hardware-tested yet", "not yet with real Tuya lights" in guide)
 check("setup.js: guide links open in a new tab without a referrer",
       'a.target = "_blank"' in js and 'a.rel = "noopener noreferrer"' in js)
-check("setup.js: unticked Tuya rows, the key field, the only-Smart-Life box and the Tuya card all link to the guide",
-      js.count("guideLink(") >= 5 and "How to get the key\")" in js and "Where do I get the key?" in js
-      and "How to get the key, step by step" in js and "Step-by-step guide" in js)
+check("setup.js: the keys box, its form, lights not in the account and the Tuya card all link to the guide",
+      js.count("guideLink(") >= 5 and all(w in js for w in ("How to set up the Tuya project", "How to set up the project",
+                                                              "How to move it", "Step-by-step guide")))
 check("setup.js: the Tuya card says to move brand-app lights to Smart Life before getting keys",
       "Move them to Smart Life first" in js)
-check("setup.html: has the only-Smart-Life box", 'id="tuya-hint"' in html)
+check("setup.html: has the Smart Life keys box", 'id="tuya-keys"' in html and 'id="tuya-hint"' not in html)
 check("README: links the guide", readme.count("docs/tuya-local-key.md") >= 2)
+
+# --- Tuya: "Get keys from Tuya" (a stand-in for tinytuya's Cloud: no internet) ------------------
+import logging  # noqa: E402
+
+from houselights import settings  # noqa: E402
+
+
+def text_home(name):
+    """A file in the settings folder (HOUSELIGHTS_HOME: a temporary folder for these tests)."""
+    with open(settings.path(name), encoding="utf-8") as f:
+        return f.read()
+
+
+KEY1, KEY2 = "a1B2c3D4e5F6g7H8", "z9Y8x7W6v5U4t3S2"
+SECRET = "s3cr3tS3cr3tS3cr3tS3cr3tS3cr3tAB"
+DEV1, DEV2, DEV3, NOT_THERE = "eb1234567890abcdef01", "eb1234567890abcdef02", "eb1234567890abcdef03", "eb1234567890abcdef09"
+DEVS = [{"id": DEV1, "key": KEY1, "name": "Front eaves", "version": "3.3", "mac": "aa:bb:cc:dd:ee:01"},
+        {"id": DEV2, "key": KEY2, "name": "Porch plug", "version": "3.4"},
+        {"id": DEV3, "key": "", "name": "Hub", "version": ""}]
+GOOD = {"access_id": "p7x3k9q2w8e5r1t6y4u0", "access_secret": SECRET, "region": "us"}
+NO_UID = {"Error": "Error Response from Tuya Cloud", "Err": "913",
+          "Payload": "Error from Tuya Cloud: Code 1106: 'permission deny'"}
+
+
+class FakeCloud:
+    """tinytuya.Cloud as tuya_cloud_keys uses it: a token (or not), getdevices() per apiDeviceID."""
+
+    def __init__(self, token="tok", error=None, listed=None, by_id=None, raw=None, boom=None, slow=0):
+        self.token, self.error, self.listed, self.by_id = token, error, listed, by_id or {}
+        self.getdevices_raw, self.boom, self.slow = raw, boom, slow
+        self.apiDeviceID, self.asked = None, []
+
+    def getdevices(self, verbose=False):
+        if self.slow:
+            time.sleep(self.slow)
+        if self.boom:
+            raise self.boom
+        self.asked.append(self.apiDeviceID)
+        if self.apiDeviceID is None:
+            return list(self.listed or [])
+        return self.by_id.get(self.apiDeviceID, NO_UID)
+
+
+def cloud_of(fc, seen=None):
+    def make(region, access_id, secret):
+        if seen is not None:
+            seen.append((region, access_id, secret))
+        return fc
+    return make
+
+
+logs = io.StringIO()
+log_handler = logging.StreamHandler(logs)
+logging.getLogger("houselights").addHandler(log_handler)
+logging.getLogger("houselights").setLevel(logging.INFO)
+
+seen = []
+setup.TUYA_KEYS.clear()
+r = setup.tuya_cloud_keys(dict(GOOD, region=" US "), cloud=cloud_of(FakeCloud(listed=DEVS), seen))
+got = {d["id"]: d for d in r["devices"]}
+check(f"tuya keys: names, versions and has-a-key come back {r}",
+      got[DEV1] == {"id": DEV1, "name": "Front eaves", "version": "3.3", "has_key": True}
+      and got[DEV2]["has_key"] and got[DEV3] == {"id": DEV3, "name": "Hub", "version": "", "has_key": False})
+check("tuya keys: no key and no Secret in the reply", not any(x in json.dumps(r) for x in (KEY1, KEY2, SECRET)))
+check("tuya keys: the server keeps the keys by device id",
+      setup.TUYA_KEYS[DEV1]["key"] == KEY1 and setup.TUYA_KEYS[DEV2]["key"] == KEY2 and setup.TUYA_KEYS[DEV3]["key"] == "")
+check(f"tuya keys: Tuya asked with the data center, Access ID and Secret {seen[0][:2]}",
+      seen == [("us", GOOD["access_id"], SECRET)])
+fails("tuya keys: no Access ID", lambda: setup.tuya_cloud_keys(dict(GOOD, access_id=""), cloud=cloud_of(FakeCloud(listed=DEVS))),
+      400, "Access ID")
+fails("tuya keys: a Secret that can't be one", lambda: setup.tuya_cloud_keys(dict(GOOD, access_secret="short"),
+                                                                            cloud=cloud_of(FakeCloud(listed=DEVS))), 400, "Access Secret")
+fails("tuya keys: unknown data center", lambda: setup.tuya_cloud_keys(dict(GOOD, region="mars"),
+                                                                     cloud=cloud_of(FakeCloud(listed=DEVS))), 400, "data center")
+refused = FakeCloud(token=None, error={"Error": "Unable to Get Cloud Token", "Err": "911",
+                                       "Payload": "Cloud _gettoken() failed: 'sign invalid'"})
+fails("tuya keys: wrong Access ID or Secret, in Tuya's words", lambda: setup.tuya_cloud_keys(GOOD, cloud=cloud_of(refused)),
+      400, "didn't accept the Access ID and Secret (Tuya said: sign invalid)")
+check("tuya keys: a failed fetch keeps the keys from the last one", setup.TUYA_KEYS[DEV1]["key"] == KEY1)
+fails("tuya keys: no devices: says to check the data center",
+      lambda: setup.tuya_cloud_keys(GOOD, cloud=cloud_of(FakeCloud(listed=[]))), 400, "no devices for this project")
+fails("tuya keys: no devices, with Tuya's reason",
+      lambda: setup.tuya_cloud_keys(GOOD, cloud=cloud_of(FakeCloud(listed=[], raw={"success": False, "code": 1106,
+                                                                                    "msg": "permission deny"}))),
+      400, "Tuya said: permission deny")
+fc = FakeCloud(listed=[], by_id={DEV2: DEVS[:2]})
+r = setup.tuya_cloud_keys(dict(GOOD, device_ids=[NOT_THERE, DEV2, "x"]), cloud=cloud_of(fc))
+check(f"tuya keys: none listed by the project: scanned ids tried one at a time, one not in the account skipped {fc.asked}",
+      fc.asked == [None, NOT_THERE, DEV2] and [d["id"] for d in r["devices"]] == [DEV1, DEV2] and DEV3 not in setup.TUYA_KEYS)
+fails("tuya keys: no internet", lambda: setup.tuya_cloud_keys(GOOD, cloud=cloud_of(FakeCloud(boom=OSError("no route")))),
+      502, "couldn't reach Tuya's cloud")
+wait, setup.TUYA_CLOUD_SECONDS = setup.TUYA_CLOUD_SECONDS, 0.2
+fails("tuya keys: Tuya's cloud too slow", lambda: setup.tuya_cloud_keys(GOOD, cloud=cloud_of(FakeCloud(listed=DEVS, slow=1.0))),
+      504, "didn't answer in time")
+setup.TUYA_CLOUD_SECONDS = wait
+time.sleep(1.0)                                   # let the slow stand-in finish before the next checks
+if not _drv.get("tuya").available()[0]:
+    fails("tuya keys: without tinytuya, says how to install it", lambda: setup.tuya_cloud_keys(GOOD), 400, "install tinytuya")
+else:
+    check("tuya keys: without tinytuya (skipped: tinytuya is installed here)", True)
+check("tuya keys: no key or Secret in the log", logs.getvalue() and not any(x in logs.getvalue() for x in (KEY1, KEY2, SECRET)))
+
+# Keys from Tuya fill in what the page didn't type: probe, tests and Go live
+setup.TUYA_KEYS.clear()
+setup.tuya_cloud_keys(GOOD, cloud=cloud_of(FakeCloud(listed=DEVS)))
+tu = {"type": "tuya", "model": "Tuya light", "ip": "192.168.2.61", "device_id": DEV1, "version": "3.3"}
+check("tuya key: filled in from Tuya when none was typed", setup._tuya_key(tu)["local_key"] == KEY1 and "local_key" not in tu)
+check("tuya key: a typed key wins", setup._tuya_key(dict(tu, local_key=KEY2))["local_key"] == KEY2)
+check("tuya key: a device Tuya has no key for, and other kinds, are left alone",
+      "local_key" not in setup._tuya_key(dict(tu, device_id=DEV3))
+      and "local_key" not in setup._tuya_key({"type": "govee", "device_id": DEV1}))
+drv_t, ctrl_t = setup._test_controller(dict(tu))
+check("tuya key: a blink test gets the key from Tuya", ctrl_t.secret.get("local_key") == KEY1)
+cfg = dict(settings.default_config(),
+           controllers=[dict(tu, id="tuya-front", name="Front eaves", enabled=True)],
+           runs=[{"name": "Front eaves", "short": "Front eaves", "controller": "tuya-front", "lights": 50}])
+res = setup.save({"config": cfg})
+saved_cfg, saved_sec = text_home("config.json"), text_home("secrets.json")
+check(f"go live: the ticked light's key from Tuya goes to secrets.json {settings.read_secrets()}",
+      settings.read_secrets() == {"tuya-front": {"local_key": KEY1}})
+check("go live: keys of lights not ticked (the plug) are never saved", KEY2 not in saved_sec and KEY2 not in saved_cfg)
+check("go live: no key in config.json or in the reply", KEY1 not in saved_cfg and KEY1 not in json.dumps(res))
+st = setup.state()
+check("setup state: says which devices Tuya has keys for, without the keys",
+      {d["id"] for d in st["tuya_keys"]} == {DEV1, DEV2, DEV3} and not any(x in json.dumps(st) for x in (KEY1, KEY2))
+      and st["tuya_regions"]["us-e"] == "Eastern America")
+check("setup.js: Get keys from Tuya posts to /api/setup/tuya-keys and keeps no key",
+      '"/api/setup/tuya-keys"' in js and "Get keys from Tuya" in js and "W.tk.secret = \"\"" in js)
+check("setup.js: Scout no longer asks for keys; Spotlight does, and blinks only once the key is there",
+      "tuyaFields" not in js and "function tuyaKeyState" in js and "Check the key" in js
+      and "if (blink && !waiting)" in js and "!keyReady(c)" in js)
+check("setup.js: lights Tuya doesn't list are marked as not in the Smart Life account",
+      "Not in your Smart Life account" in js and "isn't in your Smart Life account" in js)
 
 print(f"\n{'ALL OK' if not FAILS else f'{len(FAILS)} FAILED'}")
 sys.exit(1 if FAILS else 0)

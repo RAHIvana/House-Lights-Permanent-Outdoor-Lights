@@ -2,7 +2,8 @@
 LAN with the tinytuya library (pip install tinytuya).
 
 Local control needs each device's id, its protocol version and its 16-character "local key".
-The key comes from Tuya's cloud once: run `python -m tinytuya wizard` (see the README).
+The key comes from Tuya's cloud once: the setup wizard's "Get keys from Tuya", or
+`python -m tinytuya wizard` (see docs/tuya-local-key.md).
 These lights show one color at a time: no per-light colors, no animated themes. A static
 theme is shown as its main color. Tests save the light's state and put it back afterwards.
 Tested only with a stand-in for tinytuya so far, not a real Tuya device.
@@ -18,7 +19,7 @@ from .base import Kit as BaseKit
 log = logging.getLogger("houselights")
 
 LABEL = "Tuya / Smart Life (one color at a time)"
-NOTE = ("For lights using the Smart Life or Tuya Smart app (most ASAHOM kits, many Amazon brands). Needs: pip install tinytuya, and each device's local key (python -m tinytuya wizard). "
+NOTE = ("For lights using the Smart Life or Tuya Smart app (most ASAHOM kits, many Amazon brands). Needs: pip install tinytuya, and each device's local key (Get keys from Tuya in the setup wizard). "
         "Whole-strip color only. Not yet tested with real Tuya hardware.")
 TESTED = False
 
@@ -48,7 +49,7 @@ def options(c, secret):
         raise ValueError(f"Tuya protocol version must be one of {', '.join(VERSIONS)}")
     key = str(c.get("local_key") or secret.get("local_key") or "").strip()
     if len(key) != 16:
-        raise ValueError("the Tuya local key is 16 characters (from python -m tinytuya wizard)")
+        raise ValueError("the Tuya local key is 16 characters (Get keys from Tuya in the setup wizard)")
     return {"device_id": dev, "version": ver}, {"local_key": key}
 
 

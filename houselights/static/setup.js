@@ -24,7 +24,9 @@ async function api(path, body) {
 }
 
 const W = {step: 0, info: null, cfg: null, found: [], counts: {}, testing: {}, anim: null, lps: {},
-           t: null, jump: false, kinds: {}, untick: new Set(), autoTick: true, tiers: {}};
+           t: null, jump: false, kinds: {}, untick: new Set(), autoTick: true, tiers: {},
+           // Get keys from Tuya: the form's fields (the Secret only until it's sent) and what came back
+           tk: {open: false, busy: false, msg: "", id: "", secret: "", region: "us", fetched: false, count: 0, byId: {}}};
 const MAX_COUNT = 12;                      // "How many controllers?" choices; 0 = not sure
 const STEPS = 5;
 // Steps by name, for links: setup.html?step=test&controller=<id>, ?step=place
@@ -57,7 +59,7 @@ const HELP = {
       + "A simple test: if the Smart Life app can find and control your lights, they're Tuya, and House Lights can use them. "
       + "Plugs, bulbs and other smart-home gadgets use Smart Life too, so the scan may list devices that aren't lights: tick only your lights.",
     steps: ["Install tinytuya: on Windows run INSTALL_WIN, on Linux or a Raspberry Pi INSTALL_NIX, then start House Lights again.",
-            "Get each light's local key once: link the Smart Life app to a free iot.tuya.com cloud project, then run python -m tinytuya wizard. GUIDE",
+            "Get each light's local key once: link the Smart Life app to a free iot.tuya.com cloud project, then press Get keys from Tuya (shown once your lights are found). GUIDE",
             "Lights in the ASAHOM or another brand app? Move them to Smart Life first: brand apps can't give out keys. "
               + "Do this before getting the keys: moving a light later gives it a new key.",
             "Close the Smart Life app while testing: these lights take one connection at a time."]},
@@ -130,7 +132,7 @@ function addController(row) {
   if (W.cfg.controllers.some(c => sameSpot(c, row))) return;
   const c = {id: ctrlId(row), type: row.type, model: row.model, ip: row.ip, name: "", enabled: true};
   if (row.zone) c.zone = row.zone;
-  if (row.type === "tuya") { c.device_id = row.device_id || ""; c.version = row.version || "3.3"; }
+  if (row.type === "tuya") { c.device_id = row.device_id || ""; c.version = tkOf(row)?.version || row.version || "3.3"; }
   if (row.local_key) c.local_key = row.local_key;
   W.cfg.controllers.push(c);
   W.cfg.runs.push(newRun(c, row.zone || `Run ${W.cfg.runs.length + 1}`, row.lights));
@@ -198,7 +200,7 @@ function drawFound() {
   const ul = $("#found");
   ul.innerHTML = "";
   const rows = allRows();
-  drawTuyaHint(rows);
+  drawTuyaKeys(rows);
   if (!rows.length) { ul.appendChild(el("li", "fempty muted", "Nothing found yet: press Find my lights.")); return; }
   for (const d of rows) {
     const li = el("li", "frow" + (d.supported ? "" : " off"));
@@ -212,7 +214,9 @@ function drawFound() {
     };
     const main = el("div", "fmain");
     const title = el("div", "ftitle");
-    title.append(el("b", "", d.label || modelLabel(d.type, d.model)));
+    const smartName = d.type === "tuya" ? tkOf(d)?.name : "";        // its name in the Smart Life app
+    title.append(el("b", "", smartName || d.label || modelLabel(d.type, d.model)));
+    if (smartName) title.append(el("span", "fname", "its name in Smart Life"));
     if (d.zone && !String(d.label || "").includes(d.zone)) title.append(el("span", "fzone", `zone ${d.zone}`));
     main.append(title);
     const bits = [d.ip, d.lights ? `${d.lights} lights` : "", d.device_tail && !d.zone ? `…${d.device_tail}` : "",
@@ -220,20 +224,12 @@ function drawFound() {
     main.append(el("small", "fsub", bits.join(" · ")));
     if (TIER_NOTE[d.tier]) main.append(el("small", "ftier", TIER_NOTE[d.tier]));
     if (d.warning) main.append(el("small", "fwarning", "\u26A0 " + d.warning));      // e.g. WLED's segment layout
-    if (d.type === "tuya") main.append(el("small", "ftier", "Could be a plug, bulb or other smart-home device, not your lights: "
-      + "tick it only if it's your lights. To check, open each device in the Smart Life app, tap the pencil, then "
-      + `Device Information, and look for the address ${d.ip}.`));
-    if (d.type === "tuya" && !c) {
-      const help = el("small", "fhelp", "Needs a local key. Lights in the ASAHOM or another brand app? ");
-      help.append(guideLink("How to get the key"));
-      main.append(help);
-    }
+    if (d.type === "tuya") main.append(...tuyaLines(d, c));
     if (!d.supported) {
       const why = el("small", "freason", (d.reason || "Not supported yet") + (d.install ? ": " : "."));
       if (d.install) why.append(el("code", "", d.install));
       main.append(why);
     }
-    if (c && c.type === "tuya") main.append(tuyaFields(c));
     if (c && (W.info.configured || c.enabled === false)) {
       const lab = el("label", "fen"), en = el("input");
       en.type = "checkbox"; en.checked = c.enabled !== false; en.onchange = () => { c.enabled = en.checked; };
@@ -245,42 +241,161 @@ function drawFound() {
     ul.appendChild(li);
   }
 }
-// Only Smart Life devices found: say what a key is, that brand apps can't give one out, and
-// that a kit with WLED needs none.
-function drawTuyaHint(rows) {
-  const box = $("#tuya-hint");
-  box.innerHTML = "";
-  box.hidden = !(rows.some(d => d.type === "tuya") && rows.every(d => d.type === "tuya"));
-  if (box.hidden) return;
-  const key = el("span");
-  key.append("Smart Life lights need a one-time ", el("b", "", "local key"), " for each light. If your lights are in a brand "
-    + "app (ASAHOM, TreatLife and others), move them to the Smart Life app first: brand apps can't give out keys.");
-  const wled = el("span");
-  wled.append("Does your kit's box or app mention ", el("b", "", "WLED"), "? Set it up in the WLED app instead, then "
-    + "press Find my lights again: no key needed, and it does more.");
-  const link = el("span");
-  link.append(guideLink("How to get the key, step by step"));
-  box.append(el("b", "", "Only Smart Life devices found"), key, wled, link);
+// --- Tuya keys: "Get keys from Tuya" asks the owner's Tuya project for every key at once. The
+// server keeps the keys; the page only learns each device's name, version and whether it has one.
+function tkOf(d) { return W.tk.fetched ? W.tk.byId[d.device_id || ""] || null : null; }
+// A Tuya light can blink once it has an id and a key: checked in Spotlight, saved, or from Tuya.
+function keyReady(c) {
+  return c.type !== "tuya" || (/^[A-Za-z0-9]{8,40}$/.test(c.device_id || "")
+    && ((c.local_key || "").length === 16 || !!c.has_secret || !!tkOf(c)?.has_key));
 }
-// A chosen Tuya light needs its device id (if the scan didn't hear it), local key and version.
-function tuyaFields(c) {
-  const box = el("div", "row ftuya");
-  if (!c.device_id || !W.found.find(d => sameSpot(d, c))?.device_id) {
-    const dev = el("input"); dev.type = "text"; dev.placeholder = "device id"; dev.size = 20; dev.value = c.device_id || "";
-    dev.setAttribute("aria-label", "Tuya device id"); dev.oninput = () => { c.device_id = dev.value.trim(); };
-    box.append(dev);
+function tkTake(devices) {
+  const list = Array.isArray(devices) ? devices : [];
+  W.tk.byId = Object.fromEntries(list.map(d => [d.id, d]));
+  W.tk.count = list.length;
+  W.tk.fetched = list.length > 0;
+  for (const c of W.cfg.controllers) {          // the protocol version Tuya knows for each light
+    const t = c.type === "tuya" ? tkOf(c) : null;
+    if (t?.version) c.version = t.version;
   }
-  const key = el("input"); key.type = "password"; key.size = 18; key.maxLength = 16; key.autocomplete = "off";
-  key.placeholder = c.has_secret ? "key saved (type to change)" : "local key (16 characters)";
+}
+// A Smart Life row in Scout: where its key comes from (or that it isn't in the account) and,
+// unticked, that plugs and bulbs use Smart Life too. The key itself is asked for in Spotlight.
+function tuyaLines(d, c) {
+  const out = [], t = tkOf(d);
+  if (t?.has_key) out.push(el("small", "fkey", "✓ Key from Tuya"));
+  else if (W.tk.fetched && d.device_id && !t) {
+    const s = el("small", "fnotin", "⚠ Not in your Smart Life account. It's probably in another app (ASAHOM, for example) or another account. ");
+    s.append(guideLink("How to move it"));
+    out.push(s);
+  } else if (c && (c.local_key || "").length === 16) out.push(el("small", "fkey", "✓ Key checked"));
+  else if (c?.has_secret) out.push(el("small", "fkey", "✓ Key saved"));
+  else if (c) out.push(el("small", "fnext", "Its key comes next, in 2 Spotlight."));
+  if (!c) out.push(el("small", "ftier", "Could be a plug or a bulb: tick only your lights. (Smart Life shows each device's address under Device Information.)"));
+  return out;
+}
+// Smart Life devices found: one box to get every key, and each device's Smart Life name, from the
+// owner's Tuya project; or, after that, what came back.
+function drawTuyaKeys(rows) {
+  const box = $("#tuya-keys");
+  box.innerHTML = "";
+  const tuya = rows.filter(d => d.type === "tuya");
+  box.hidden = !tuya.length;
+  if (box.hidden) return;
+  if (W.tk.open) { box.append(...tuyaKeysForm(() => drawFound())); return; }
+  if (W.tk.fetched) {
+    const inIt = tuya.filter(d => tkOf(d)).length, out = tuya.filter(d => d.device_id && !tkOf(d)).length;
+    box.append(el("b", "ok", `✓ Got ${W.tk.count} device${W.tk.count === 1 ? "" : "s"} from your Smart Life account`),
+      el("span", "", `${inIt} of the ${tuya.length} found here ${inIt === 1 ? "is" : "are"} in it`
+        + (inIt ? ": their names and keys are filled in below." : ".")
+        + (out ? ` ${out} ${out === 1 ? "isn't: it's" : "aren't: they're"} marked ⚠.` : "")));
+    const again = el("div", "row");
+    again.append(button("Get keys again…", () => { W.tk.open = true; drawFound(); }));
+    box.append(again);
+    return;
+  }
+  const ok = drv("tuya").available;
+  box.append(el("b", "", "Smart Life lights need a key"),
+    el("span", "", "Each Smart Life light needs a one-time local key. House Lights can get every key, and each device's name "
+      + "from your Smart Life app, from your free Tuya developer project in one go."));
+  const row = el("div", "row");
+  if (ok) row.append(button("Get keys from Tuya…", () => { W.tk.open = true; drawFound(); }));
+  row.append(guideLink("How to set up the Tuya project"));
+  box.append(row, el("small", "muted", (ok ? "Or type each light's key in the next step. " : "")
+    + "Lights in ASAHOM or another brand app? Move them to Smart Life first."
+    + (rows.every(d => d.type === "tuya") ? " Does your kit mention WLED? Set it up in the WLED app instead: no key needed." : "")));
+}
+// The form: Access ID, Access Secret and data center, from the project's Overview page. Returns the
+// parts to put in a box; redraw() draws that box again (Scout or Spotlight).
+function tuyaKeysForm(redraw) {
+  const head = el("span");
+  head.append("Copy these from your project's Overview page at iot.tuya.com. ", guideLink("How to set up the project"));
+  const fld = (label, input) => { const l = el("label", "fld"); l.append(el("span", "", label), input); return l; };
+  const id = el("input");
+  id.type = "text"; id.value = W.tk.id; id.autocomplete = "off"; id.spellcheck = false;
+  id.oninput = () => { W.tk.id = id.value.trim(); };
+  const sec = el("input");
+  sec.type = "password"; sec.value = W.tk.secret; sec.autocomplete = "off";
+  sec.oninput = () => { W.tk.secret = sec.value.trim(); };
+  const reg = el("select");
+  for (const [k, v] of Object.entries(W.info.tuya_regions || {us: "Western America"})) reg.appendChild(new Option(`${v} (${k})`, k));
+  reg.value = W.tk.region;
+  reg.onchange = () => { W.tk.region = reg.value; };
+  const grid = el("div", "tkform");
+  grid.append(fld("Access ID", id), fld("Access Secret", sec), fld("Data center", reg));
+  const get = button(W.tk.busy ? "Getting keys…" : "Get keys", async () => {
+    W.tk.busy = true; W.tk.msg = ""; redraw();
+    try {
+      const ids = [...new Set(allRows().filter(d => d.type === "tuya" && d.device_id).map(d => d.device_id))];
+      const r = await api("/api/setup/tuya-keys", {access_id: W.tk.id, access_secret: W.tk.secret, region: W.tk.region, device_ids: ids});
+      tkTake(r.devices);
+      W.tk.open = false; W.tk.secret = "";
+    } catch (e) { W.tk.msg = e.message; }
+    finally { W.tk.busy = false; redraw(); }
+  }, "primary");
+  get.disabled = W.tk.busy;
+  const btns = el("div", "row");
+  btns.append(get, button("Cancel", () => { W.tk.open = false; W.tk.msg = ""; W.tk.secret = ""; redraw(); }, "ghost"));
+  const parts = [el("b", "", "Get keys from Tuya"), head, grid, btns,
+    el("small", "muted", "House Lights asks Tuya once, now, only because you pressed Get keys. The Access Secret is used for this "
+      + "and not saved. Keys are kept only for the lights you tick (in secrets.json, readable only by you) and are never shown on this page.")];
+  if (W.tk.msg) parts.push(el("p", "note warn", W.tk.msg));
+  return parts;
+}
+// Spotlight, a Tuya light: where its key came from, or ask for it before it can blink (get the keys
+// from Tuya, or type it and check it on the light).
+function tuyaKeyState(c) {
+  const t = tkOf(c);
+  if (keyReady(c)) {
+    const how = (c.local_key || "").length === 16 ? "✓ Key checked" : t?.has_key ? "✓ Key from Tuya" : "✓ Key saved";
+    return el("p", "note ok-line", how + (t?.name ? ` · called “${t.name}” in Smart Life` : ""));
+  }
+  const box = el("div", "keyneed");
+  box.append(q("This light needs its local key before it can blink"));
+  if (W.tk.fetched && c.device_id && !t) {
+    const s = el("p", "fnotin", "⚠ It isn't in your Smart Life account: it's probably in another app (ASAHOM, for example) or another account. ");
+    s.append(guideLink("How to move it"));
+    box.append(s, el("p", "note", "Moved it to Smart Life? Get the keys again: moving gives it a new key."));
+  }
+  if (W.tk.open) {
+    const f = el("div", "tuyakeys");
+    f.append(...tuyaKeysForm(() => drawName(!W.tk.open && !W.tk.busy && keyReady(c))));    // blinks once the key came
+    box.append(f);
+  } else if (drv("tuya").available) {
+    const r = el("div", "row");
+    r.append(button(W.tk.fetched ? "Get keys from Tuya again…" : "Get keys from Tuya…", () => { W.tk.open = true; drawName(); }));
+    box.append(r);
+  }
+  const needId = !/^[A-Za-z0-9]{8,40}$/.test(c.device_id || "");
+  box.append(el("p", "note", needId ? "Or type its device id and key:" : `Or type its key (its device id ends in ${c.device_id.slice(-5)}):`));
+  const row = el("div", "row");
+  let dev = null;
+  if (needId) {
+    dev = el("input"); dev.type = "text"; dev.placeholder = "device id"; dev.size = 20; dev.value = c.device_id || "";
+    dev.setAttribute("aria-label", "Tuya device id");
+    row.append(dev);
+  }
+  const key = el("input");
+  key.type = "password"; key.size = 18; key.maxLength = 16; key.autocomplete = "off"; key.placeholder = "local key (16 characters)";
   key.setAttribute("aria-label", "Tuya local key");
-  key.value = c.local_key || ""; key.oninput = () => { c.local_key = key.value.trim(); };
   const ver = el("select");
   ver.setAttribute("aria-label", "Tuya protocol version");
   for (const v of ["3.1", "3.2", "3.3", "3.4", "3.5"]) ver.appendChild(new Option(v, v));
-  ver.value = c.version || "3.3"; ver.onchange = () => { c.version = ver.value; };
-  const help = el("span", "keyhelp");
-  help.append(guideLink("Where do I get the key?"));
-  box.append(key, ver, help);
+  ver.value = c.version || "3.3";
+  const msg = el("p", "note");
+  msg.setAttribute("aria-live", "polite");
+  row.append(key, ver, button("Check the key", async () => {
+    const id = dev ? dev.value.trim() : c.device_id, k = key.value.trim();
+    if (!/^[A-Za-z0-9]{8,40}$/.test(id || "")) { msg.textContent = "Type the device id: letters and digits."; return; }
+    if (k.length !== 16) { msg.textContent = "The local key is 16 characters."; return; }
+    msg.textContent = "Checking the key…";
+    try {
+      await api("/api/setup/probe", {type: "tuya", ip: c.ip, device_id: id, local_key: k, version: ver.value});
+      Object.assign(c, {device_id: id, local_key: k, version: ver.value});
+      drawName(true);
+    } catch (e) { msg.textContent = e.message; }
+  }));
+  box.append(row, msg);
   return box;
 }
 
@@ -481,12 +596,19 @@ function drawName(blink = false) {
   const r = runOf(c.id);
   $("#n-title").textContent = `Controller ${W.n.i + 1} of ${n}`;
   $("#n-sub").textContent = `${modelLabel(c.type, c.model)} · ${where(c)}` + (TIER_NOTE[tierOf(c)] ? ` · ${TIER_NOTE[tierOf(c)]}` : "");
-  if (blink) runTest(c, "identify").then(() => drawName()).catch(e => err(e.message));
+  const waiting = !keyReady(c);             // a Tuya light without its key can't blink yet
+  const smart = c.type === "tuya" ? tkOf(c) : null;
+  if (smart?.name && (!String(r.name || "").trim() || /^Run \d+$/.test(r.name))) {   // suggest its Smart Life name
+    r.name = smart.name.slice(0, 40); r.short = r.name.slice(0, 12); syncNames();
+  }
+  if (blink && !waiting) runTest(c, "identify").then(() => drawName()).catch(e => err(e.message));
   const body = $("#n-body");
   body.innerHTML = "";
-  body.append(answers(
-    testBtn(c, "identify", "Blink lights", null, () => { if (W.n.nothing) { W.n.nothing = false; drawName(); } }),  // also undoes "Nothing blinked"
-    button("Nothing blinked", () => { W.n.nothing = !W.n.nothing; drawName(); }, W.n.nothing ? "on" : "")));
+  if (c.type === "tuya") body.append(tuyaKeyState(c));
+  const blinkBtn = testBtn(c, "identify", "Blink lights", null, () => { if (W.n.nothing) { W.n.nothing = false; drawName(); } });  // also undoes "Nothing blinked"
+  const nothingBtn = button("Nothing blinked", () => { W.n.nothing = !W.n.nothing; drawName(); }, W.n.nothing ? "on" : "");
+  if (waiting) for (const b of [blinkBtn, nothingBtn]) { b.disabled = true; b.title = "Needs its key first"; }
+  body.append(answers(blinkBtn, nothingBtn));
   litTests();
   if (W.n.nothing) {
     const ul = el("ul", "note help");
@@ -1093,12 +1215,15 @@ async function waitForRestart() {
 function check(step) {
   if (step === 0) {
     if (!W.cfg.controllers.length) return "Tick at least one controller, or add one by address.";
-    const noId = W.cfg.controllers.find(c => c.type === "tuya" && !/^[A-Za-z0-9]{8,40}$/.test(c.device_id || ""));
-    if (noId) return `Type the device id for the Tuya device at ${noId.ip}.`;
-    const noKey = W.cfg.controllers.find(c => c.type === "tuya" && !c.has_secret && !(c.local_key && c.local_key.length === 16));
-    if (noKey) return `Type the 16-character local key for the Tuya device at ${noKey.ip}.`;
   }
   if (step === 1) {
+    // A Tuya light can't blink, or be counted, without its key: Spotlight asks for it
+    const nk = W.cfg.controllers.find(c => !keyReady(c));
+    if (nk) {
+      const k = W.n ? W.n.order.indexOf(nk.id) : -1;
+      if (W.step === 1 && k >= 0 && k !== W.n.i) toNamed(k);
+      return `The Tuya light at ${nk.ip} needs its local key first: get the keys from Tuya, or type it and press Check the key.`;
+    }
     // Next at the bottom before every controller has blinked: go to the first one not seen yet
     if (W.step === 1 && W.n && !W.info.configured) {
       const k = W.n.order.findIndex((id, i) => !W.n.seen.has(i));
@@ -1170,6 +1295,7 @@ async function init() {
   W.cfg = JSON.parse(JSON.stringify(W.info.config));
   W.cfg.controllers = Array.isArray(W.cfg.controllers) ? W.cfg.controllers : [];
   W.cfg.runs = Array.isArray(W.cfg.runs) ? W.cfg.runs : [];
+  tkTake(W.info.tuya_keys);                 // keys the server got from Tuya before this page was (re)loaded
   for (const r of W.cfg.runs) if (r.light1 == null) r.light1 = r.reverse ? "right" : "";
   const ips = {};
   for (const c of W.cfg.controllers) (ips[c.type] ||= new Set()).add(c.ip);
