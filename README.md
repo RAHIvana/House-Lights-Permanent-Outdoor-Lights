@@ -7,7 +7,8 @@ your home. It is tested on **Govee H806A** controllers. Open-source **WLED** con
 [Supported controllers](#supported-controllers)). Play animated themes light by light, apply
 static themes, schedule them by clock time or sunrise/sunset, and make your own themes. It talks
 to the light controllers directly over your home network: no cloud service and no app login while
-it runs (Tuya / Smart Life lights need a one-time key lookup, see
+it runs (Tuya / Smart Life lights need a one-time key lookup: the setup wizard asks Tuya's
+cloud for the keys once, only when you press its button; see
 [Getting each kind of controller ready](#getting-each-kind-of-controller-ready)). Free for
 personal and other noncommercial use (see [License](#license)).
 
@@ -270,6 +271,10 @@ which patterns it plays on them, and what it does with your answers is explained
    To check a row, open each device in the Smart Life app, tap the pencil, then **Device
    Information**, and compare its IP address. A simple test for any lights: if the Smart
    Life app can find and control them, they're Tuya, and House Lights can use them.
+   When Smart Life devices are found, a box above the list offers **Get keys from Tuya**: with
+   your free Tuya project's Access ID, Access Secret and data center it gets every key at once,
+   with each device's name from the Smart Life app, so the rows show which light is which.
+   Devices that aren't in your Smart Life account are marked.
    - **Expecting more?** **Deep scan, 30 s** keeps asking for up to half a minute. Govee
      controllers ignore many requests (often three in four), so a quick scan can miss them;
      asking again finds them. **Add by address** asks one address as every kind and adds
@@ -284,7 +289,8 @@ which patterns it plays on them, and what it does with your answers is explained
    Then name them, with a short name for buttons, and pick their place along the house,
    left to right as you stand in front of it. The page draws your house in that order, and
    patterns that play across the whole house travel from one end to the other. **Nothing
-   blinked** lists what to check.
+   blinked** lists what to check. A Tuya light without its key asks for it here before it
+   blinks (get the keys from Tuya, or type one and check it).
 3. **Tally** (count the lights): one run at a time, by name.
    - **Govee** counts like the Govee Home app, in groups of 5 lights (segments):
      - **A**: the groups light up green, white, red, yellow, then again. Say the color of
@@ -339,13 +345,15 @@ UDP realtime** is ticked.
 Set up the zones in the JellyFish app first.
 
 **Tuya / Smart Life**: local control needs each device's **local key**, which comes from
-Tuya's cloud once. Install tinytuya (above), pair the lights in the Smart Life app, create a
-free developer account at iot.tuya.com with a cloud project linked to your app account, then
-run `venv/bin/python -m tinytuya wizard` (Windows: `venv\Scripts\python -m tinytuya wizard`).
-It lists every device with its id and local key.
+Tuya's cloud once. Install tinytuya (above), pair the lights in the Smart Life app, and create
+a free developer account at iot.tuya.com with a cloud project linked to your app account. Then
+press **Get keys from Tuya** in the setup wizard and type the project's Access ID, Access
+Secret and data center: House Lights asks Tuya once, keeps the keys of the lights you tick, and
+doesn't save the Secret. (Or run `venv/bin/python -m tinytuya wizard`, on Windows
+`venv\Scripts\python -m tinytuya wizard`, and type each key in 2 Spotlight.)
 [Getting the local key](docs/tuya-local-key.md) walks through it step by step, including
-moving lights out of a brand app such as ASAHOM's; the setup wizard links to it from every
-Tuya row. Tuya devices accept one connection at a time,
+moving lights out of a brand app such as ASAHOM's; the setup wizard links to it. Tuya devices
+accept one connection at a time,
 so close the Smart Life app while testing. The key is stored in `data/secrets.json`, readable
 only by you, never in `config.json` and never sent to the web page.
 

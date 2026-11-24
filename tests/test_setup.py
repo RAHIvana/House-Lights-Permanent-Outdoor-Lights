@@ -364,6 +364,8 @@ guide = text("docs", "tuya-local-key.md") if os.path.exists(guide_path) else ""
 check("guide: covers brand apps, moving to Smart Life, WLED, the tinytuya wizard and new keys after re-pairing",
       all(w in guide for w in ("ASAHOM", "Smart Life", "WLED", "python -m tinytuya wizard", "new local key", "Remove device")))
 check("guide: says Tuya isn't hardware-tested yet", "not yet with real Tuya lights" in guide)
+check("guide: Get keys from Tuya in the wizard, the Secret not saved, typing keys in Spotlight",
+      all(w in guide for w in ("Get keys from Tuya", "isn't saved", "2 Spotlight", "Check the key")))
 check("setup.js: guide links open in a new tab without a referrer",
       'a.target = "_blank"' in js and 'a.rel = "noopener noreferrer"' in js)
 check("setup.js: the keys box, its form, lights not in the account and the Tuya card all link to the guide",

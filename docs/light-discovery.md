@@ -74,13 +74,17 @@ Things worth knowing:
 - **Add by address** asks one address as every kind at once ("who are you?") and keeps what
   answers. Once one kind has answered, the others get one more second, not their whole timeout.
   The result reads like "192.168.2.50 is a WLED controller".
-- **Tuya needs more.** Its rows need the device id and the 16-character **local key** (from
-  `python -m tinytuya wizard`), and the optional `tinytuya` package. Smart Life rows are never
-  ticked by themselves, because plugs, bulbs and other gadgets use Smart Life too. Each Tuya
-  row links to [Getting the local key](tuya-local-key.md), and when a scan finds only Smart
-  Life devices a box says that brand apps (ASAHOM and others) can't give out keys and that a
-  kit with WLED needs none. Nothing on the network says which app a light was paired with, so
-  the wizard can't tell a brand-app light from a Smart Life one.
+- **Tuya needs more.** Its lights need the device id and the 16-character **local key**, and
+  the optional `tinytuya` package. Smart Life rows are never ticked by themselves, because
+  plugs, bulbs and other gadgets use Smart Life too. When a scan finds Smart Life devices, a
+  box offers **Get keys from Tuya**: the Access ID, Access Secret and data center of the
+  owner's free Tuya project. The server asks Tuya's cloud once (tinytuya's own cloud code, what
+  `python -m tinytuya wizard` does) and keeps the keys in memory by device id; the page only
+  gets each device's name, version and whether it has a key. Rows then show the Smart Life
+  name and "✓ Key from Tuya", and a device Tuya doesn't list is marked "Not in your Smart Life
+  account" (it's in a brand app such as ASAHOM's, or another account). Nothing on the network
+  itself says which app a light was paired with. The box links to
+  [Getting the local key](tuya-local-key.md), and says that a kit with WLED needs no key.
 - **Govee LAN Control** must be switched on for each device in the Govee Home app, or it will
   not answer. Another program on UDP port 4002 (for example Home Assistant's Govee integration)
   takes the replies: stop it while scanning.
@@ -117,6 +121,10 @@ One controller at a time, the wizard plays the **Blink** test the moment the pag
 
 1. a **name** (up to 40 characters, for the page) and a **short name** (up to 12, for buttons),
 2. its **place on the house**, standing in front of it, left to right.
+
+**Tuya lights without a key** can't blink yet: Spotlight asks for the key first, from Tuya
+(the same form) or typed and checked with **Check the key** (the light must answer with it).
+Blink unlocks once the key works.
 
 **"Nothing blinked"** opens a checklist: is the controller powered and working in its own app,
 is LAN Control on (Govee), is this computer on the same network and not a guest network, is a
